@@ -1,7 +1,7 @@
 import { requireUserEmail } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { exercises, sessions } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, isNull } from "drizzle-orm";
 import SessionForm from "@/components/session-form";
 import type { Exercise } from "@/lib/types";
 
@@ -9,7 +9,11 @@ export default async function LogPage() {
   const email = await requireUserEmail();
 
   const [allExercises, recentNames] = await Promise.all([
-    db.select().from(exercises).orderBy(exercises.name),
+    db
+      .select()
+      .from(exercises)
+      .where(or(isNull(exercises.createdBy), eq(exercises.createdBy, email)))
+      .orderBy(exercises.name),
     db
       .selectDistinct({ sessionName: sessions.sessionName })
       .from(sessions)

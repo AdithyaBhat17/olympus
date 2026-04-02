@@ -24,6 +24,7 @@ CREATE TABLE exercises (
   category exercise_category NOT NULL,
   status exercise_status NOT NULL DEFAULT 'YES',
   is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
@@ -59,3 +60,7 @@ CREATE INDEX idx_sessions_session_name ON sessions(session_name);
 CREATE INDEX idx_session_exercises_session_id ON session_exercises(session_id);
 CREATE INDEX idx_session_exercises_exercise_id ON session_exercises(exercise_id);
 CREATE INDEX idx_exercises_category ON exercises(category);
+
+-- Unique constraints to prevent duplicate exercises
+CREATE UNIQUE INDEX idx_exercises_global_unique ON exercises(name, category) WHERE created_by IS NULL;
+CREATE UNIQUE INDEX idx_exercises_user_unique ON exercises(name, category, created_by) WHERE created_by IS NOT NULL;

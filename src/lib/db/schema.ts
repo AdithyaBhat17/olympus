@@ -29,6 +29,7 @@ export const exercises = pgTable("exercises", {
   category: exerciseCategoryEnum("category").notNull(),
   status: exerciseStatusEnum("status").notNull().default("YES"),
   isCustom: boolean("is_custom").notNull().default(false),
+  createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

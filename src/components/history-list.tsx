@@ -94,6 +94,7 @@ export default function HistoryList({
     : sessions;
 
   async function handleDelete(sessionId: string) {
+    if (!window.confirm("Delete this session? This cannot be undone.")) return;
     try {
       await deleteSession(sessionId);
       toast.success("Session deleted");

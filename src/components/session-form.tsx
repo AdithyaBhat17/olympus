@@ -166,7 +166,7 @@ export default function SessionForm({
         date,
         sessionName: sessionName.trim(),
         weekNumber: parseInt(weekNumber),
-        blockNumber,
+        blockNumber: blockNumber as "1" | "2" | "3" | "Deload",
         notes: notes.trim() || null,
         exercises: parsedExercises,
       });

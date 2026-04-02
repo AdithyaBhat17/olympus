@@ -23,6 +23,7 @@ export default async function ProgressPage() {
     db.query.sessions.findMany({
       where: eq(sessions.userId, email),
       orderBy: [desc(sessions.date)],
+      limit: 200,
       with: {
         sessionExercises: {
           with: { exercise: true },
