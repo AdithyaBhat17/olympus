@@ -12,12 +12,23 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Olympus — Forge Your Strength",
   description: "Personal gym session logger",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Olympus",
+  },
+  icons: {
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/icon-180x180.png",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
   themeColor: "#0c0a09",
 };
 
