@@ -17,8 +17,7 @@ export default async function LogPage() {
     db
       .selectDistinct({ sessionName: sessions.sessionName })
       .from(sessions)
-      .where(eq(sessions.userId, email))
-      .orderBy(desc(sessions.date)),
+      .where(eq(sessions.userId, email)),
   ]);
 
   const recentSessionNames = recentNames.map((s) => s.sessionName);
