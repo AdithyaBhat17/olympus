@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Olympus — Forge Your Strength
 
-## Getting Started
+A mobile-first gym session logging app built with Next.js 14, TypeScript, Tailwind CSS, Neon PostgreSQL, and NextAuth.js.
 
-First, run the development server:
+## Setup
+
+### 1. Install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Set up Neon database
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Create a Neon project at [neon.tech](https://neon.tech)
+2. Run the schema and seed scripts in the Neon SQL Editor:
+   - `supabase/schema.sql` — creates tables and indexes
+   - `supabase/seed.sql` — pre-seeds the exercise library
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Set up Google OAuth
 
-## Learn More
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID (Web application)
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+4. Copy the Client ID and Client Secret
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Environment variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+cp .env.local.example .env.local
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Fill in:
 
-## Deploy on Vercel
+```
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+AUTH_SECRET=<run: openssl rand -base64 32>
+AUTH_GOOGLE_ID=<your-google-client-id>
+AUTH_GOOGLE_SECRET=<your-google-client-secret>
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 5. Run
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Tech Stack
+
+- **Framework:** Next.js 14 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Database:** Neon PostgreSQL + Drizzle ORM
+- **Auth:** NextAuth.js v5 (Google OAuth)
+- **Charts:** Recharts
+- **Icons:** Heroicons
+- **Toasts:** Sonner
+
+## Project Structure
+
+```
+src/
+  app/
+    (app)/          # Authenticated app shell (bottom nav)
+      log/          # Session logging form (main feature)
+      history/      # Session history with filters
+      exercises/    # Exercise library
+      progress/     # Charts + working weight tracker
+    login/          # Google sign-in
+    api/auth/       # NextAuth handler
+  components/       # Shared components
+  lib/
+    auth.ts         # NextAuth config
+    actions.ts      # Server actions (save session, etc.)
+    db/             # Drizzle ORM schema + client
+    types.ts        # TypeScript types
+    utils.ts        # Utilities
+supabase/
+  schema.sql        # Database DDL
+  seed.sql          # Exercise library seed data
+```
