@@ -13,12 +13,16 @@ export interface Exercise {
   createdAt: Date;
 }
 
+export interface SessionFormSet {
+  reps: string;
+  weight: string;
+}
+
 export interface SessionFormExercise {
   id: string;
   exercise_id: string;
   exercise_name: string;
-  sets_reps: string;
-  weight: string;
+  sets: SessionFormSet[];
   rpe: string;
   notes: string;
 }

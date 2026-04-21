@@ -41,6 +41,9 @@ CREATE TABLE sessions (
 );
 
 -- Session exercises table
+-- sets/reps/weight remain as aggregate summary fields (max across sets) for
+-- backward compatibility and fast querying. The authoritative per-set data
+-- lives in set_details when present.
 CREATE TABLE session_exercises (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE NOT NULL,
@@ -48,6 +51,7 @@ CREATE TABLE session_exercises (
   sets INTEGER NOT NULL CHECK (sets > 0),
   reps INTEGER NOT NULL CHECK (reps > 0),
   weight NUMERIC(6,2) NOT NULL CHECK (weight >= 0),
+  set_details JSONB,
   rpe NUMERIC(3,1) CHECK (rpe BETWEEN 5 AND 10),
   notes TEXT,
   order_index INTEGER NOT NULL DEFAULT 0

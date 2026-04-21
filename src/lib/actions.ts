@@ -24,9 +24,15 @@ const saveSessionSchema = z.object({
     .array(
       z.object({
         exerciseId: z.string().uuid(),
-        sets: z.number().int().min(1).max(100),
-        reps: z.number().int().min(1).max(1000),
-        weight: z.number().min(0).max(9999),
+        sets: z
+          .array(
+            z.object({
+              reps: z.number().int().min(1).max(1000),
+              weight: z.number().min(0).max(9999),
+            })
+          )
+          .min(1)
+          .max(100),
         rpe: z.number().min(5).max(10).nullable(),
         notes: z.string().max(500).nullable(),
         orderIndex: z.number().int().min(0),
@@ -64,16 +70,21 @@ export async function saveSession(data: z.input<typeof saveSessionSchema>) {
       .returning({ id: sessions.id });
 
     await db.insert(sessionExercises).values(
-      v.exercises.map((ex) => ({
-        sessionId: newSession.id,
-        exerciseId: ex.exerciseId,
-        sets: ex.sets,
-        reps: ex.reps,
-        weight: ex.weight.toFixed(2),
-        rpe: ex.rpe?.toFixed(1) ?? null,
-        notes: ex.notes,
-        orderIndex: ex.orderIndex,
-      }))
+      v.exercises.map((ex) => {
+        const maxReps = Math.max(...ex.sets.map((s) => s.reps));
+        const maxWeight = Math.max(...ex.sets.map((s) => s.weight));
+        return {
+          sessionId: newSession.id,
+          exerciseId: ex.exerciseId,
+          sets: ex.sets.length,
+          reps: maxReps,
+          weight: maxWeight.toFixed(2),
+          setDetails: ex.sets,
+          rpe: ex.rpe?.toFixed(1) ?? null,
+          notes: ex.notes,
+          orderIndex: ex.orderIndex,
+        };
+      })
     );
 
     revalidatePath("/history");
