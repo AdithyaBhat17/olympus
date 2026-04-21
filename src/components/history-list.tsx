@@ -12,6 +12,11 @@ import { deleteSession } from "@/lib/actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
+interface SetDetail {
+  reps: number;
+  weight: number;
+}
+
 interface SessionData {
   id: string;
   date: string;
@@ -24,6 +29,7 @@ interface SessionData {
     sets: number;
     reps: number;
     weight: string;
+    setDetails: SetDetail[] | null;
     rpe: string | null;
     notes: string | null;
     orderIndex: number;
@@ -32,6 +38,30 @@ interface SessionData {
       name: string;
     };
   }>;
+}
+
+function resolveSets(se: SessionData["sessionExercises"][number]): SetDetail[] {
+  if (se.setDetails && se.setDetails.length > 0) return se.setDetails;
+  // Legacy rows: synthesize uniform sets from aggregate columns.
+  return Array.from({ length: se.sets }, () => ({
+    reps: se.reps,
+    weight: parseFloat(se.weight),
+  }));
+}
+
+function isUniform(sets: SetDetail[]): boolean {
+  if (sets.length <= 1) return true;
+  const [first] = sets;
+  return sets.every((s) => s.reps === first.reps && s.weight === first.weight);
+}
+
+function formatSetsShort(sets: SetDetail[]): string {
+  if (sets.length === 0) return "";
+  if (isUniform(sets)) {
+    const [first] = sets;
+    return `${sets.length}x${first.reps} @ ${first.weight}kg`;
+  }
+  return sets.map((s) => `${s.reps}@${s.weight}kg`).join(" · ");
 }
 
 interface HistoryListProps {
@@ -59,16 +89,16 @@ export default function HistoryList({
     );
 
     const header = `[${dateStr}] — ${s.sessionName}\nWeek ${s.weekNumber} | Block ${s.blockNumber}\n`;
-    const colHeader = `Exercise          | Sets x Reps | Weight (kg) | RPE | Notes\n----------------------------------------------------------`;
+    const colHeader = `Exercise          | Sets (reps @ kg)                | RPE | Notes\n------------------------------------------------------------------`;
 
     const rows = sorted
       .map((se) => {
+        const setsList = resolveSets(se);
         const name = se.exercise.name.padEnd(18);
-        const setsReps = `${se.sets} x ${se.reps}`.padEnd(12);
-        const weight = `${parseFloat(se.weight)}`.padEnd(12);
+        const setsStr = formatSetsShort(setsList).padEnd(32);
         const rpe = se.rpe ? `${parseFloat(se.rpe)}`.padEnd(4) : "    ";
         const notes = se.notes || "";
-        return `${name}| ${setsReps}| ${weight}| ${rpe}| ${notes}`;
+        return `${name}| ${setsStr}| ${rpe}| ${notes}`;
       })
       .join("\n");
 
@@ -193,29 +223,57 @@ export default function HistoryList({
                   <div className="mt-4 pt-4 border-t border-stone-800 space-y-3 animate-fade-in">
                     {[...s.sessionExercises]
                       .sort((a, b) => a.orderIndex - b.orderIndex)
-                      .map((se) => (
-                        <div
-                          key={se.id}
-                          className="flex items-baseline justify-between gap-4"
-                        >
-                          <span className="text-sm text-stone-300 truncate min-w-0">
-                            {se.exercise.name}
-                          </span>
-                          <div className="flex items-baseline gap-3 shrink-0 text-sm">
-                            <span className="text-stone-400">
-                              {se.sets}x{se.reps}
-                            </span>
-                            <span className="text-stone-200 font-medium">
-                              {parseFloat(se.weight)}kg
-                            </span>
-                            {se.rpe && (
-                              <span className="text-amber-500/80 text-xs">
-                                @{parseFloat(se.rpe)}
+                      .map((se) => {
+                        const setsList = resolveSets(se);
+                        const uniform = isUniform(setsList);
+                        return (
+                          <div key={se.id} className="space-y-1">
+                            <div className="flex items-baseline justify-between gap-4">
+                              <span className="text-sm text-stone-300 truncate min-w-0">
+                                {se.exercise.name}
                               </span>
+                              {uniform && setsList[0] && (
+                                <div className="flex items-baseline gap-3 shrink-0 text-sm">
+                                  <span className="text-stone-400">
+                                    {setsList.length}x{setsList[0].reps}
+                                  </span>
+                                  <span className="text-stone-200 font-medium">
+                                    {setsList[0].weight}kg
+                                  </span>
+                                  {se.rpe && (
+                                    <span className="text-amber-500/80 text-xs">
+                                      @{parseFloat(se.rpe)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {!uniform && (
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 pl-2 text-xs">
+                                {setsList.map((set, i) => (
+                                  <span key={i} className="text-stone-400">
+                                    <span className="text-stone-600">
+                                      {i + 1}.
+                                    </span>{" "}
+                                    <span className="text-stone-300">
+                                      {set.reps}
+                                    </span>
+                                    <span className="text-stone-600">×</span>
+                                    <span className="text-stone-200 font-medium">
+                                      {set.weight}kg
+                                    </span>
+                                  </span>
+                                ))}
+                                {se.rpe && (
+                                  <span className="text-amber-500/80">
+                                    @{parseFloat(se.rpe)}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                     {s.notes && (
                       <p className="text-xs text-stone-500 mt-3 italic">

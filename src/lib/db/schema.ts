@@ -8,6 +8,7 @@ import {
   date,
   timestamp,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { EXERCISE_CATEGORIES } from "../constants";
@@ -44,6 +45,8 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export type SetDetail = { reps: number; weight: number };
+
 export const sessionExercises = pgTable("session_exercises", {
   id: uuid("id").defaultRandom().primaryKey(),
   sessionId: uuid("session_id")
@@ -55,6 +58,7 @@ export const sessionExercises = pgTable("session_exercises", {
   sets: integer("sets").notNull(),
   reps: integer("reps").notNull(),
   weight: numeric("weight", { precision: 6, scale: 2 }).notNull(),
+  setDetails: jsonb("set_details").$type<SetDetail[]>(),
   rpe: numeric("rpe", { precision: 3, scale: 1 }),
   notes: text("notes"),
   orderIndex: integer("order_index").notNull().default(0),

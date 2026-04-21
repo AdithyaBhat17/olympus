@@ -8,9 +8,13 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import ExerciseSearch from "./exercise-search";
-import { cn, parseSetsReps, todayISO } from "@/lib/utils";
+import { cn, todayISO } from "@/lib/utils";
 import { saveSession, getLastSessionByName } from "@/lib/actions";
-import type { Exercise, SessionFormExercise } from "@/lib/types";
+import type {
+  Exercise,
+  SessionFormExercise,
+  SessionFormSet,
+} from "@/lib/types";
 
 const RPE_VALUES = [
   "5",
@@ -27,10 +31,15 @@ const RPE_VALUES = [
 ];
 const WEEKS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BLOCKS = ["1", "2", "3", "Deload"];
+const DEFAULT_SET_COUNT = 3;
 
 interface SessionFormProps {
   exercises: Exercise[];
   recentSessionNames: string[];
+}
+
+function makeEmptySet(): SessionFormSet {
+  return { reps: "", weight: "" };
 }
 
 function makeEmptyExercise(): SessionFormExercise {
@@ -38,8 +47,7 @@ function makeEmptyExercise(): SessionFormExercise {
     id: crypto.randomUUID(),
     exercise_id: "",
     exercise_name: "",
-    sets_reps: "",
-    weight: "",
+    sets: Array.from({ length: DEFAULT_SET_COUNT }, makeEmptySet),
     rpe: "",
     notes: "",
   };
@@ -73,6 +81,45 @@ export default function SessionForm({
     []
   );
 
+  const updateSet = useCallback(
+    (exerciseId: string, setIndex: number, updates: Partial<SessionFormSet>) => {
+      setFormExercises((prev) =>
+        prev.map((ex) => {
+          if (ex.id !== exerciseId) return ex;
+          const nextSets = ex.sets.map((s, i) =>
+            i === setIndex ? { ...s, ...updates } : s
+          );
+          return { ...ex, sets: nextSets };
+        })
+      );
+    },
+    []
+  );
+
+  const addSet = useCallback((exerciseId: string) => {
+    setFormExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        // Pre-fill new set with the last set's values as a convenience.
+        const last = ex.sets[ex.sets.length - 1];
+        const seed: SessionFormSet = last
+          ? { reps: last.reps, weight: last.weight }
+          : makeEmptySet();
+        return { ...ex, sets: [...ex.sets, seed] };
+      })
+    );
+  }, []);
+
+  const removeSet = useCallback((exerciseId: string, setIndex: number) => {
+    setFormExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        if (ex.sets.length <= 1) return ex;
+        return { ...ex, sets: ex.sets.filter((_, i) => i !== setIndex) };
+      })
+    );
+  }, []);
+
   const removeExercise = useCallback((id: string) => {
     setFormExercises((prev) => {
       if (prev.length <= 1) return prev;
@@ -84,28 +131,40 @@ export default function SessionForm({
     if (!sessionName.trim()) return;
 
     try {
-    const last = await getLastSessionByName(sessionName.trim());
-    if (!last || !last.sessionExercises.length) {
-      toast.error("No previous session found");
-      return;
-    }
+      const last = await getLastSessionByName(sessionName.trim());
+      if (!last || !last.sessionExercises.length) {
+        toast.error("No previous session found");
+        return;
+      }
 
-    setWeekNumber(last.weekNumber.toString());
-    setBlockNumber(last.blockNumber);
+      setWeekNumber(last.weekNumber.toString());
+      setBlockNumber(last.blockNumber);
 
-    setFormExercises(
-      last.sessionExercises.map((se) => ({
-        id: crypto.randomUUID(),
-        exercise_id: se.exerciseId,
-        exercise_name: se.exercise.name,
-        sets_reps: `${se.sets}x${se.reps}`,
-        weight: parseFloat(se.weight).toString(),
-        rpe: se.rpe ? parseFloat(se.rpe).toString() : "",
-        notes: se.notes || "",
-      }))
-    );
+      setFormExercises(
+        last.sessionExercises.map((se) => {
+          const fromDetails = se.setDetails?.map((s) => ({
+            reps: s.reps.toString(),
+            weight: s.weight.toString(),
+          }));
+          const sets: SessionFormSet[] =
+            fromDetails && fromDetails.length > 0
+              ? fromDetails
+              : Array.from({ length: se.sets }, () => ({
+                  reps: se.reps.toString(),
+                  weight: parseFloat(se.weight).toString(),
+                }));
+          return {
+            id: crypto.randomUUID(),
+            exercise_id: se.exerciseId,
+            exercise_name: se.exercise.name,
+            sets,
+            rpe: se.rpe ? parseFloat(se.rpe).toString() : "",
+            notes: se.notes || "",
+          };
+        })
+      );
 
-    toast.success(`Filled from last "${last.sessionName}"`);
+      toast.success(`Filled from last "${last.sessionName}"`);
     } catch {
       toast.error("Failed to load previous session");
     }
@@ -117,46 +176,53 @@ export default function SessionForm({
       return;
     }
 
-    const validExercises = formExercises.filter(
-      (ex) => ex.exercise_id && ex.sets_reps && ex.weight
-    );
-
-    if (validExercises.length === 0) {
-      toast.error("Add at least one exercise");
-      return;
-    }
-
     const parsedExercises: Array<{
       exerciseId: string;
-      sets: number;
-      reps: number;
-      weight: number;
+      sets: Array<{ reps: number; weight: number }>;
       rpe: number | null;
       notes: string | null;
       orderIndex: number;
     }> = [];
 
-    for (let i = 0; i < validExercises.length; i++) {
-      const ex = validExercises[i];
-      const parsed = parseSetsReps(ex.sets_reps);
-      if (!parsed) {
-        toast.error(`Invalid sets x reps: "${ex.sets_reps}" — use format 4x8`);
-        return;
+    for (let i = 0; i < formExercises.length; i++) {
+      const ex = formExercises[i];
+      if (!ex.exercise_id) continue;
+
+      const validSets: Array<{ reps: number; weight: number }> = [];
+      for (let j = 0; j < ex.sets.length; j++) {
+        const s = ex.sets[j];
+        if (!s.reps.trim() && !s.weight.trim()) continue; // skip blank rows
+        const reps = parseInt(s.reps, 10);
+        const weight = parseFloat(s.weight);
+        if (isNaN(reps) || reps < 1) {
+          toast.error(
+            `Invalid reps for ${ex.exercise_name || "exercise"} (set ${j + 1})`
+          );
+          return;
+        }
+        if (isNaN(weight) || weight < 0) {
+          toast.error(
+            `Invalid weight for ${ex.exercise_name || "exercise"} (set ${j + 1})`
+          );
+          return;
+        }
+        validSets.push({ reps, weight });
       }
-      const weight = parseFloat(ex.weight);
-      if (isNaN(weight) || weight < 0) {
-        toast.error(`Invalid weight for ${ex.exercise_name}`);
-        return;
-      }
+
+      if (validSets.length === 0) continue;
+
       parsedExercises.push({
         exerciseId: ex.exercise_id,
-        sets: parsed.sets,
-        reps: parsed.reps,
-        weight,
+        sets: validSets,
         rpe: ex.rpe ? parseFloat(ex.rpe) : null,
         notes: ex.notes.trim() || null,
-        orderIndex: i,
+        orderIndex: parsedExercises.length,
       });
+    }
+
+    if (parsedExercises.length === 0) {
+      toast.error("Add at least one exercise with sets");
+      return;
     }
 
     setSaving(true);
@@ -302,57 +368,97 @@ export default function SessionForm({
                 )}
               </div>
 
-              {/* Sets × Reps, Weight, RPE */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[10px] font-semibold text-stone-600 uppercase mb-1 block">
-                    Sets × Reps
-                  </label>
-                  <input
-                    type="text"
-                    value={ex.sets_reps}
-                    onChange={(e) =>
-                      updateExercise(ex.id, { sets_reps: e.target.value })
-                    }
-                    placeholder="4x8"
-                    className="input-base text-sm text-center"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-stone-600 uppercase mb-1 block">
+              {/* Per-set rows */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-[2rem_1fr_1fr_1.75rem] gap-2 items-center">
+                  <span className="text-[10px] font-semibold text-stone-600 uppercase">
+                    Set
+                  </span>
+                  <span className="text-[10px] font-semibold text-stone-600 uppercase text-center">
+                    Reps
+                  </span>
+                  <span className="text-[10px] font-semibold text-stone-600 uppercase text-center">
                     Weight (kg)
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.5"
-                    value={ex.weight}
-                    onChange={(e) =>
-                      updateExercise(ex.id, { weight: e.target.value })
-                    }
-                    placeholder="0"
-                    className="input-base text-sm text-center"
-                  />
+                  </span>
+                  <span />
                 </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-stone-600 uppercase mb-1 block">
-                    RPE
-                  </label>
-                  <select
-                    value={ex.rpe}
-                    onChange={(e) =>
-                      updateExercise(ex.id, { rpe: e.target.value })
-                    }
-                    className="select-base text-sm"
+
+                {ex.sets.map((s, setIdx) => (
+                  <div
+                    key={setIdx}
+                    className="grid grid-cols-[2rem_1fr_1fr_1.75rem] gap-2 items-center"
                   >
-                    <option value="">—</option>
-                    {RPE_VALUES.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    <span className="text-xs font-semibold text-stone-500 text-center">
+                      {setIdx + 1}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={s.reps}
+                      onChange={(e) =>
+                        updateSet(ex.id, setIdx, { reps: e.target.value })
+                      }
+                      placeholder="8"
+                      className="input-base text-sm text-center"
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step={0.5}
+                      value={s.weight}
+                      onChange={(e) =>
+                        updateSet(ex.id, setIdx, { weight: e.target.value })
+                      }
+                      placeholder="0"
+                      className="input-base text-sm text-center"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSet(ex.id, setIdx)}
+                      disabled={ex.sets.length <= 1}
+                      className={cn(
+                        "p-1 text-stone-600 hover:text-red-400 transition-colors",
+                        ex.sets.length <= 1 && "opacity-30 cursor-not-allowed"
+                      )}
+                      aria-label={`Remove set ${setIdx + 1}`}
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => addSet(ex.id)}
+                  className="btn-secondary flex items-center justify-center gap-1.5 text-xs py-1.5 mt-1"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Add Set
+                </button>
+              </div>
+
+              {/* RPE */}
+              <div className="mt-3">
+                <label className="text-[10px] font-semibold text-stone-600 uppercase mb-1 block">
+                  RPE
+                </label>
+                <select
+                  value={ex.rpe}
+                  onChange={(e) =>
+                    updateExercise(ex.id, { rpe: e.target.value })
+                  }
+                  className="select-base text-sm"
+                >
+                  <option value="">—</option>
+                  {RPE_VALUES.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Notes */}
