@@ -8,4 +8,5 @@ export const EXERCISE_CATEGORIES = [
   "Arms",
   "Core",
   "Calves",
+  "Cardio",
 ] as const;

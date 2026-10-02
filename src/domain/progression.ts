@@ -46,7 +46,13 @@ function sessionHit(
 export function progressionStatus(
   ex: Pick<DomainExercise, "name" | "loadMode" | "bodyRegion"> & { isCompound?: boolean },
   history: ExerciseSessionLog[],
-  opts: { repTop?: number; targetRpe?: number; sleepGateFails?: boolean } = {}
+  opts: {
+    repTop?: number;
+    targetRpe?: number;
+    sleepGateFails?: boolean;
+    /** No sleep logged today: an earned bump has to wait for an answer. */
+    sleepUnknown?: boolean;
+  } = {}
 ): ProgressionStatus {
   // Without a planned range: lower-body compounds top out at 8, everything else 10.
   const repTop = opts.repTop ?? (ex.isCompound && ex.bodyRegion === "lower" ? 8 : 10);
@@ -77,7 +83,7 @@ export function progressionStatus(
     if (hits >= SESSIONS_TO_PROGRESS) break;
   }
 
-  const ready = hits >= SESSIONS_TO_PROGRESS && !opts.sleepGateFails;
+  const ready = hits >= SESSIONS_TO_PROGRESS && !opts.sleepGateFails && !opts.sleepUnknown;
   const nextKg = roundKg(
     ex.loadMode === "COUNTERWEIGHT"
       ? Math.max(0, workingKg - increment)
@@ -86,7 +92,9 @@ export function progressionStatus(
   const remaining = SESSIONS_TO_PROGRESS - hits;
 
   let summary: string;
-  if (opts.sleepGateFails && hits >= SESSIONS_TO_PROGRESS) {
+  if (opts.sleepUnknown && !opts.sleepGateFails && hits >= SESSIONS_TO_PROGRESS) {
+    summary = `Earned ${formatKg(nextKg)} kg, but today's sleep isn't logged — ask before bumping.`;
+  } else if (opts.sleepGateFails && hits >= SESSIONS_TO_PROGRESS) {
     summary = `Ready for ${formatKg(nextKg)} kg but held — sleep under the gate today.`;
   } else if (ready) {
     summary = `Top of range at RPE ${targetRpe} in ${hits} of ${SESSIONS_TO_PROGRESS} sessions. Goes to ${formatKg(nextKg)} kg.`;
@@ -127,6 +135,7 @@ export function underloadNudge(
   planned: PlanSet | null,
   lastTopKg: number | null
 ): UnderloadNudge | null {
+  if (ex.loadMode === "TIME") return null;
   const target = planned?.openKg ?? lastTopKg;
   if (target == null) return null;
   const easierThanTarget = isHarder(ex.loadMode, target, logged.weight);

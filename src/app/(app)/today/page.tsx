@@ -58,15 +58,23 @@ export default async function TodayPage() {
       return {
         key: it.id,
         name: ex?.name ?? "Unknown exercise",
-        load: open != null ? formatLoad(mode, open) : null,
+        load:
+          mode === "TIME"
+            ? `${it.sets.reduce((a, s) => a + s.reps[1], 0)} min`
+            : open != null
+              ? formatLoad(mode, open)
+              : null,
         up,
         straps: it.straps,
       };
     });
-    const totalSec = showPlan.items.reduce(
-      (acc, it) => acc + it.sets.length * (it.restSec + SET_WORK_SEC),
-      0
-    );
+    const totalSec = showPlan.items.reduce((acc, it) => {
+      // Cardio blocks are their minutes; lifting sets are work + rest.
+      if (byId.get(it.exerciseId)?.loadMode === "TIME") {
+        return acc + it.sets.reduce((a, s) => a + s.reps[1] * 60, 0);
+      }
+      return acc + it.sets.length * (it.restSec + SET_WORK_SEC);
+    }, 0);
     data = {
       sessionType: showPlan.sessionType,
       rotation: ROTATION,

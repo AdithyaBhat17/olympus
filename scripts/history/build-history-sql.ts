@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  flagsForSet,
+  annotateSets,
   topSet,
   trueKg,
   type DomainExercise,
@@ -106,7 +106,7 @@ for (const s of sessions) {
   s.exercises.forEach((ex, order) => {
     const load = loadOf(ex.name);
     const prevTop = lastTop.get(ex.name) ?? null;
-    const sets: SetLogEntry[] = ex.sets.map(([kg, reps], i) => {
+    const raw: SetLogEntry[] = ex.sets.map(([kg, reps], i) => {
       const weight = ex.plates ? trueKg(load, kg) : kg;
       const isLast = i === ex.sets.length - 1;
       return {
@@ -116,11 +116,15 @@ for (const s of sessions) {
         // The log records one RPE per exercise: it belongs to the final set.
         rpe: isLast ? ex.rpe ?? null : null,
         type: "working",
-        flags: flagsForSet(load, { weight, type: "working" }, prevTop, {
-          blockedOverride: !!ex.blockedOverride,
-        }),
       };
     });
+    // Same rules as a live log: vs. last session's top, plus easy openers.
+    const sets = annotateSets(
+      { ...load, name: ex.name, isCompound: /\bbarbell\b|deadlift/i.test(ex.name) },
+      raw,
+      prevTop,
+      { blockedOverride: !!ex.blockedOverride }
+    );
     const top = topSet(load.loadMode, sets);
     if (top) lastTop.set(ex.name, top.weight);
 

@@ -26,6 +26,7 @@ export function toDomainExercise(row: ExerciseRow): DomainExercise {
       row.carriageKgPerSide != null ? parseFloat(row.carriageKgPerSide) : null,
     isCompound: row.isCompound,
     bodyRegion: row.bodyRegion ?? null,
+    equipment: row.equipment,
     blockedReason: row.blockedReason,
     substituteIds: row.substituteIds ?? [],
   };
@@ -60,6 +61,15 @@ export async function getConstraints(userId: string): Promise<DomainConstraint[]
   }));
 }
 
+/**
+ * The one id Claude sees for an exercise everywhere (working weights, flags,
+ * sessions, search): the slug when it has one, else the uuid. Every payload
+ * that carries it also carries `exerciseUuid`, so joins work either way.
+ */
+export function exerciseRef(ex: { id: string; slug?: string | null }): string {
+  return ex.slug ?? ex.id;
+}
+
 /** Resolve a uuid, slug or exact (case-insensitive) name to an exercise. */
 export function resolveRef(
   all: DomainExercise[],
@@ -83,6 +93,9 @@ export async function resolveExerciseRef(
 }
 
 export interface ExerciseSearchHit {
+  /** Pass this as exerciseId: the slug when there is one, else the uuid. */
+  exerciseId: string;
+  exerciseUuid: string;
   id: string;
   slug: string | null;
   name: string;
@@ -102,6 +115,8 @@ export function describeExercise(
 ): ExerciseSearchHit {
   const reason = blockedReason(ex, cons);
   return {
+    exerciseId: exerciseRef(ex),
+    exerciseUuid: ex.id,
     id: ex.id,
     slug: ex.slug ?? null,
     name: ex.name,

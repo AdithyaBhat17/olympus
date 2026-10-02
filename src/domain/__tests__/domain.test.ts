@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  annotateSets,
+  blockedReason,
   checkWeightJump,
+  gateMessage,
   flagsForSet,
   holdMessage,
   matchesPattern,
@@ -547,5 +550,136 @@ describe("markdown export", () => {
     expect(sessionFileName({ date: "2026-10-02", sessionType: "B", title: "x" })).toBe(
       "2026-10-02 Session B.md"
     );
+  });
+});
+
+// --- Fixes from the first week of real use ------------------------------------
+
+const sets = (rows: Array<[number, number, number?]>) =>
+  rows.map(([weight, reps, rpe]) => ({ weight, reps, rpe: rpe ?? null, type: "working" as const }));
+const underloadedIdx = (xs: { flags?: string[] }[]) =>
+  xs.flatMap((x, i) => (x.flags?.includes("underloaded") ? [i] : []));
+
+describe("annotateSets — underloaded openers in the session itself", () => {
+  it("flags the 12/08 openers: pull-ups 54×10, lat pulldown 40×13, preacher 23×12", () => {
+    expect(underloadedIdx(annotateSets(EX.assistedPullup, sets([[54, 10], [47, 6], [47, 5, 8]]), null))).toEqual([0]);
+    expect(underloadedIdx(annotateSets(EX.latPulldown, sets([[40, 13], [47, 8], [47, 8, 8]]), null))).toEqual([0]);
+    const preacher = ex({ id: "preacher", name: "Preacher Curl (rotating handles)" });
+    expect(underloadedIdx(annotateSets(preacher, sets([[23, 12], [30, 6], [30, 5, 9]]), null))).toEqual([0]);
+  });
+  it("leaves barbell ramp-ups alone (deadlift 60/70/80)", () => {
+    const dl = { ...EX.deadlift, equipment: "barbell" };
+    expect(underloadedIdx(annotateSets(dl, sets([[60, 12], [70, 10], [80, 5, 8]]), null))).toEqual([]);
+  });
+  it("doesn't flag a normal pyramid (17/08 shoulder press 27.5×12 → 35×10)", () => {
+    expect(underloadedIdx(annotateSets(EX.shoulderPress, sets([[27.5, 12], [35, 10], [35, 8]]), 20))).toEqual([]);
+  });
+  it("flags every set when the hardest set was RPE 6 (10/08 shoulder press)", () => {
+    expect(underloadedIdx(annotateSets(EX.shoulderPress, sets([[20, 15], [20, 15], [20, 12, 6]]), null))).toEqual([0, 1, 2]);
+  });
+  it("keeps blocked_override and marks PRs against the previous session", () => {
+    const out = annotateSets(EX.deadlift, [{ weight: 85, reps: 5, type: "working", flags: ["blocked_override"] }], 80);
+    expect(out[0].flags).toEqual(["top_set_pr", "blocked_override"]);
+  });
+  it("never calls an underloaded opener a PR (17/08 lateral raise 27.5×15 → 39×9)", () => {
+    const lat = ex({ id: "lat-raise", name: "Machine Lateral Raise" });
+    const out = annotateSets(lat, sets([[27.5, 15], [32, 12], [39, 9]]), 25);
+    expect(out.map((s) => s.flags)).toEqual([["underloaded"], ["underloaded"], ["top_set_pr"]]);
+  });
+});
+
+describe("recovery gate", () => {
+  it("is unknown — not clear — when today's sleep isn't logged", () => {
+    const s = summarizeRecovery([]);
+    expect(s.gate).toBe("unknown");
+    expect(s.progressionOnHold).toBe(false);
+    expect(gateMessage(s)).toMatch(/ask/);
+  });
+  it("is clear or hold when it is logged", () => {
+    const d = (sleepMin: number) => [{ date: "d", sleepMin, proteinG: null, waterMl: null }];
+    expect(summarizeRecovery(d(420)).gate).toBe("clear");
+    expect(summarizeRecovery(d(300)).gate).toBe("hold");
+  });
+  it("V4 warns on a bump when sleep isn't logged", () => {
+    const r = validatePlan(
+      plan([{ exerciseId: EX.deadlift.id, order: 1, restSec: 180, sets: [working(85)] }], {
+        recoveryGate: { minSleepH: 6, onFail: "hold_progression" },
+      }),
+      ctx({ sleepMinToday: null })
+    );
+    expect(codes(r).warnings).toContain("V4");
+    expect(r.warnings.find((w) => w.code === "V4")?.message).toMatch(/isn't logged/);
+  });
+  it("progression waits on unknown sleep", () => {
+    const history = [
+      { date: "b", sets: [{ weight: 35, reps: 10, rpe: 8 }] },
+      { date: "a", sets: [{ weight: 35, reps: 10, rpe: 8 }] },
+    ];
+    const p = progressionStatus(EX.shoulderPress, history, { sleepUnknown: true });
+    expect(p.ready).toBe(false);
+    expect(p.summary).toMatch(/ask before bumping/);
+  });
+});
+
+describe("lumbar constraint covers deadlifts in any session", () => {
+  const lumbar: DomainConstraint = {
+    region: "Lower back · lumbar irritation",
+    rule: "No loaded spinal hinging in any session until symptom-free",
+    blockedPatterns: ["deadlift", "rdl", "good morning", "bent over row", "pendlay row", "back extension", "hyperextension"],
+  };
+  it("blocks barbell and RDL variants, not leg curls or hip thrusts", () => {
+    const blocked = (name: string) => blockedReason(ex({ id: name, name }), [lumbar]) != null;
+    expect(blocked("Barbell Deadlift")).toBe(true);
+    expect(blocked("Conventional Deadlift")).toBe(true);
+    expect(blocked("DB Romanian Deadlift")).toBe(true);
+    expect(blocked("Barbell Bent Over Row")).toBe(true);
+    expect(blocked("Pendlay Row")).toBe(true);
+    expect(blocked("Sumo Deadlift")).toBe(true);
+    expect(blocked("Leg Curl (lying)")).toBe(false);
+    expect(blocked("Seated Cable Row")).toBe(false);
+    expect(blocked("Overhead Tricep extension - Dumbbell")).toBe(false);
+    expect(blocked("Hip Thrust (barbell)")).toBe(false);
+  });
+});
+
+describe("cardio (TIME) exercises", () => {
+  const walk = ex({
+    id: "incline-treadmill-walk",
+    name: "Incline Treadmill Walk",
+    category: "Cardio",
+    loadMode: "TIME",
+    bodyRegion: "lower",
+  });
+  it("validates a Zone 2 plan with no load warnings", () => {
+    const c = ctx();
+    c.exercises.set(walk.id, walk);
+    const r = validatePlan(
+      plan([
+        {
+          exerciseId: walk.id,
+          order: 1,
+          restSec: 0,
+          cues: ["Flat 5 min", "HR 130–140, incline is the only lever"],
+          sets: [
+            { type: "warmup", reps: [5, 5] },
+            { type: "working", reps: [35, 35] },
+          ],
+        },
+      ], { sessionType: "Cardio", recoveryGate: { minSleepH: 6, onFail: "hold_progression" } }),
+      { ...c, sleepMinToday: null }
+    );
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+  it("never flags minutes, and exports them as minutes", () => {
+    const out = annotateSets(walk, [{ weight: 0, reps: 35, type: "working", avgHr: 134 }], null);
+    expect(out[0].flags).toEqual([]);
+    const md = renderSessionMarkdown({
+      date: "2026-10-02",
+      sessionType: "Cardio",
+      title: "Zone 2",
+      exercises: [{ name: walk.name, loadMode: "TIME", sets: out }],
+    });
+    expect(md).toContain("| Incline Treadmill Walk | 35 min | avg HR 134 |");
   });
 });

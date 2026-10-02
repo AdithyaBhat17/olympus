@@ -3,7 +3,11 @@
  * Nothing in src/domain may import from the DB, Next.js or React.
  */
 
-export type LoadMode = "TOTAL" | "PER_SIDE" | "COUNTERWEIGHT";
+/**
+ * TIME = cardio: a set is a block of minutes. `reps` holds the minutes and
+ * weight is 0; speed, incline and HR targets live in the plan item's cues.
+ */
+export type LoadMode = "TOTAL" | "PER_SIDE" | "COUNTERWEIGHT" | "TIME";
 export type ExStatus = "YES" | "SUB" | "NO";
 export type PlanStatus = "DRAFT" | "READY" | "IN_PROGRESS" | "DONE" | "SKIPPED";
 export type SessionType = "A" | "B" | "C" | "Cardio" | (string & {});
@@ -33,6 +37,8 @@ export interface SetLogEntry {
   type?: "warmup" | "working";
   flags?: SetFlag[];
   doneAt?: string;
+  /** Cardio only: average heart rate for the block. */
+  avgHr?: number | null;
 }
 
 export type SetFlag = "underloaded" | "top_set_pr" | "blocked_override";
@@ -47,6 +53,7 @@ export interface DomainExercise {
   carriageKgPerSide: number | null;
   isCompound: boolean;
   bodyRegion: "upper" | "lower" | null;
+  equipment?: string | null;
   blockedReason?: string | null;
   substituteIds?: string[];
 }
@@ -99,6 +106,8 @@ export interface Issue {
   level: "error" | "warning";
   message: string;
   exerciseId?: string;
+  /** Set by the server when exerciseId is a slug. */
+  exerciseUuid?: string;
 }
 
 export interface ValidationContext {

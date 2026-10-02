@@ -30,6 +30,10 @@ export function sessionFileName(s: Pick<ExportSession, "date" | "sessionType" | 
 }
 
 function weightCell(ex: ExportExercise): string {
+  if (ex.loadMode === "TIME") {
+    const hr = ex.sets.map((s) => s.avgHr).filter((h): h is number => h != null);
+    return hr.length ? `avg HR ${Math.round(hr.reduce((a, b) => a + b, 0) / hr.length)}` : "—";
+  }
   const working = ex.sets.filter((s) => s.type !== "warmup");
   const pool = working.length ? working : ex.sets;
   const distinct = Array.from(new Set(pool.map((s) => s.weight)));
@@ -60,7 +64,11 @@ export function renderSessionMarkdown(s: ExportSession): string {
   const rows = s.exercises.map((ex) => {
     const working = ex.sets.filter((x) => x.type !== "warmup");
     const pool = working.length ? working : ex.sets;
-    return `| ${ex.name} | ${pool.map((x) => x.reps).join(", ")} | ${weightCell(ex)} | ${rpeCell(pool)} | ${notesCell(ex)} |`;
+    const reps =
+      ex.loadMode === "TIME"
+        ? pool.map((x) => `${x.reps} min`).join(", ")
+        : pool.map((x) => x.reps).join(", ");
+    return `| ${ex.name} | ${reps} | ${weightCell(ex)} | ${rpeCell(pool)} | ${notesCell(ex)} |`;
   });
   const lines = [
     `## ${heading}`,
