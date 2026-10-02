@@ -49,7 +49,7 @@ export default function LoginPage() {
 
         {/* Sign in */}
         <button
-          onClick={() => signIn("google", { callbackUrl: "/log" })}
+          onClick={() => signIn("google", { callbackUrl: "/today" })}
           className="flex items-center gap-3 bg-stone-900 hover:bg-stone-800
             border border-stone-800 hover:border-stone-700
             text-stone-200 px-8 py-4 rounded-2xl text-base font-medium

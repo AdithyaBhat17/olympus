@@ -8,9 +8,18 @@
   }
 
   body {
-    @apply bg-stone-950 text-stone-50;
+    @apply bg-bg text-fg text-[15px];
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid #7fb2ff;
+    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
@@ -21,7 +30,7 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-stone-700 rounded-full;
+    @apply bg-line rounded-full;
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -32,40 +41,74 @@
   input[type="number"] {
     -moz-appearance: textfield;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
+  /* Section label: 13px, semibold, tracked caps, muted. */
+  .eyebrow {
+    @apply text-[13px] font-semibold uppercase tracking-[0.06em] text-muted;
+  }
+
+  .num {
+    @apply font-display font-semibold leading-none tabular-nums;
+  }
+
+  .card {
+    @apply bg-surface rounded-2xl p-4;
+  }
+
   .input-base {
-    @apply w-full bg-stone-900 border border-stone-800 text-stone-50 rounded-xl px-4 py-3
-    focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/60
-    placeholder:text-stone-600 transition-all text-[16px];
+    @apply w-full bg-surface border border-line text-fg rounded-xl px-4 py-3
+    focus:outline-none focus:border-accent
+    placeholder:text-faint transition-colors text-[16px];
   }
 
   .select-base {
-    @apply w-full bg-stone-900 border border-stone-800 text-stone-50 rounded-xl px-4 py-3
-    focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/60
-    transition-all text-[16px] appearance-none cursor-pointer
-    bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2378716c%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.646%206.646a.5.5%200%200%201%20.708%200L8%209.293l2.646-2.647a.5.5%200%200%201%20.708.708l-3%203a.5.5%200%200%201-.708%200l-3-3a.5.5%200%200%201%200-.708z%22%2F%3E%3C%2Fsvg%3E')]
+    @apply w-full bg-surface border border-line text-fg rounded-xl px-4 py-3
+    focus:outline-none focus:border-accent
+    transition-colors text-[16px] appearance-none cursor-pointer
+    bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%23A3A7AE%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.646%206.646a.5.5%200%200%201%20.708%200L8%209.293l2.646-2.647a.5.5%200%200%201%20.708.708l-3%203a.5.5%200%200%201-.708%200l-3-3a.5.5%200%200%201%200-.708z%22%2F%3E%3C%2Fsvg%3E')]
     bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
   }
 
   .btn-primary {
-    @apply w-full bg-amber-500 hover:bg-amber-400 active:bg-amber-600
-    text-stone-950 font-semibold py-4 px-6 rounded-xl
-    transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+    @apply w-full h-14 rounded-[14px] bg-accent text-accent-ink font-semibold text-[17px]
+    flex items-center justify-center gap-2
+    transition active:scale-[0.98] hover:bg-accent-hover
+    disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply w-full bg-stone-900 hover:bg-stone-800 active:bg-stone-800
-    border border-stone-700 text-stone-300 font-medium py-3 px-4 rounded-xl
-    transition-all active:scale-[0.98];
+    @apply w-full h-12 rounded-xl bg-surface border border-line text-fg text-sm
+    flex items-center justify-center gap-2
+    transition active:scale-[0.98] hover:bg-surface-2
+    disabled:opacity-50 disabled:pointer-events-none;
   }
 
-  .card {
-    @apply bg-stone-900/60 border border-stone-800/80 rounded-2xl p-4;
+  .btn-ghost {
+    @apply h-11 rounded-[10px] border border-line bg-transparent text-fg text-sm
+    flex items-center justify-center gap-2 transition hover:bg-surface-2 active:scale-[0.98];
+  }
+
+  .chip {
+    @apply text-xs rounded-md px-1.5 py-px border;
   }
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
   }
 }

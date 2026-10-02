@@ -2,10 +2,10 @@
   "name": "Olympus — Forge Your Strength",
   "short_name": "Olympus",
   "description": "Personal gym session logger",
-  "start_url": "/log",
+  "start_url": "/today",
   "display": "standalone",
-  "background_color": "#0c0a09",
-  "theme_color": "#0c0a09",
+  "background_color": "#0E0F11",
+  "theme_color": "#0E0F11",
   "orientation": "portrait",
   "icons": [
     {

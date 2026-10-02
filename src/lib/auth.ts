@@ -15,7 +15,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (isAuthRoute) return true;
 
       if (isOnLogin) {
-        if (isLoggedIn) return Response.redirect(new URL("/log", nextUrl));
+        if (isLoggedIn) return Response.redirect(new URL("/today", nextUrl));
         return true;
       }
 
