@@ -42,7 +42,7 @@ export interface CheckInPatch {
 
 /**
  * Merge a partial check-in. Only fields present in `patch` change; each
- * changed field records where it came from.
+ * changed field records where it came from. `patch` may be mutated.
  */
 export async function upsertCheckIn(
   userId: string,
@@ -52,6 +52,15 @@ export async function upsertCheckIn(
 ): Promise<CheckInRow> {
   const existing = await getCheckIn(userId, date);
   const sources = { ...(existing?.sources ?? {}) };
+
+  // Integrations (Whoop, Apple Health) never overwrite a value the athlete
+  // typed in the app or told Claude for that day. People win over sensors.
+  if (source === "whoop" || source === "apple_health") {
+    const human = (s: CheckInSource | undefined) => s === "manual" || s === "claude";
+    if (human(sources.sleep)) delete patch.sleepMin;
+    if (human(sources.protein)) delete patch.proteinG;
+    if (human(sources.water)) delete patch.waterMl;
+  }
   const next = {
     sleepMin: existing?.sleepMin ?? null,
     proteinG: existing?.proteinG ?? null,

@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import BottomNav from "@/components/bottom-nav";
+import { syncWhoopIfStale } from "@/server/integrations/whoop";
 
 export default async function AppLayout({
   children,
@@ -12,6 +14,12 @@ export default async function AppLayout({
 
   if (!session?.user) {
     redirect("/login");
+  }
+
+  // Keep last night's Whoop sleep fresh without slowing the page down.
+  const email = session.user.email;
+  if (email) {
+    after(() => syncWhoopIfStale(email).catch((err) => console.error("whoop sync", err)));
   }
 
   return (

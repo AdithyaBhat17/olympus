@@ -44,11 +44,12 @@ function sessionHit(
  * `history` is newest first.
  */
 export function progressionStatus(
-  ex: Pick<DomainExercise, "name" | "loadMode" | "bodyRegion">,
+  ex: Pick<DomainExercise, "name" | "loadMode" | "bodyRegion"> & { isCompound?: boolean },
   history: ExerciseSessionLog[],
   opts: { repTop?: number; targetRpe?: number; sleepGateFails?: boolean } = {}
 ): ProgressionStatus {
-  const repTop = opts.repTop ?? 10;
+  // Without a planned range: lower-body compounds top out at 8, everything else 10.
+  const repTop = opts.repTop ?? (ex.isCompound && ex.bodyRegion === "lower" ? 8 : 10);
   const targetRpe = opts.targetRpe ?? 8;
   const increment = incrementFor(ex);
   const latest = history[0] ? topSet(ex.loadMode, history[0].sets) : null;

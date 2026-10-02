@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 function GoogleIcon() {
@@ -25,42 +27,50 @@ function GoogleIcon() {
   );
 }
 
+/** Only same-origin paths — never bounce a sign-in to another site. */
+function safeCallback(raw: string | null): string {
+  if (!raw) return "/today";
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.origin !== window.location.origin) return "/today";
+    return `${u.pathname}${u.search}` || "/today";
+  } catch {
+    return "/today";
+  }
+}
+
+function SignIn() {
+  const params = useSearchParams();
+  const isConnect = (params.get("callbackUrl") ?? "").includes("/oauth/authorize");
+  return (
+    <button
+      onClick={() => signIn("google", { callbackUrl: safeCallback(params.get("callbackUrl")) })}
+      className="flex items-center justify-center gap-3 w-full h-14 rounded-[14px] bg-surface hover:bg-surface-2 border border-line text-fg text-base font-medium transition active:scale-[0.98]"
+    >
+      <GoogleIcon />
+      {isConnect ? "Sign in to connect Claude" : "Sign in with Google"}
+    </button>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
-      {/* Atmospheric glow */}
-      <div className="absolute inset-0 bg-gradient-to-b from-amber-950/20 via-transparent to-transparent" />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/[0.04] rounded-full blur-[100px]" />
-
-      <div className="relative z-10 flex flex-col items-center">
-        {/* Logo */}
-        <div className="text-center mb-16">
-          <h1 className="text-6xl sm:text-7xl font-black tracking-tight text-stone-50 leading-none">
-            OLYMPUS
-          </h1>
-          <div className="mt-4 flex items-center gap-3 justify-center">
-            <div className="h-px w-8 bg-gradient-to-r from-transparent to-amber-500/60" />
-            <p className="text-stone-500 tracking-[0.3em] uppercase text-[11px] font-medium">
-              Forge Your Strength
-            </p>
-            <div className="h-px w-8 bg-gradient-to-l from-transparent to-amber-500/60" />
-          </div>
-        </div>
-
-        {/* Sign in */}
-        <button
-          onClick={() => signIn("google", { callbackUrl: "/today" })}
-          className="flex items-center gap-3 bg-stone-900 hover:bg-stone-800
-            border border-stone-800 hover:border-stone-700
-            text-stone-200 px-8 py-4 rounded-2xl text-base font-medium
-            transition-all active:scale-[0.97] shadow-lg shadow-black/20"
-        >
-          <GoogleIcon />
-          Sign in with Google
-        </button>
-
-        <p className="mt-8 text-stone-700 text-xs">Personal training log</p>
+    <main className="min-h-screen flex flex-col justify-end px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-16 bg-bg">
+      <div className="flex-1 flex flex-col justify-center gap-3">
+        <span className="eyebrow">LiftLog</span>
+        <h1 className="font-display font-bold text-[72px] leading-[0.9] tracking-tight">
+          Olympus
+        </h1>
+        <p className="text-muted text-base max-w-[28ch] leading-snug">
+          Your training log, programmed by your PT. Plans land on Today; sets go back to Claude.
+        </p>
       </div>
-    </div>
+      <div className="flex flex-col gap-4 w-full max-w-sm mx-auto">
+        <Suspense fallback={<div className="h-14" />}>
+          <SignIn />
+        </Suspense>
+        <p className="text-faint text-xs text-center">Personal training log</p>
+      </div>
+    </main>
   );
 }

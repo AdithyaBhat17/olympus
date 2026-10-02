@@ -236,7 +236,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     date: session.date,
     status: session.status,
     sessionType: session.sessionType,
-    title: plan?.title ?? session.sessionName,
+    title: plan?.title ?? session.sessionName.replace(/^Session \S+ · /, ""),
     notes: session.notes,
     startedAt: session.startedAt?.toISOString() ?? null,
     finishedAt: session.finishedAt?.toISOString() ?? null,

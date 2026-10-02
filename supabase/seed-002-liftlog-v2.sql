@@ -4,7 +4,7 @@
 -- Constraints (global: user_id NULL) ---------------------------------------------
 INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES
   (NULL, 'Left wrist · TFCC', 'No loaded supination or pronation on a fixed straight bar',
-    ARRAY['straight-bar curl', 'reverse barbell curl', 'straight-bar pushdown',
+    ARRAY['straight-bar curl', 'barbell curl', 'reverse barbell curl', 'straight-bar pushdown',
           'reverse-grip pushdown', 'fixed straight-bar preacher', 'barbell shrug',
           'flat-palm push-up']),
   (NULL, 'Shoulder · impingement', 'No barbell overhead or behind-the-neck pressing',
