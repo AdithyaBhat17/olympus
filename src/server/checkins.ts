@@ -53,13 +53,19 @@ export async function upsertCheckIn(
   const existing = await getCheckIn(userId, date);
   const sources = { ...(existing?.sources ?? {}) };
 
-  // Integrations (Whoop, Apple Health) never overwrite a value the athlete
-  // typed in the app or told Claude for that day. People win over sensors.
+  // Syncs (Whoop, Apple Health) vs values the athlete typed or told Claude:
+  // - sleep is one fact per night, so a human value always wins;
+  // - protein and water accumulate through the day, so a sync may raise a
+  //   human value (they kept logging in MyFitnessPal) but never lower it.
   if (source === "whoop" || source === "apple_health") {
     const human = (s: CheckInSource | undefined) => s === "manual" || s === "claude";
     if (human(sources.sleep)) delete patch.sleepMin;
-    if (human(sources.protein)) delete patch.proteinG;
-    if (human(sources.water)) delete patch.waterMl;
+    if (human(sources.protein) && (patch.proteinG ?? -1) <= (existing?.proteinG ?? -1)) {
+      delete patch.proteinG;
+    }
+    if (human(sources.water) && (patch.waterMl ?? -1) <= (existing?.waterMl ?? -1)) {
+      delete patch.waterMl;
+    }
   }
   const next = {
     sleepMin: existing?.sleepMin ?? null,
