@@ -155,6 +155,9 @@ export function validatePlan(
       });
     }
 
+    // Cardio is minutes, not load: only the block rule (V1) applies.
+    if (ex.loadMode === "TIME") continue;
+
     // V6 — compounds need real rest.
     if (ex.isCompound && item.restSec < 150) {
       push({
@@ -223,8 +226,15 @@ export function validatePlan(
     }
 
     if (delta > 0) {
-      // V4 — no bumps on short sleep.
-      if (sleepGateFails) {
+      // V4 — no bumps on short sleep, and no bumps on sleep nobody logged.
+      if (plan.recoveryGate && ctx.sleepMinToday == null) {
+        push({
+          code: "V4",
+          level: "warning",
+          exerciseId: ex.id,
+          message: `${ex.name}: load increase proposed but sleep for ${plan.date} isn't logged — ask before progressing (gate is ${plan.recoveryGate.minSleepH} h).`,
+        });
+      } else if (sleepGateFails) {
         push({
           code: "V4",
           level: "warning",

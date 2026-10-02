@@ -15,7 +15,7 @@ import {
   type PlanStatus,
   type RecoveryGate,
 } from "@/domain";
-import { getConstraints, listExercises, resolveRef } from "./exercises";
+import { exerciseRef, getConstraints, listExercises, resolveRef } from "./exercises";
 import { lastTopSetKg, resolveSets } from "./history";
 import { getCheckIn } from "./checkins";
 import { sendPushToUser } from "./push";
@@ -76,6 +76,13 @@ async function validateAgainstDb(
     sleepMinToday: checkIn?.sleepMin ?? null,
     inProgressPlanExists: inProgress.length > 0,
   });
+  // Same id Claude sees everywhere else: the slug, with the uuid alongside.
+  const withRef = (i: Issue): Issue => {
+    const ex = i.exerciseId ? byId.get(i.exerciseId) : undefined;
+    return ex ? { ...i, exerciseId: exerciseRef(ex), exerciseUuid: ex.id } : i;
+  };
+  result.errors = result.errors.map(withRef);
+  result.warnings = result.warnings.map(withRef);
   return { input, result };
 }
 

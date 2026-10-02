@@ -13,7 +13,13 @@ export interface RecoverySummary {
   avgSleepMin: number | null;
   daysUnderProtein: number;
   streaks: string[];
+  /** True only when today's sleep is logged AND under the floor. */
   progressionOnHold: boolean;
+  /**
+   * clear = slept enough; hold = slept too little; unknown = no sleep logged
+   * for today, so nobody knows. Unknown must be asked about, never assumed fine.
+   */
+  gate: "clear" | "hold" | "unknown";
 }
 
 export function formatSleep(min: number | null | undefined): string {
@@ -60,6 +66,12 @@ export function summarizeRecovery(
     daysUnderProtein,
     streaks,
     progressionOnHold: today?.sleepMin != null && today.sleepMin < minSleepMin,
+    gate:
+      today?.sleepMin == null
+        ? "unknown"
+        : today.sleepMin < minSleepMin
+          ? "hold"
+          : "clear",
   };
 }
 
@@ -77,4 +89,13 @@ export function holdMessage(summary: RecoverySummary): string | null {
       ? ` — ${ordinal(summary.shortSleepStreak)} short night`
       : "";
   return `Sleep under ${TARGETS.minSleepMin / 60} h${nth}. Hit last session's loads; no bumps.`;
+}
+
+/** One line for Claude/the app on whether load may go up today. */
+export function gateMessage(summary: RecoverySummary): string {
+  if (summary.gate === "hold") return holdMessage(summary) ?? "Progression on hold today.";
+  if (summary.gate === "unknown") {
+    return "No sleep logged for today — ask how they slept before adding load.";
+  }
+  return "Slept enough — progression allowed where earned.";
 }

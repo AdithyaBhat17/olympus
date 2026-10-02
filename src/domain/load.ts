@@ -69,8 +69,16 @@ export function formatKg(kg: number): string {
   return Number.isInteger(kg) ? String(kg) : String(roundKg(kg));
 }
 
-/** "47 cw", "21.1/side", "85". */
+export const isTimed = (mode: LoadMode) => mode === "TIME";
+
+/** "35 min" */
+export function formatMinutes(min: number): string {
+  return `${formatKg(min)} min`;
+}
+
+/** "47 cw", "21.1/side", "85". Cardio has no load: "—". */
 export function formatLoad(mode: LoadMode, kg: number): string {
+  if (mode === "TIME") return "—";
   if (mode === "COUNTERWEIGHT") return `${formatKg(kg)} cw`;
   if (mode === "PER_SIDE") return `${formatKg(kg)}/side`;
   return formatKg(kg);

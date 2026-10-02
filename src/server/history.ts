@@ -6,7 +6,7 @@ import {
   sessions,
   workingWeightOverrides,
 } from "@/lib/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne, or } from "drizzle-orm";
 import {
   topSet,
   type DomainExercise,
@@ -154,6 +154,50 @@ export async function workingWeights(
         source: "override",
       });
     }
+  }
+  return out;
+}
+
+/**
+ * Per exercise: the most recent DONE session strictly before a point in time
+ * (an earlier date, or the same date but created earlier). Used for the
+ * "Last" column, `lastTopKgBefore`, and flagging back-dated logs.
+ */
+export async function previousSessions(
+  userId: string,
+  exerciseList: DomainExercise[],
+  exerciseIds: string[],
+  before: { date: string; createdAt?: Date; excludeSessionId?: string }
+): Promise<Map<string, { date: string; sets: SetLogEntry[]; topKg: number | null }>> {
+  const out = new Map<string, { date: string; sets: SetLogEntry[]; topKg: number | null }>();
+  if (exerciseIds.length === 0) return out;
+  const byId = new Map(exerciseList.map((e) => [e.id, e]));
+  const earlier = before.createdAt
+    ? or(
+        lt(sessions.date, before.date),
+        and(eq(sessions.date, before.date), lt(sessions.createdAt, before.createdAt))
+      )
+    : lt(sessions.date, before.date);
+  const rows = await db
+    .select({ sessionId: sessions.id, date: sessions.date, se: sessionExercises })
+    .from(sessionExercises)
+    .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        eq(sessions.status, "DONE"),
+        inArray(sessionExercises.exerciseId, exerciseIds),
+        earlier,
+        before.excludeSessionId ? ne(sessions.id, before.excludeSessionId) : undefined
+      )
+    )
+    .orderBy(desc(sessions.date), desc(sessions.createdAt))
+    .limit(500);
+  for (const r of rows) {
+    if (out.has(r.se.exerciseId)) continue;
+    const sets = resolveSets(r.se);
+    const top = topSet(byId.get(r.se.exerciseId)?.loadMode ?? "TOTAL", sets);
+    out.set(r.se.exerciseId, { date: r.date, sets, topKg: top?.weight ?? null });
   }
   return out;
 }

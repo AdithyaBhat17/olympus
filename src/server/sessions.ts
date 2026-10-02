@@ -6,7 +6,7 @@ import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { todayInTz } from "@/lib/dates";
 import {
   blockedReason,
-  flagsForSet,
+  annotateSets,
   formatSleep,
   renderSessionMarkdown,
   sessionCatches,
@@ -20,8 +20,14 @@ import {
   type SetLogEntry,
   type UnderloadNudge,
 } from "@/domain";
-import { getConstraints, listExerciseRows, resolveRef, toDomainExercise } from "./exercises";
-import { aggregateColumns, exerciseHistory, resolveSets, workingWeights } from "./history";
+import {
+  exerciseRef,
+  getConstraints,
+  listExerciseRows,
+  resolveRef,
+  toDomainExercise,
+} from "./exercises";
+import { aggregateColumns, previousSessions, resolveSets, workingWeights } from "./history";
 import { getCheckIn } from "./checkins";
 import { flagsFor, listOpenFlags } from "./flags";
 import { getPlan, setPlanStatus } from "./plans";
@@ -216,11 +222,18 @@ export async function getSessionView(userId: string, sessionId: string): Promise
   logged.forEach((se) => actualIds.add(se.exerciseId));
   const ids = Array.from(actualIds);
 
-  const [tops, lastSets] = await Promise.all([
-    workingWeights(userId, domain, { exerciseIds: ids, excludeSessionId: sessionId }),
-    Promise.all(
-      ids.map(async (id) => [id, (await exerciseHistory(userId, id, 1, sessionId))[0]?.sets ?? []] as const)
-    ).then((pairs) => new Map(pairs)),
+  // "Last" and "last top" mean the session before this one — not the latest
+  // other session, which for an old session would be a later one.
+  const [prevs, live] = await Promise.all([
+    previousSessions(userId, domain, ids, {
+      date: session.date,
+      createdAt: session.createdAt,
+      excludeSessionId: sessionId,
+    }),
+    // While training, the reference also honours working-weight overrides.
+    session.status === "IN_PROGRESS"
+      ? workingWeights(userId, domain, { exerciseIds: ids, excludeSessionId: sessionId })
+      : Promise.resolve(null),
   ]);
 
   const buildItem = (
@@ -235,7 +248,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     const ex = byId.get(exId);
     if (!ex) return null;
     const done = row ? resolveSets(row) : [];
-    const prev = lastSets.get(exId) ?? [];
+    const prev = prevs.get(exId)?.sets ?? [];
     const count = Math.max(planned.length, done.length, 1);
     const sets: LiveSetView[] = Array.from({ length: count }, (_, i) => ({
       index: i,
@@ -256,7 +269,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       pairGroup: null,
       sets,
       notes: row?.notes ?? null,
-      lastTopKg: tops.get(exId)?.kg ?? null,
+      lastTopKg: live ? live.get(exId)?.kg ?? null : prevs.get(exId)?.topKg ?? null,
       done: planned.length > 0 ? done.length >= planned.length : done.length > 0,
       coachFlags: flagsFor(openFlags, { exerciseId: exId }).filter((f) => f.scope === "exerciseId").map((f) => f.text),
       blockedReason: blockedReason(ex, cons),
@@ -406,9 +419,7 @@ export async function logSet(
     platesKg: input.platesKg ?? null,
     rpe: input.rpe ?? null,
     type: input.type ?? "working",
-    flags: flagsForSet(ex, { weight, type: input.type ?? "working" }, lastTop, {
-      blockedOverride: isBlocked && !!input.blockedOverride,
-    }),
+    flags: isBlocked && input.blockedOverride ? ["blocked_override"] : [],
     doneAt: new Date().toISOString(),
   };
 
@@ -439,10 +450,12 @@ export async function logSet(
     entry.type === "working" ? underloadNudge(ex, entry, planned, lastTop) : null;
   // A set the app nudged as a warm-up is an underload even inside the 15% band,
   // so the export and "What the app caught" match what the athlete saw.
-  if (nudge && !entry.flags?.includes("underloaded")) {
-    entry.flags = [...(entry.flags ?? []), "underloaded"];
-  }
+  if (nudge) entry.flags = [...(entry.flags ?? []), "underloaded"];
   sets[idx] = entry;
+  // Re-flag the whole exercise: an opener only reads as underloaded once the
+  // heavier sets land. Nudged sets keep their flag.
+  const annotated = annotateSets(ex, sets, lastTop, { keep: ["underloaded"] });
+  sets.splice(0, sets.length, ...annotated);
 
   if (existing) {
     await db
@@ -461,7 +474,7 @@ export async function logSet(
     });
   }
 
-  return { set: entry, nudge };
+  return { set: sets[idx], nudge };
 }
 
 export async function removeSet(
@@ -657,8 +670,10 @@ export async function getSessionsDetailed(userId: string, f: SessionFilters) {
         .filter((i) => !exId || i.exercise.id === exId)
         .map((i) => ({
           exercise: i.exercise.name,
-          exerciseId: i.exercise.slug ?? i.exercise.id,
+          exerciseId: exerciseRef(i.exercise),
+          exerciseUuid: i.exercise.id,
           plannedExercise: i.swapped ? i.plannedExercise?.name ?? null : undefined,
+          blockedReason: i.blockedReason,
           loadMode: i.exercise.loadMode,
           notes: i.notes,
           lastTopKgBefore: i.lastTopKg,
@@ -713,6 +728,7 @@ export interface LogSessionPayload {
       reps: number;
       rpe?: number | null;
       type?: "warmup" | "working";
+      avgHr?: number | null;
     }>;
   }>;
 }
@@ -725,7 +741,10 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
   const unknown = resolved.filter((r) => !r.ex).map((r) => r.e.exerciseId);
   if (unknown.length) throw new DomainError(`Unknown exercise(s): ${unknown.join(", ")}`);
   // Validate everything before the first insert: neon-http has no transactions.
-  const noLoad = p.exercises.filter((e) => e.sets.some((st) => st.kg == null && st.platesKg == null));
+  const noLoad = resolved
+    .filter(({ ex }) => ex!.loadMode !== "TIME")
+    .map(({ e }) => e)
+    .filter((e) => e.sets.some((st) => st.kg == null && st.platesKg == null));
   if (noLoad.length) {
     throw new DomainError(
       `Every set needs kg or platesKg (use kg: 0 for bodyweight): ${noLoad.map((e) => e.exerciseId).join(", ")}`
@@ -733,7 +752,8 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
   }
 
   const ids = resolved.map((r) => r.ex!.id);
-  const tops = await workingWeights(userId, domain, { exerciseIds: ids });
+  // Back-dated sessions compare against what came before *that* date.
+  const prevs = await previousSessions(userId, domain, ids, { date: p.date });
 
   const [prev] = await db
     .select({ weekNumber: sessions.weekNumber, blockNumber: sessions.blockNumber })
@@ -760,20 +780,16 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
   const flagged: string[] = [];
   const rows = resolved.map(({ e, ex }, i) => {
     const d = byId.get(ex!.id)!;
-    const lastTop = tops.get(d.id)?.kg ?? null;
     const blocked = blockedReason(d, cons) != null;
-    const sets: SetLogEntry[] = e.sets.map((st) => {
-      const weight = st.platesKg != null ? trueKg(d, st.platesKg) : st.kg!;
-      const type = st.type ?? "working";
-      return {
-        reps: st.reps,
-        weight,
-        platesKg: st.platesKg ?? null,
-        rpe: st.rpe ?? null,
-        type,
-        flags: flagsForSet(d, { weight, type }, lastTop, { blockedOverride: blocked }),
-      };
-    });
+    const raw: SetLogEntry[] = e.sets.map((st) => ({
+      reps: st.reps,
+      weight: d.loadMode === "TIME" ? 0 : st.platesKg != null ? trueKg(d, st.platesKg) : st.kg!,
+      platesKg: d.loadMode === "TIME" ? null : st.platesKg ?? null,
+      rpe: st.rpe ?? null,
+      type: st.type ?? "working",
+      ...(st.avgHr != null ? { avgHr: st.avgHr } : {}),
+    }));
+    const sets = annotateSets(d, raw, prevs.get(d.id)?.topKg ?? null, { blockedOverride: blocked });
     if (blocked) flagged.push(`${d.name} is blocked — logged with a blocked_override flag`);
     return {
       sessionId: s.id,

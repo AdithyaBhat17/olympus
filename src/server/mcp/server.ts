@@ -6,7 +6,7 @@ import { planItems, plans } from "@/lib/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { addDays, todayInTz } from "@/lib/dates";
 import {
-  holdMessage,
+  gateMessage,
   progressionStatus,
   renderLogMarkdown,
   renderSessionMarkdown,
@@ -15,7 +15,7 @@ import {
 } from "@/domain";
 import { getAthleteContext } from "../athlete";
 import { getRecovery, upsertCheckIn } from "../checkins";
-import { getConstraints, listExercises, resolveRef, searchExercises } from "../exercises";
+import { exerciseRef, getConstraints, listExercises, resolveRef, searchExercises } from "../exercises";
 import { addFlag, resolveFlag } from "../flags";
 import { exerciseHistory } from "../history";
 import { pushPlan, updatePlan, type PlanPayload } from "../plans";
@@ -44,7 +44,7 @@ const repsSchema = z
   .array(z.number().int().min(0).max(100))
   .min(1)
   .max(2)
-  .describe("[min, max] reps, or [n] for a fixed target")
+  .describe("[min, max] reps, or [n] for a fixed target. Cardio (loadMode TIME): minutes, e.g. [35]")
   .transform((r) => (r.length === 1 ? [r[0], r[0]] : [r[0], r[1]]) as [number, number]);
 
 const planSetSchema = z.object({
@@ -56,7 +56,7 @@ const planSetSchema = z.object({
     .min(0)
     .max(1000)
     .optional()
-    .describe("Load to open at in TRUE kg (per side for PER_SIDE machines, counterweight for COUNTERWEIGHT)"),
+    .describe("Load to open at in TRUE kg (per side for PER_SIDE machines, counterweight for COUNTERWEIGHT). Omit for cardio."),
 });
 
 const planItemSchema = z.object({
@@ -65,7 +65,11 @@ const planItemSchema = z.object({
   pairGroup: z.string().max(20).nullable().optional().describe("Superset/alternation group label"),
   restSec: z.number().int().min(0).max(900).describe("Compounds default 180"),
   straps: z.boolean().optional(),
-  cues: z.array(z.string().max(200)).max(8).optional(),
+  cues: z
+    .array(z.string().max(200))
+    .max(8)
+    .optional()
+    .describe("Coaching cues. For cardio put speed, incline and HR targets here."),
   sets: z.array(planSetSchema).min(1).max(12),
   overrideReason: z
     .string()
@@ -200,7 +204,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     async () => {
       const ctx = await getAthleteContext(userId);
       return ok(
-        `Next due: Session ${ctx.rotation.nextDue}. ${ctx.workingWeights.length} working weights, ${ctx.constraints.length} constraints, ${ctx.openCoachFlags.length} open flags.${ctx.progressionOnHold ? " Progression ON HOLD today (short sleep)." : ""}`,
+        `Next due: Session ${ctx.rotation.nextDue}. ${ctx.workingWeights.length} working weights, ${ctx.constraints.length} constraints, ${ctx.openCoachFlags.length} open flags.${ctx.blockedLifts.length ? ` ${ctx.blockedLifts.length} blocked lift(s) listed separately — never programme them.` : ""} Progression gate: ${ctx.progressionGate} — ${ctx.progressionGateMessage}`,
         ctx
       );
     }
@@ -249,9 +253,8 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       await syncWhoopIfStale(userId).catch(() => {});
       const date = a.date ?? todayInTz();
       const r = await getRecovery(userId, date, a.days);
-      const hold = holdMessage(r.summary);
       return ok(
-        `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""}${hold ? ` ${hold}` : ""}`,
+        `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate} — ${gateMessage(r.summary)}`,
         {
           date,
           today: r.today,
@@ -292,10 +295,11 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       const status = progressionStatus(ex, history, {
         repTop: range.repTop,
         targetRpe: range.targetRpe,
-        sleepGateFails: recovery.summary.progressionOnHold,
+        sleepGateFails: recovery.summary.gate === "hold",
+        sleepUnknown: recovery.summary.gate === "unknown",
       });
       return ok(`${ex.name}: ${status.summary}`, {
-        exercise: { id: ex.id, slug: ex.slug, name: ex.name, loadMode: ex.loadMode, carriageKgPerSide: ex.carriageKgPerSide },
+        exercise: { exerciseId: exerciseRef(ex), exerciseUuid: ex.id, name: ex.name, loadMode: ex.loadMode, carriageKgPerSide: ex.carriageKgPerSide },
         progression: status,
         sessions: history.map((h) => {
           const top = topSet(ex.loadMode, h.sets);
@@ -337,7 +341,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Push plan to Today",
       description:
-        "Validate and store a session plan; it shows on the athlete's Today screen with a push notification. Upserts on clientRef (safe to retry). Returns planId, warnings[] and errors[]. Errors block the write; warnings don't. Only push after the athlete approved the plan in chat.",
+        "Validate and store a session plan; it shows on the athlete's Today screen with a push notification. Upserts on clientRef (safe to retry). Returns planId, warnings[] and errors[]. Errors block the write; warnings don't. Cardio days use sessionType 'Cardio' and exercises from search_exercises('cardio'): each set's reps are minutes. Only push after the athlete approved the plan in chat.",
       inputSchema: {
         clientRef: z.string().min(1).max(100).describe("Idempotency key, e.g. 'pt-2026-10-02-B'"),
         date: isoDate,
@@ -385,7 +389,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Log a whole session",
       description:
-        "Record a session rebuilt from chat (e.g. Garmin/Strava notes). Same true-load maths and auto-flags as the app: give platesKg for PER_SIDE machines and the carriage is added, or kg for true load. Blocked exercises are logged with a blocked_override flag.",
+        "Record a session rebuilt from chat (e.g. Garmin/Strava notes). Same true-load maths and auto-flags as the app: give platesKg for PER_SIDE machines and the carriage is added, or kg for true load. Cardio exercises (loadMode TIME, category Cardio): reps = minutes, no kg, optional avgHr. Blocked exercises are logged with a blocked_override flag.",
       inputSchema: {
         date: isoDate,
         sessionType: z.string().max(20).nullable().optional(),
@@ -401,7 +405,8 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                   z.object({
                     kg: z.number().min(0).max(1000).nullable().optional(),
                     platesKg: z.number().min(0).max(1000).nullable().optional(),
-                    reps: z.number().int().min(0).max(1000),
+                    reps: z.number().int().min(0).max(1000).describe("Reps; for cardio, minutes"),
+                    avgHr: z.number().int().min(30).max(230).nullable().optional().describe("Cardio only"),
                     rpe: z.number().min(1).max(10).nullable().optional(),
                     type: z.enum(["warmup", "working"]).optional(),
                   })
@@ -586,7 +591,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                 "",
                 "1. Call get_athlete_context. Use rotation.nextDue unless I named a type.",
                 `2. Call get_sessions with sessionType=<that type>, limit=2 (and from=${addDays(date, -60)}).`,
-                "3. Call get_recovery. If progressionOnHold is true: no load bumps today — repeat last loads.",
+                "3. Call get_recovery. Gate 'hold': no load bumps — repeat last loads. Gate 'unknown': ask how I slept before adding any load.",
                 "4. For each exercise, call get_exercise_history if you need the progression status.",
                 "5. Apply the rules:",
                 "   - Never programme a blocked exercise; use its substitutes. Active constraints:",

@@ -5,7 +5,7 @@ import type { LiveItemView } from "@/server/sessions";
 import { cn } from "@/lib/utils";
 import { WarnIcon, InfoIcon } from "./icons";
 import { OptionsMenu, type MenuEntry } from "./options-menu";
-import { loadWithUnit, openKg, targetLabel, targetRpe } from "./format";
+import { loadWithUnit, openKg, plannedMinutes, targetLabel, targetRpe } from "./format";
 
 interface ExerciseCardProps {
   item: LiveItemView;
@@ -133,11 +133,15 @@ export function ExerciseCard({
       <div className="grid grid-cols-3 gap-2">
         <Tile label="Target" value={target ?? `${item.sets.length} sets`} />
         <Tile label="RPE" value={rpe != null ? formatKg(rpe) : "—"} />
-        <Tile
-          label="Open at"
-          value={open != null ? loadWithUnit(exercise.loadMode, open) : "Calibrate"}
-          accent
-        />
+        {exercise.loadMode === "TIME" ? (
+          <Tile label="Total" value={`${plannedMinutes(item)?.total ?? "—"} min`} accent />
+        ) : (
+          <Tile
+            label="Open at"
+            value={open != null ? loadWithUnit(exercise.loadMode, open) : "Calibrate"}
+            accent
+          />
+        )}
       </div>
 
       {children}

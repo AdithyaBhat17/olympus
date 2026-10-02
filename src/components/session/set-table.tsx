@@ -51,7 +51,9 @@ function setLabels(sets: LiveSetView[]): string[] {
 export function SetTable({ item, disabled, onLog }: SetTableProps) {
   const { exercise, sets } = item;
   const perSide = exercise.loadMode === "PER_SIDE";
-  const unit = exercise.loadMode === "COUNTERWEIGHT" ? "cw" : perSide ? "kg/side" : "kg";
+  // Cardio: a set is a block of minutes. No load; "reps" holds the minutes.
+  const timed = exercise.loadMode === "TIME";
+  const unit = timed ? "" : exercise.loadMode === "COUNTERWEIGHT" ? "cw" : perSide ? "kg/side" : "kg";
   const labels = setLabels(sets);
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -74,6 +76,7 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
       .slice(0, i)
       .reverse()
       .find((x) => x.logged)?.logged;
+    if (timed) return { kg: "0", reps: "", platesKg: null };
     const kg = s.planned?.openKg ?? prev?.weight ?? s.last?.weight ?? null;
     return { kg: kg == null ? "" : formatKg(kg), reps: "", platesKg: null };
   };
@@ -99,7 +102,7 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
     const placeholder = repsPlaceholder(s);
     const reps = d.reps.trim() === "" ? placeholder : parseInt(d.reps, 10);
     if (reps == null || !Number.isFinite(reps) || reps < 0) {
-      toast.error(`Enter reps for set ${labels[i]}`);
+      toast.error(timed ? `Enter minutes for block ${labels[i]}` : `Enter reps for set ${labels[i]}`);
       repsRefs.current[dkey(i, kind)]?.focus();
       return;
     }
@@ -133,6 +136,13 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
   const sheetKg = sheetDraft ? parseFloat(sheetDraft.kg) : NaN;
 
   const kgCell = (i: number, kind: "new" | "edit") => {
+    if (timed) {
+      return (
+        <span aria-hidden className={cn(INPUT, "border border-line text-faint flex items-center justify-center")}>
+          —
+        </span>
+      );
+    }
     const d = draftFor(i, kind);
     const label = `Set ${labels[i]} ${perSide ? "load per side" : unit === "cw" ? "counterweight" : "weight"}, kg`;
     if (perSide) {
@@ -168,7 +178,7 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
     const ph = repsPlaceholder(sets[i]);
     return (
       <label className="relative block">
-        <span className="sr-only">Set {labels[i]} reps</span>
+        <span className="sr-only">Set {labels[i]} {timed ? "minutes" : "reps"}</span>
         <input
           ref={(el) => {
             repsRefs.current[dkey(i, kind)] = el;
@@ -199,7 +209,7 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
         <span>Set</span>
         <span>Last</span>
         <span>{unit}</span>
-        <span>Reps</span>
+        <span>{timed ? "Min" : "Reps"}</span>
         <span>RPE</span>
         <span />
       </div>
@@ -209,7 +219,11 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
         const isEditing = editing === i && !!s.logged;
         const isActive = i === activeIndex;
         const isFuture = !s.logged && !isActive;
-        const last = s.last ? `${formatKg(s.last.weight)} × ${s.last.reps}` : "—";
+        const last = s.last
+          ? timed
+            ? `${s.last.reps} min`
+            : `${formatKg(s.last.weight)} × ${s.last.reps}`
+          : "—";
 
         let row: React.ReactNode;
         if (s.logged && !isEditing) {
@@ -222,7 +236,7 @@ export function SetTable({ item, disabled, onLog }: SetTableProps) {
             >
               <span className="font-display text-xl font-semibold tabular-nums">{label}</span>
               <span className="font-display text-[17px] text-muted tabular-nums truncate">{last}</span>
-              <span className={cn(BOX, "bg-surface-2 text-muted")}>{formatKg(s.logged.weight)}</span>
+              <span className={cn(BOX, "bg-surface-2 text-muted")}>{timed ? "—" : formatKg(s.logged.weight)}</span>
               <span className={cn(BOX, "bg-surface-2 text-muted")}>{s.logged.reps}</span>
               <span className={cn(BOX, "bg-surface-2 text-muted")}>{s.logged.rpe ?? "—"}</span>
               <button
