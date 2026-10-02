@@ -1,100 +1,86 @@
+import { and, desc, eq } from "drizzle-orm";
 import { requireUserEmail } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { sessions, exercises } from "@/lib/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
-import ProgressCharts from "@/components/progress-charts";
+import { sessionExercises, sessions } from "@/lib/db/schema";
+import { listExercises } from "@/server/exercises";
+import { resolveSets, workingWeights } from "@/server/history";
+import { EXERCISE_CATEGORIES } from "@/lib/constants";
+import { formatLoad, progressDelta, topSet } from "@/domain";
+import ProgressList, { type ProgressRow } from "@/components/progress/progress-list";
 
-const COMPOUND_LIFTS = [
-  "Barbell Bench Press",
-  "Barbell Back Squat",
-  "Conventional Deadlift",
-  "Barbell OHP",
-  "Barbell Bent Over Row",
-];
+export const metadata = { title: "Progress" };
+
+const HEADER_PAD = "pt-[max(56px,calc(env(safe-area-inset-top)_+_12px))]";
 
 export default async function ProgressPage() {
-  const email = await requireUserEmail();
+  const userId = await requireUserEmail();
+  const all = await listExercises(userId);
+  const byId = new Map(all.map((e) => [e.id, e]));
 
-  const [compoundExercises, userSessions] = await Promise.all([
+  const [ww, logRows] = await Promise.all([
+    workingWeights(userId, all),
+    // Two most recent top sets per exercise, for the trend arrow.
     db
-      .select({ id: exercises.id, name: exercises.name })
-      .from(exercises)
-      .where(inArray(exercises.name, COMPOUND_LIFTS)),
-    db.query.sessions.findMany({
-      where: eq(sessions.userId, email),
-      orderBy: [desc(sessions.date)],
-      limit: 200,
-      with: {
-        sessionExercises: {
-          with: { exercise: true },
-        },
-      },
-    }),
+      .select({ sessionId: sessions.id, date: sessions.date, se: sessionExercises })
+      .from(sessionExercises)
+      .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+      .where(and(eq(sessions.userId, userId), eq(sessions.status, "DONE")))
+      .orderBy(desc(sessions.date), desc(sessions.createdAt))
+      .limit(2000),
   ]);
 
-  // Build chart data for compound lifts
-  const lifts = compoundExercises.map((ce) => ({
-    name: ce.name,
-    data: userSessions
-      .flatMap((s) =>
-        s.sessionExercises
-          .filter((se) => se.exerciseId === ce.id)
-          .map((se) => ({
-            date: s.date,
-            weight: parseFloat(se.weight),
-          }))
-      )
-      .reverse(),
-  }));
-
-  // Build working weights for ALL exercises used
-  const exerciseMap = new Map<
-    string,
-    { name: string; weights: { weight: number; date: string }[] }
-  >();
-
-  for (const s of userSessions) {
-    for (const se of s.sessionExercises) {
-      if (!exerciseMap.has(se.exerciseId)) {
-        exerciseMap.set(se.exerciseId, {
-          name: se.exercise.name,
-          weights: [],
-        });
-      }
-      exerciseMap.get(se.exerciseId)!.weights.push({
-        weight: parseFloat(se.weight),
-        date: s.date,
-      });
-    }
+  const recentTops = new Map<string, number[]>();
+  for (const r of logRows) {
+    const ex = byId.get(r.se.exerciseId);
+    if (!ex) continue;
+    const list = recentTops.get(ex.id) ?? [];
+    if (list.length >= 2) continue;
+    const top = topSet(ex.loadMode, resolveSets(r.se));
+    if (top) list.push(top.weight);
+    recentTops.set(ex.id, list);
   }
 
-  const workingWeights = Array.from(exerciseMap.values())
-    .map((entry) => {
-      const sorted = entry.weights.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      const current = sorted[0];
-      const previous = sorted[1] ?? null;
-      return {
-        exerciseName: entry.name,
-        currentWeight: current.weight,
-        previousWeight: previous?.weight ?? null,
-        lastUsed: current.date,
-        trend: (previous
-          ? current.weight > previous.weight
-            ? "up"
-            : current.weight < previous.weight
-              ? "down"
-              : "same"
-          : "same") as "up" | "same" | "down",
-      };
-    })
-    .sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
+  const rows: ProgressRow[] = [];
+  ww.forEach((w, id) => {
+    const ex = byId.get(id);
+    if (!ex) return;
+    const tops = recentTops.get(id) ?? [];
+    // Override newer than the log: compare it with the last logged top set.
+    const prev = w.source === "override" ? tops[0] : tops[1];
+    const delta = prev != null ? progressDelta(ex.loadMode, prev, w.kg) : 0;
+    rows.push({
+      id,
+      name: ex.name,
+      category: ex.category,
+      load: formatLoad(ex.loadMode, w.kg),
+      unit: ex.loadMode === "TOTAL" ? "kg" : null,
+      lastDate: w.date,
+      trend: prev == null || delta === 0 ? "flat" : delta > 0 ? "up" : "down",
+      trendLabel:
+        prev == null
+          ? "First logged session"
+          : delta === 0
+            ? "Same as last session"
+            : `${delta > 0 ? "Progressed" : "Eased off"} ${Math.abs(delta)} kg vs last session`,
+    });
+  });
+
+  const order = new Map<string, number>(EXERCISE_CATEGORIES.map((c, i) => [c, i]));
+  rows.sort(
+    (a, b) =>
+      (order.get(a.category) ?? 99) - (order.get(b.category) ?? 99) ||
+      a.name.localeCompare(b.name)
+  );
 
   return (
-    <div className="py-6">
-      <h2 className="text-2xl font-black tracking-tight mb-6">PROGRESS</h2>
-      <ProgressCharts lifts={lifts} workingWeights={workingWeights} />
+    <div className="flex flex-col pb-8">
+      <header className={`px-5 flex flex-col gap-0.5 ${HEADER_PAD}`}>
+        <span className="eyebrow font-normal">
+          {rows.length} {rows.length === 1 ? "lift" : "lifts"} tracked
+        </span>
+        <h1 className="font-display font-bold text-[44px] leading-none">Progress</h1>
+      </header>
+      <ProgressList rows={rows} />
     </div>
   );
 }

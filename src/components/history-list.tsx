@@ -1,160 +1,118 @@
 "use client";
 
-import { useState } from "react";
-import {
-  ChevronDownIcon,
-  FunnelIcon,
-  TrashIcon,
-  ClipboardDocumentIcon,
-} from "@heroicons/react/24/outline";
-import { cn, formatDate } from "@/lib/utils";
-import { deleteSession } from "@/lib/actions";
-import { toast } from "sonner";
+import { useId, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { formatKg } from "@/domain/load";
+import { deleteSession } from "@/lib/actions";
+import { cn } from "@/lib/utils";
 
-interface SetDetail {
+export interface HistorySet {
   reps: number;
   weight: number;
+  rpe: number | null;
+  warmup: boolean;
+  underloaded: boolean;
 }
 
-interface SessionData {
+export interface HistorySession {
   id: string;
   date: string;
+  /** "Fri 2 Oct · W3 · B1", formatted on the server. */
+  eyebrow: string;
   sessionName: string;
+  sessionType: string | null;
   weekNumber: number;
   blockNumber: string;
   notes: string | null;
-  sessionExercises: Array<{
-    id: string;
-    sets: number;
-    reps: number;
-    weight: string;
-    setDetails: SetDetail[] | null;
-    rpe: string | null;
-    notes: string | null;
-    orderIndex: number;
-    exercise: {
-      id: string;
-      name: string;
-    };
-  }>;
-}
-
-function resolveSets(se: SessionData["sessionExercises"][number]): SetDetail[] {
-  if (se.setDetails && se.setDetails.length > 0) return se.setDetails;
-  // Legacy rows: synthesize uniform sets from aggregate columns.
-  return Array.from({ length: se.sets }, () => ({
-    reps: se.reps,
-    weight: parseFloat(se.weight),
-  }));
-}
-
-function isUniform(sets: SetDetail[]): boolean {
-  if (sets.length <= 1) return true;
-  const [first] = sets;
-  return sets.every((s) => s.reps === first.reps && s.weight === first.weight);
-}
-
-function formatSetsShort(sets: SetDetail[]): string {
-  if (sets.length === 0) return "";
-  if (isUniform(sets)) {
-    const [first] = sets;
-    return `${sets.length}x${first.reps} @ ${first.weight}kg`;
-  }
-  return sets.map((s) => `${s.reps}@${s.weight}kg`).join(" · ");
+  status: "IN_PROGRESS" | "DONE";
+  sent: boolean;
+  exercises: Array<{ id: string; name: string; notes: string | null; sets: HistorySet[] }>;
 }
 
 interface HistoryListProps {
-  sessions: SessionData[];
+  sessions: HistorySession[];
   sessionNames: string[];
 }
 
-export default function HistoryList({
-  sessions,
-  sessionNames,
-}: HistoryListProps) {
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={cn("text-muted shrink-0 transition-transform", open && "rotate-180")}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function workingSetCount(s: HistorySession): number {
+  return s.exercises.reduce((n, e) => n + e.sets.filter((x) => !x.warmup).length, 0);
+}
+
+export default function HistoryList({ sessions, sessionNames }: HistoryListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterName, setFilterName] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const filterId = useId();
   const router = useRouter();
 
-  function formatForClaude(s: SessionData) {
-    const dateStr = new Date(s.date).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    const sorted = [...s.sessionExercises].sort(
-      (a, b) => a.orderIndex - b.orderIndex
-    );
-
-    const header = `[${dateStr}] — ${s.sessionName}\nWeek ${s.weekNumber} | Block ${s.blockNumber}\n`;
-    const colHeader = `Exercise          | Sets (reps @ kg)                | RPE | Notes\n------------------------------------------------------------------`;
-
-    const rows = sorted
-      .map((se) => {
-        const setsList = resolveSets(se);
-        const name = se.exercise.name.padEnd(18);
-        const setsStr = formatSetsShort(setsList).padEnd(32);
-        const rpe = se.rpe ? `${parseFloat(se.rpe)}`.padEnd(4) : "    ";
-        const notes = se.notes || "";
-        return `${name}| ${setsStr}| ${rpe}| ${notes}`;
-      })
-      .join("\n");
-
-    const sessionNotes = s.notes
-      ? `\nSession notes: ${s.notes}`
-      : "";
-
-    return `${header}\n${colHeader}\n${rows}${sessionNotes}`;
-  }
-
-  async function handleCopy(s: SessionData) {
-    try {
-      const text = formatForClaude(s);
-      await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
-    } catch {
-      toast.error("Failed to copy");
-    }
-  }
-
-  const filtered = filterName
-    ? sessions.filter((s) => s.sessionName === filterName)
-    : sessions;
+  const filtered = filterName ? sessions.filter((s) => s.sessionName === filterName) : sessions;
 
   async function handleDelete(sessionId: string) {
     if (!window.confirm("Delete this session? This cannot be undone.")) return;
+    setDeleting(sessionId);
     try {
       await deleteSession(sessionId);
       toast.success("Session deleted");
       router.refresh();
     } catch {
       toast.error("Failed to delete session");
+    } finally {
+      setDeleting(null);
     }
   }
 
-  return (
-    <div>
-      {/* Filters */}
-      <button
-        type="button"
-        onClick={() => setShowFilters(!showFilters)}
-        className="flex items-center gap-2 text-sm text-stone-400 hover:text-stone-200 mb-4 transition-colors"
-      >
-        <FunnelIcon className="w-4 h-4" />
-        {showFilters ? "Hide filters" : "Filter"}
-      </button>
+  if (sessions.length === 0) {
+    return (
+      <div className="mx-4 mt-6 card flex flex-col gap-2">
+        <p className="font-semibold">No sessions logged yet</p>
+        <p className="text-sm text-muted leading-[1.45]">
+          Start today&apos;s session from Today, or add an old one by hand.
+        </p>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <Link href="/today" className="btn-secondary">
+            Go to Today
+          </Link>
+          <Link href="/log" className="btn-secondary">
+            Log manually
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-      {showFilters && (
-        <div className="card mb-4 animate-slide-up">
-          <label className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider mb-1 block">
-            Session Name
+  return (
+    <div className="flex flex-col">
+      {sessionNames.length > 1 && (
+        <div className="px-4 pt-3 pb-1 flex items-center gap-3">
+          <label htmlFor={filterId} className="eyebrow shrink-0">
+            Show
           </label>
           <select
+            id={filterId}
             value={filterName}
             onChange={(e) => setFilterName(e.target.value)}
-            className="select-base text-sm"
+            className="select-base h-11 py-0 text-[15px]"
           >
             <option value="">All sessions</option>
             {sessionNames.map((name) => (
@@ -166,145 +124,139 @@ export default function HistoryList({
         </div>
       )}
 
-      {/* Sessions */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-stone-500 text-sm">No sessions logged yet.</p>
-          <p className="text-stone-600 text-xs mt-1">
-            Head to the Log tab to start.
-          </p>
-        </div>
+        <p className="px-5 py-10 text-sm text-muted text-center">No sessions with that name.</p>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((s, i) => {
-            const isExpanded = expandedId === s.id;
-            return (
-              <div
-                key={s.id}
-                className="card animate-slide-up"
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                {/* Summary row */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExpandedId(isExpanded ? null : s.id)
-                  }
-                  className="w-full flex items-center justify-between text-left"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-stone-100 truncate">
-                      {s.sessionName}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-stone-500">
-                        {formatDate(s.date)}
-                      </span>
-                      <span className="text-stone-700">·</span>
-                      <span className="text-xs text-stone-500">
-                        W{s.weekNumber} B{s.blockNumber}
-                      </span>
-                      <span className="text-stone-700">·</span>
-                      <span className="text-xs text-stone-500">
-                        {s.sessionExercises.length} exercises
+        <ul className="flex flex-col gap-2 px-4 pt-3">
+          {filtered.map((s) => {
+            const live = s.status === "IN_PROGRESS";
+            const open = expandedId === s.id;
+            const eyebrow = s.eyebrow;
+            const sets = workingSetCount(s);
+            const summary = `${s.exercises.length} ${s.exercises.length === 1 ? "exercise" : "exercises"} · ${sets} working ${sets === 1 ? "set" : "sets"}`;
+            const panelId = `history-${s.id}`;
+
+            if (live) {
+              return (
+                <li key={s.id}>
+                  <Link
+                    href={`/session/${s.id}`}
+                    className="block rounded-2xl bg-surface border border-accent-line p-4 hover:bg-surface-2"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                        <span className="eyebrow font-normal">{eyebrow}</span>
+                        <span className="font-display font-bold text-2xl leading-tight truncate">{s.sessionName}</span>
+                        <span className="text-sm text-muted">{summary}</span>
+                      </div>
+                      <span className="shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-accent text-accent-ink text-xs font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent-ink" aria-hidden="true" />
+                        Live
                       </span>
                     </div>
+                    <span className="mt-3 flex items-center gap-1 text-sm font-medium text-accent">
+                      Resume session
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
+                    </span>
+                  </Link>
+                </li>
+              );
+            }
+
+            return (
+              <li key={s.id} className="rounded-2xl bg-surface">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => setExpandedId(open ? null : s.id)}
+                  className="w-full flex items-start gap-3 p-4 text-left rounded-2xl"
+                >
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <span className="eyebrow font-normal">{eyebrow}</span>
+                    <span className="font-display font-bold text-2xl leading-tight truncate">{s.sessionName}</span>
+                    <span className="flex items-center gap-2 flex-wrap text-sm text-muted">
+                      {summary}
+                      {s.sent && (
+                        <span className="inline-flex items-center gap-1 h-6 px-2 rounded-full border border-info-line text-info text-xs font-medium">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M5 12.5l4.5 4.5L19 7.5" />
+                          </svg>
+                          Sent to PT
+                        </span>
+                      )}
+                    </span>
                   </div>
-                  <ChevronDownIcon
-                    className={cn(
-                      "w-5 h-5 text-stone-500 transition-transform shrink-0 ml-2",
-                      isExpanded && "rotate-180"
-                    )}
-                  />
+                  <span className="mt-1">
+                    <Chevron open={open} />
+                  </span>
                 </button>
 
-                {/* Expanded details */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-stone-800 space-y-3 animate-fade-in">
-                    {[...s.sessionExercises]
-                      .sort((a, b) => a.orderIndex - b.orderIndex)
-                      .map((se) => {
-                        const setsList = resolveSets(se);
-                        const uniform = isUniform(setsList);
+                {open && (
+                  <div id={panelId} className="px-4 pb-4 flex flex-col animate-fade-in">
+                    <ul className="flex flex-col border-t border-line-soft">
+                      {s.exercises.map((e) => {
+                        const rpes = e.sets.map((x) => x.rpe).filter((r): r is number => r != null);
                         return (
-                          <div key={se.id} className="space-y-1">
-                            <div className="flex items-baseline justify-between gap-4">
-                              <span className="text-sm text-stone-300 truncate min-w-0">
-                                {se.exercise.name}
-                              </span>
-                              {uniform && setsList[0] && (
-                                <div className="flex items-baseline gap-3 shrink-0 text-sm">
-                                  <span className="text-stone-400">
-                                    {setsList.length}x{setsList[0].reps}
-                                  </span>
-                                  <span className="text-stone-200 font-medium">
-                                    {setsList[0].weight}kg
-                                  </span>
-                                  {se.rpe && (
-                                    <span className="text-amber-500/80 text-xs">
-                                      @{parseFloat(se.rpe)}
-                                    </span>
-                                  )}
-                                </div>
+                          <li key={e.id} className="py-3 border-b border-line-soft flex flex-col gap-2">
+                            <div className="flex justify-between gap-3">
+                              <span className="font-semibold min-w-0">{e.name}</span>
+                              {rpes.length > 0 && (
+                                <span className="text-[13px] text-muted shrink-0">RPE {formatKg(Math.max(...rpes))}</span>
                               )}
                             </div>
-                            {!uniform && (
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 pl-2 text-xs">
-                                {setsList.map((set, i) => (
-                                  <span key={i} className="text-stone-400">
-                                    <span className="text-stone-600">
-                                      {i + 1}.
-                                    </span>{" "}
-                                    <span className="text-stone-300">
-                                      {set.reps}
-                                    </span>
-                                    <span className="text-stone-600">×</span>
-                                    <span className="text-stone-200 font-medium">
-                                      {set.weight}kg
-                                    </span>
-                                  </span>
-                                ))}
-                                {se.rpe && (
-                                  <span className="text-amber-500/80">
-                                    @{parseFloat(se.rpe)}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                            <ul className="flex flex-wrap gap-2" aria-label={`${e.name} sets`}>
+                              {e.sets.map((x, i) => (
+                                <li
+                                  key={i}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-lg bg-surface-2 font-display text-lg leading-tight tabular-nums",
+                                    x.warmup && "text-muted",
+                                    x.underloaded && "text-danger-soft"
+                                  )}
+                                >
+                                  {formatKg(x.weight)} × {x.reps}
+                                  {x.warmup && <span className="sr-only"> (warm-up)</span>}
+                                  {x.underloaded && <span className="sr-only"> (underloaded)</span>}
+                                </li>
+                              ))}
+                            </ul>
+                            {e.notes && <p className="text-[13px] text-muted">{e.notes}</p>}
+                          </li>
                         );
                       })}
+                    </ul>
 
-                    {s.notes && (
-                      <p className="text-xs text-stone-500 mt-3 italic">
-                        {s.notes}
-                      </p>
-                    )}
+                    {s.notes && <p className="mt-3 text-sm text-fg-2 leading-[1.45]">{s.notes}</p>}
 
-                    <div className="flex items-center gap-4 mt-2 pt-2 border-t border-stone-800/50">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(s)}
-                        className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-amber-500 transition-colors"
-                      >
-                        <ClipboardDocumentIcon className="w-3.5 h-3.5" />
-                        Copy for Claude
-                      </button>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Link href={`/session/${s.id}/finish`} className="btn-ghost">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M22 2L11 13" />
+                          <path d="M22 2l-7 20-4-9-9-4z" />
+                        </svg>
+                        {s.sent ? "Export" : "Export / send"}
+                      </Link>
                       <button
                         type="button"
                         onClick={() => handleDelete(s.id)}
-                        className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-red-400 transition-colors"
+                        disabled={deleting === s.id}
+                        className="btn-ghost text-danger-soft hover:bg-danger-bg disabled:opacity-50"
                       >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                        Delete
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                        </svg>
+                        {deleting === s.id ? "Deleting…" : "Delete"}
                       </button>
                     </div>
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </div>
   );

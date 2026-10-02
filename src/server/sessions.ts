@@ -6,6 +6,7 @@ import { todayInTz } from "@/lib/dates";
 import {
   blockedReason,
   flagsForSet,
+  formatSleep,
   renderSessionMarkdown,
   sessionCatches,
   sessionFileName,
@@ -372,6 +373,19 @@ export async function logSet(
 
   const sets = existing ? [...resolveSets(existing)] : [];
   const idx = Math.min(Math.max(0, input.setIndex), sets.length);
+
+  const [pi] = planItemId
+    ? await db.select().from(planItems).where(eq(planItems.id, planItemId))
+    : [];
+  const planned: PlanSet | null =
+    pi?.sets[idx] ?? pi?.sets.find((s) => s.type === "working") ?? null;
+  const nudge =
+    entry.type === "working" ? underloadNudge(ex, entry, planned, lastTop) : null;
+  // A set the app nudged as a warm-up is an underload even inside the 15% band,
+  // so the export and "What the app caught" match what the athlete saw.
+  if (nudge && !entry.flags?.includes("underloaded")) {
+    entry.flags = [...(entry.flags ?? []), "underloaded"];
+  }
   sets[idx] = entry;
 
   if (existing) {
@@ -380,29 +394,16 @@ export async function logSet(
       .set({ setDetails: sets, ...aggregateColumns(sets) })
       .where(eq(sessionExercises.id, existing.id));
   } else {
-    let orderIndex = rows.length;
-    if (planItemId) {
-      const [pi] = await db.select().from(planItems).where(eq(planItems.id, planItemId));
-      if (pi) orderIndex = pi.orderIndex;
-    }
     await db.insert(sessionExercises).values({
       sessionId,
       exerciseId: ex.id,
       planItemId,
       setDetails: sets,
-      orderIndex,
+      orderIndex: pi?.orderIndex ?? rows.length,
       notes: null,
       ...aggregateColumns(sets),
     });
   }
-
-  let planned: PlanSet | null = null;
-  if (planItemId) {
-    const [pi] = await db.select().from(planItems).where(eq(planItems.id, planItemId));
-    planned = pi?.sets[idx] ?? pi?.sets.find((s) => s.type === "working") ?? null;
-  }
-  const nudge =
-    entry.type === "working" ? underloadNudge(ex, entry, planned, lastTop) : null;
 
   return { set: entry, nudge };
 }
@@ -536,7 +537,10 @@ export async function sessionExport(
     }))
   );
   if (view.progressionOnHold && view.checkIn?.sleepMin != null) {
-    catches.push({ kind: "recovery", text: "Sleep under the gate — progression held." });
+    catches.push({
+      kind: "recovery",
+      text: `Sleep ${formatSleep(view.checkIn.sleepMin)} — progression held.`,
+    });
   }
   return {
     fileName: sessionFileName(exp),

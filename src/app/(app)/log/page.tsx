@@ -1,9 +1,11 @@
 import { requireUserEmail } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { exercises, sessions } from "@/lib/db/schema";
-import { eq, desc, or, isNull } from "drizzle-orm";
+import { eq, or, isNull } from "drizzle-orm";
 import SessionForm from "@/components/session-form";
 import type { Exercise } from "@/lib/types";
+
+export const metadata = { title: "Log a session" };
 
 export default async function LogPage() {
   const email = await requireUserEmail();

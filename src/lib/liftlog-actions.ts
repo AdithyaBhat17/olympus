@@ -268,7 +268,7 @@ export async function updateWorkingWeightAction(input: {
       })
       .parse(input);
     const res = await updateWorkingWeight(userId, v, "user");
-    revalidatePath("/progress");
+    revalidatePath("/progress", "layout");
     return { ok: res.ok, message: res.message };
   });
 }

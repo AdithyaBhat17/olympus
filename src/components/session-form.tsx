@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import {
   PlusIcon,
   XMarkIcon,
@@ -251,9 +252,23 @@ export default function SessionForm({
   }
 
   return (
-    <div className="py-6 space-y-5">
+    <div className="px-4 pb-8 space-y-5 pt-[max(52px,calc(env(safe-area-inset-top)_+_8px))]">
       {/* Header */}
-      <h2 className="text-2xl font-black tracking-tight">NEW SESSION</h2>
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center gap-1 -ml-2">
+          <Link
+            href="/history"
+            aria-label="Back to log"
+            className="w-11 h-11 flex items-center justify-center rounded-xl text-fg hover:bg-surface"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </Link>
+          <span className="eyebrow font-normal">Manual entry</span>
+        </div>
+        <h1 className="px-1 font-display font-bold text-[44px] leading-none">Log a session</h1>
+      </header>
 
       {/* Session info */}
       <div className="card space-y-3">
@@ -261,6 +276,7 @@ export default function SessionForm({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
+          aria-label="Date"
           className="input-base"
         />
 
@@ -271,6 +287,7 @@ export default function SessionForm({
             onChange={(e) => setSessionName(e.target.value)}
             list="session-names"
             placeholder="Session name (e.g. Upper A — Push)"
+            aria-label="Session name"
             className="input-base"
           />
           <datalist id="session-names">
@@ -284,7 +301,7 @@ export default function SessionForm({
           <button
             type="button"
             onClick={handleQuickFill}
-            className="btn-secondary flex items-center justify-center gap-2 text-sm text-amber-500 border-amber-500/30 hover:border-amber-500/50"
+            className="btn-secondary flex items-center justify-center gap-2 text-sm text-accent border-accent-line hover:border-accent"
           >
             <ArrowPathIcon className="w-4 h-4" />
             Fill from last &quot;{sessionName}&quot;
@@ -293,10 +310,11 @@ export default function SessionForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1 block">
+            <label htmlFor="log-week" className="eyebrow text-xs mb-1 block">
               Week
             </label>
             <select
+              id="log-week"
               value={weekNumber}
               onChange={(e) => setWeekNumber(e.target.value)}
               className="select-base"
@@ -309,10 +327,11 @@ export default function SessionForm({
             </select>
           </div>
           <div>
-            <label className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1 block">
+            <label htmlFor="log-block" className="eyebrow text-xs mb-1 block">
               Block
             </label>
             <select
+              id="log-block"
               value={blockNumber}
               onChange={(e) => setBlockNumber(e.target.value)}
               className="select-base"
@@ -329,9 +348,9 @@ export default function SessionForm({
 
       {/* Exercises */}
       <div>
-        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+        <h2 className="eyebrow mb-3">
           Exercises
-        </h3>
+        </h2>
 
         <div className="space-y-3">
           {formExercises.map((ex, index) => (
@@ -361,7 +380,8 @@ export default function SessionForm({
                   <button
                     type="button"
                     onClick={() => removeExercise(ex.id)}
-                    className="p-2 text-stone-600 hover:text-red-400 transition-colors mt-1"
+                    aria-label="Remove exercise"
+                    className="w-11 h-11 flex items-center justify-center rounded-[10px] text-faint hover:text-danger-soft hover:bg-surface-2 transition-colors"
                   >
                     <XMarkIcon className="w-5 h-5" />
                   </button>
@@ -370,14 +390,14 @@ export default function SessionForm({
 
               {/* Per-set rows */}
               <div className="space-y-2">
-                <div className="grid grid-cols-[2rem_1fr_1fr_1.75rem] gap-2 items-center">
-                  <span className="text-[10px] font-semibold text-stone-600 uppercase">
+                <div className="grid grid-cols-[2rem_1fr_1fr_2.75rem] gap-2 items-center">
+                  <span className="text-[11px] font-semibold text-faint uppercase">
                     Set
                   </span>
-                  <span className="text-[10px] font-semibold text-stone-600 uppercase text-center">
+                  <span className="text-[11px] font-semibold text-faint uppercase text-center">
                     Reps
                   </span>
-                  <span className="text-[10px] font-semibold text-stone-600 uppercase text-center">
+                  <span className="text-[11px] font-semibold text-faint uppercase text-center">
                     Weight (kg)
                   </span>
                   <span />
@@ -386,9 +406,9 @@ export default function SessionForm({
                 {ex.sets.map((s, setIdx) => (
                   <div
                     key={setIdx}
-                    className="grid grid-cols-[2rem_1fr_1fr_1.75rem] gap-2 items-center"
+                    className="grid grid-cols-[2rem_1fr_1fr_2.75rem] gap-2 items-center"
                   >
-                    <span className="text-xs font-semibold text-stone-500 text-center">
+                    <span className="font-display text-lg font-semibold text-muted text-center">
                       {setIdx + 1}
                     </span>
                     <input
@@ -401,7 +421,8 @@ export default function SessionForm({
                         updateSet(ex.id, setIdx, { reps: e.target.value })
                       }
                       placeholder="8"
-                      className="input-base text-sm text-center"
+                      aria-label={`Set ${setIdx + 1} reps`}
+                      className="input-base font-display text-lg text-center px-2"
                     />
                     <input
                       type="number"
@@ -413,14 +434,15 @@ export default function SessionForm({
                         updateSet(ex.id, setIdx, { weight: e.target.value })
                       }
                       placeholder="0"
-                      className="input-base text-sm text-center"
+                      aria-label={`Set ${setIdx + 1} weight in kg`}
+                      className="input-base font-display text-lg text-center px-2"
                     />
                     <button
                       type="button"
                       onClick={() => removeSet(ex.id, setIdx)}
                       disabled={ex.sets.length <= 1}
                       className={cn(
-                        "p-1 text-stone-600 hover:text-red-400 transition-colors",
+                        "w-11 h-11 flex items-center justify-center rounded-[10px] text-faint hover:text-danger-soft hover:bg-surface-2 transition-colors",
                         ex.sets.length <= 1 && "opacity-30 cursor-not-allowed"
                       )}
                       aria-label={`Remove set ${setIdx + 1}`}
@@ -433,7 +455,7 @@ export default function SessionForm({
                 <button
                   type="button"
                   onClick={() => addSet(ex.id)}
-                  className="btn-secondary flex items-center justify-center gap-1.5 text-xs py-1.5 mt-1"
+                  className="btn-secondary h-11 flex items-center justify-center gap-1.5 text-sm mt-1"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   Add Set
@@ -442,10 +464,11 @@ export default function SessionForm({
 
               {/* RPE */}
               <div className="mt-3">
-                <label className="text-[10px] font-semibold text-stone-600 uppercase mb-1 block">
+                <label htmlFor={`rpe-${index}`} className="text-[11px] font-semibold text-faint uppercase mb-1 block">
                   RPE
                 </label>
                 <select
+                  id={`rpe-${index}`}
                   value={ex.rpe}
                   onChange={(e) =>
                     updateExercise(ex.id, { rpe: e.target.value })
@@ -469,7 +492,8 @@ export default function SessionForm({
                   updateExercise(ex.id, { notes: e.target.value })
                 }
                 placeholder="Notes (optional)"
-                className="input-base text-sm mt-2 text-stone-400"
+                aria-label="Exercise notes"
+                className="input-base text-[15px] mt-2 text-fg-2"
               />
             </div>
           ))}
@@ -490,10 +514,11 @@ export default function SessionForm({
 
       {/* Session notes */}
       <div>
-        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
-          Session Notes
-        </h3>
+        <label htmlFor="log-notes" className="eyebrow mb-3 block">
+          Session notes
+        </label>
         <textarea
+          id="log-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="How did it feel? Energy, sleep, anything notable..."
@@ -507,9 +532,9 @@ export default function SessionForm({
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className={cn("btn-primary text-lg font-bold", saving && "opacity-60")}
+        className={cn("btn-primary", saving && "opacity-60")}
       >
-        {saving ? "Saving..." : "Save Session"}
+        {saving ? "Saving…" : "Save session"}
       </button>
     </div>
   );
