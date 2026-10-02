@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { integrations } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { upsertCheckIn } from "../checkins";
 import { mainSleepByDate, type WhoopSleep } from "./whoop-parse";
 
@@ -153,5 +153,23 @@ export async function syncWhoopIfStale(userId: string): Promise<void> {
   const row = await getWhoop(userId);
   if (!row?.accessToken) return;
   if (row.lastSyncAt && Date.now() - row.lastSyncAt.getTime() < STALE_MS) return;
+  // Claim the slot atomically before syncing: concurrent page loads don't race
+  // the refresh-token rotation, and a failing connection is retried every
+  // 30 min instead of on every navigation (lastError still records failures).
+  const claimed = await db
+    .update(integrations)
+    .set({ lastSyncAt: new Date() })
+    .where(
+      and(
+        eq(integrations.userId, userId),
+        eq(integrations.provider, "whoop"),
+        or(
+          isNull(integrations.lastSyncAt),
+          lt(integrations.lastSyncAt, new Date(Date.now() - STALE_MS))
+        )
+      )
+    )
+    .returning({ userId: integrations.userId });
+  if (claimed.length === 0) return;
   await syncWhoop(userId, 3);
 }

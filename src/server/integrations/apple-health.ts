@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { integrations } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { isAllowedUser } from "@/lib/allowlist";
 import { sha256 } from "../oauth";
 
 /**
@@ -47,7 +48,8 @@ export async function userForIngestToken(raw: string): Promise<string | null> {
     .where(
       and(eq(integrations.provider, "apple_health"), eq(integrations.ingestTokenHash, sha256(raw)))
     );
-  return row?.userId ?? null;
+  // Dropping someone from ALLOWED_EMAILS revokes their ingest token too.
+  return row && isAllowedUser(row.userId) ? row.userId : null;
 }
 
 export async function markIngested(userId: string) {

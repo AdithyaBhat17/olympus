@@ -102,7 +102,7 @@ export async function workingWeights(
       .select({
         sessionId: sessions.id,
         date: sessions.date,
-        createdAt: sessions.createdAt,
+        finishedAt: sessions.finishedAt,
         se: sessionExercises,
       })
       .from(sessionExercises)
@@ -133,7 +133,14 @@ export async function workingWeights(
     const top = topSet(ex?.loadMode ?? "TOTAL", resolveSets(r.se));
     if (!top) continue;
     out.set(r.se.exerciseId, { kg: top.weight, date: r.date, source: "log" });
-    logTimes.set(r.se.exerciseId, new Date(`${r.date}T23:59:59Z`).getTime());
+    // When the log happened: its finish time, capped at the end of its date so a
+    // back-dated log_session doesn't outrank an override made after that date.
+    // Imported/legacy rows have no finish time and fall back to end of day.
+    const endOfDay = new Date(`${r.date}T23:59:59Z`).getTime();
+    logTimes.set(
+      r.se.exerciseId,
+      r.finishedAt ? Math.min(r.finishedAt.getTime(), endOfDay) : endOfDay
+    );
   }
   const seenOverride = new Set<string>();
   for (const o of overrides) {

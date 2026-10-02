@@ -19,13 +19,13 @@ export default async function FinishPage({
   const userId = await requireUserEmail();
 
   let view: Awaited<ReturnType<typeof getSessionView>>;
-  let exp: Awaited<ReturnType<typeof sessionExport>>;
   try {
-    [view, exp] = await Promise.all([getSessionView(userId, id), sessionExport(userId, id)]);
+    view = await getSessionView(userId, id);
   } catch (err) {
     if (err instanceof DomainError) notFound();
     throw err;
   }
+  const exp = sessionExport(view);
 
   const logged = view.items.flatMap((i) =>
     i.sets.map((s) => s.logged).filter((s): s is SetLogEntry => !!s)

@@ -1,7 +1,7 @@
 import "server-only";
 import { DomainError } from "./errors";
 import { db } from "@/lib/db";
-import { planItems, sessionExercises, sessions } from "@/lib/db/schema";
+import { dailyCheckIns, planItems, plans, sessionExercises, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { todayInTz } from "@/lib/dates";
 import {
@@ -66,6 +66,8 @@ export interface LiveItemView {
   cues: string[];
   pairGroup: string | null;
   sets: LiveSetView[];
+  /** Per-exercise note on the logged row (log_session, imported history). */
+  notes: string | null;
   lastTopKg: number | null;
   done: boolean;
   coachFlags: string[];
@@ -112,6 +114,62 @@ async function exerciseIndex(userId: string) {
   const rows = await listExerciseRows(userId);
   const domain = rows.map((r) => ({ ...toDomainExercise(r), formCueId: r.formCueId }));
   return { domain, byId: new Map(domain.map((e) => [e.id, e])) };
+}
+
+type PlanItemRow = typeof planItems.$inferSelect;
+
+interface AssembledItem {
+  key: string;
+  planItemId: string | null;
+  exerciseId: string;
+  plannedExerciseId: string | null;
+  planItem: PlanItemRow | null;
+  row: SessionExerciseRow | undefined;
+}
+
+/**
+ * Plan items in plan order (swaps applied), each with the row logged for its
+ * current exercise; then every other logged row — unplanned additions and
+ * sets logged before a swap — so no logged set is ever dropped.
+ */
+function assembleItems(
+  plan: { items: PlanItemRow[] } | null,
+  swaps: Record<string, { exerciseId: string }>,
+  logged: SessionExerciseRow[]
+): AssembledItem[] {
+  const out: AssembledItem[] = [];
+  const used = new Set<string>();
+  const planItemIds = new Set((plan?.items ?? []).map((it) => it.id));
+  for (const it of plan?.items ?? []) {
+    const actual = swaps[it.id]?.exerciseId ?? it.exerciseId;
+    const row = logged.find((se) => se.planItemId === it.id && se.exerciseId === actual);
+    if (row) used.add(row.id);
+    out.push({
+      key: it.id,
+      planItemId: it.id,
+      exerciseId: actual,
+      plannedExerciseId: it.exerciseId,
+      planItem: it,
+      row,
+    });
+  }
+  for (const se of logged) {
+    if (used.has(se.id)) continue;
+    out.push({
+      key: `x-${se.id}`,
+      // Keep the plan item id when it's this plan's, so logSet/removeSet find the row.
+      planItemId: se.planItemId && planItemIds.has(se.planItemId) ? se.planItemId : null,
+      exerciseId: se.exerciseId,
+      plannedExerciseId: null,
+      planItem: null,
+      row: se,
+    });
+  }
+  return out;
+}
+
+function sessionTitle(session: SessionRow, plan: { title: string } | null): string {
+  return plan?.title ?? session.sessionName.replace(/^Session \S+ · /, "");
 }
 
 async function ownedSession(userId: string, sessionId: string): Promise<SessionRow> {
@@ -165,11 +223,6 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     ).then((pairs) => new Map(pairs)),
   ]);
 
-  const findLogged = (planItemId: string | null, exerciseId: string) =>
-    logged.find((se) =>
-      planItemId ? se.planItemId === planItemId : !se.planItemId && se.exerciseId === exerciseId
-    );
-
   const buildItem = (
     key: string,
     planItemId: string | null,
@@ -202,6 +255,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       cues: [],
       pairGroup: null,
       sets,
+      notes: row?.notes ?? null,
       lastTopKg: tops.get(exId)?.kg ?? null,
       done: planned.length > 0 ? done.length >= planned.length : done.length > 0,
       coachFlags: flagsFor(openFlags, { exerciseId: exId }).filter((f) => f.scope === "exerciseId").map((f) => f.text),
@@ -211,24 +265,19 @@ export async function getSessionView(userId: string, sessionId: string): Promise
   };
 
   const items: LiveItemView[] = [];
-  for (const it of plan?.items ?? []) {
-    const actual = swaps[it.id]?.exerciseId ?? it.exerciseId;
+  for (const a of assembleItems(plan, swaps, logged)) {
+    const it = a.planItem;
     const v = buildItem(
-      it.id,
-      it.id,
-      actual,
-      it.exerciseId,
-      it.sets,
-      { restSec: it.restSec, straps: it.straps, cues: it.cues, pairGroup: it.pairGroup },
-      findLogged(it.id, actual)
+      a.key,
+      a.planItemId,
+      a.exerciseId,
+      a.plannedExerciseId,
+      it?.sets ?? [],
+      it
+        ? { restSec: it.restSec, straps: it.straps, cues: it.cues, pairGroup: it.pairGroup }
+        : { restSec: byId.get(a.exerciseId)?.isCompound ? 180 : 90 },
+      a.row
     );
-    if (v) items.push(v);
-  }
-  for (const se of logged) {
-    if (se.planItemId && plan?.items.some((it) => it.id === se.planItemId)) continue;
-    const v = buildItem(`x-${se.id}`, null, se.exerciseId, null, [], {
-      restSec: byId.get(se.exerciseId)?.isCompound ? 180 : 90,
-    }, se);
     if (v) items.push(v);
   }
 
@@ -238,7 +287,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     date: session.date,
     status: session.status,
     sessionType: session.sessionType,
-    title: plan?.title ?? session.sessionName.replace(/^Session \S+ · /, ""),
+    title: sessionTitle(session, plan),
     notes: session.notes,
     startedAt: session.startedAt?.toISOString() ?? null,
     finishedAt: session.finishedAt?.toISOString() ?? null,
@@ -516,11 +565,10 @@ export async function discardSession(userId: string, sessionId: string) {
 // Finish screen + exports
 // ---------------------------------------------------------------------------
 
-export async function sessionExport(
-  userId: string,
-  sessionId: string
-): Promise<{ fileName: string; markdown: string; export: ExportSession; catches: SessionCatch[] }> {
-  const view = await getSessionView(userId, sessionId);
+/** Finish-screen export, built from a view the caller already loaded. */
+export function sessionExport(
+  view: SessionView
+): { fileName: string; markdown: string; export: ExportSession; catches: SessionCatch[] } {
   const exp: ExportSession = {
     date: view.date,
     sessionType: view.sessionType,
@@ -533,6 +581,7 @@ export async function sessionExport(
         name: i.exercise.name,
         loadMode: i.exercise.loadMode,
         straps: i.straps,
+        notes: i.notes,
         sets: i.sets.map((s) => s.logged).filter((s): s is SetLogEntry => !!s),
       })),
   };
@@ -611,6 +660,7 @@ export async function getSessionsDetailed(userId: string, f: SessionFilters) {
           exerciseId: i.exercise.slug ?? i.exercise.id,
           plannedExercise: i.swapped ? i.plannedExercise?.name ?? null : undefined,
           loadMode: i.exercise.loadMode,
+          notes: i.notes,
           lastTopKgBefore: i.lastTopKg,
           sets: i.sets.map((st) => ({
             set: st.index + 1,
@@ -674,6 +724,13 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
   const resolved = p.exercises.map((e) => ({ e, ex: resolveRef(domain, e.exerciseId) }));
   const unknown = resolved.filter((r) => !r.ex).map((r) => r.e.exerciseId);
   if (unknown.length) throw new DomainError(`Unknown exercise(s): ${unknown.join(", ")}`);
+  // Validate everything before the first insert: neon-http has no transactions.
+  const noLoad = p.exercises.filter((e) => e.sets.some((st) => st.kg == null && st.platesKg == null));
+  if (noLoad.length) {
+    throw new DomainError(
+      `Every set needs kg or platesKg (use kg: 0 for bodyweight): ${noLoad.map((e) => e.exerciseId).join(", ")}`
+    );
+  }
 
   const ids = resolved.map((r) => r.ex!.id);
   const tops = await workingWeights(userId, domain, { exerciseIds: ids });
@@ -706,7 +763,7 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
     const lastTop = tops.get(d.id)?.kg ?? null;
     const blocked = blockedReason(d, cons) != null;
     const sets: SetLogEntry[] = e.sets.map((st) => {
-      const weight = st.platesKg != null ? trueKg(d, st.platesKg) : st.kg ?? 0;
+      const weight = st.platesKg != null ? trueKg(d, st.platesKg) : st.kg!;
       const type = st.type ?? "working";
       return {
         reps: st.reps,
@@ -731,10 +788,17 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
   return { sessionId: s.id, warnings: flagged };
 }
 
-/** All DONE sessions as ExportSessions, newest first (for latest.md). */
-export async function exportSessions(userId: string, opts: { date?: string; limit?: number } = {}) {
+/**
+ * All DONE sessions as ExportSessions, newest first (for latest.md). Batched:
+ * a fixed handful of queries however many sessions, since the export needs no
+ * per-session history lookups.
+ */
+export async function exportSessions(
+  userId: string,
+  opts: { date?: string; limit?: number } = {}
+): Promise<ExportSession[]> {
   const rows = await db
-    .select({ id: sessions.id })
+    .select()
     .from(sessions)
     .where(
       and(
@@ -745,9 +809,63 @@ export async function exportSessions(userId: string, opts: { date?: string; limi
     )
     .orderBy(desc(sessions.date), desc(sessions.createdAt))
     .limit(opts.limit ?? 200);
-  const out: ExportSession[] = [];
-  for (const r of rows) out.push((await sessionExport(userId, r.id)).export);
-  return out;
+  if (rows.length === 0) return [];
+
+  const planIds = Array.from(new Set(rows.map((r) => r.planId).filter((id): id is string => !!id)));
+  const dates = Array.from(new Set(rows.map((r) => r.date)));
+  const [{ byId }, logged, planRows, checkIns] = await Promise.all([
+    exerciseIndex(userId),
+    db
+      .select()
+      .from(sessionExercises)
+      .where(inArray(sessionExercises.sessionId, rows.map((r) => r.id)))
+      .orderBy(asc(sessionExercises.orderIndex)),
+    planIds.length
+      ? db.query.plans.findMany({
+          where: and(eq(plans.userId, userId), inArray(plans.id, planIds)),
+          with: { items: { orderBy: [asc(planItems.orderIndex)] } },
+        })
+      : Promise.resolve([]),
+    db
+      .select()
+      .from(dailyCheckIns)
+      .where(and(eq(dailyCheckIns.userId, userId), inArray(dailyCheckIns.date, dates))),
+  ]);
+
+  const planById = new Map(planRows.map((p) => [p.id, p]));
+  const checkInByDate = new Map(checkIns.map((c) => [c.date, c]));
+  const loggedBySession = new Map<string, SessionExerciseRow[]>();
+  for (const se of logged) {
+    const list = loggedBySession.get(se.sessionId) ?? [];
+    list.push(se);
+    loggedBySession.set(se.sessionId, list);
+  }
+
+  return rows.map((s) => {
+    const plan = s.planId ? planById.get(s.planId) ?? null : null;
+    const c = checkInByDate.get(s.date);
+    return {
+      date: s.date,
+      sessionType: s.sessionType,
+      title: sessionTitle(s, plan),
+      notes: s.notes,
+      checkIn: c ? { sleepMin: c.sleepMin, proteinG: c.proteinG, waterMl: c.waterMl } : null,
+      exercises: assembleItems(plan, s.swaps ?? {}, loggedBySession.get(s.id) ?? []).flatMap((a) => {
+        const ex = byId.get(a.exerciseId);
+        const sets = a.row ? resolveSets(a.row) : [];
+        if (!ex || sets.length === 0) return [];
+        return [
+          {
+            name: ex.name,
+            loadMode: ex.loadMode,
+            straps: a.planItem?.straps ?? false,
+            notes: a.row?.notes ?? null,
+            sets,
+          },
+        ];
+      }),
+    };
+  });
 }
 
 /** Recent rotation types, newest first. */

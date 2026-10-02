@@ -568,7 +568,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       description:
         "Pull context and the last two sessions of the next type, apply the rules, draft a table, wait for approval, then push_plan.",
       argsSchema: {
-        date: z.string().optional().describe("YYYY-MM-DD, defaults to today"),
+        date: isoDate.optional().describe("YYYY-MM-DD, defaults to today"),
         sessionType: z.string().optional().describe("Override the rotation (A/B/C)"),
       },
     },
