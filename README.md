@@ -57,7 +57,8 @@ cp .env.local.example .env.local
 
 Every variable is documented in `.env.local.example`. You need at least
 `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and
-`APP_URL`. Set `MCP_ALLOWED_EMAILS` to lock the MCP to your account.
+`APP_URL`. Set `ALLOWED_EMAILS` to your Google address: it locks sign-in,
+the MCP connector, and edits to the shared exercise library to you.
 
 ### 5. Run
 

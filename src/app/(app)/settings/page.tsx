@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { auth, requireUserEmail } from "@/lib/auth";
 import { formatSleep } from "@/domain";
-import { connectionStatus } from "@/server/oauth";
+import { connectionStatus, publicOrigin } from "@/server/oauth";
 import { recentToolCalls } from "@/server/audit";
 import { getWhoop, whoopConfigured } from "@/server/integrations/whoop";
 import { getAppleHealth } from "@/server/integrations/apple-health";
@@ -73,9 +73,9 @@ export default async function SettingsPage({
   const session = await auth();
   const sp = await searchParams;
   const h = await headers();
-  const origin =
-    process.env.APP_URL?.replace(/\/$/, "") ??
-    `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+  const origin = publicOrigin(
+    new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h })
+  );
 
   const [clients, calls, whoop, health, recovery] = await Promise.all([
     connectionStatus(userId),

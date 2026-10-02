@@ -3,6 +3,9 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { oauthClients, oauthCodes, oauthTokens } from "@/lib/db/schema";
 import { and, eq, gt, isNull } from "drizzle-orm";
+import { isAllowedUser } from "@/lib/allowlist";
+
+export { isAllowedUser };
 
 /**
  * Minimal OAuth 2.1 authorization server for the MCP endpoint, per the MCP
@@ -27,6 +30,9 @@ function token(bytes = 32): string {
 /** Public origin. Prefer APP_URL so tokens/issuer never depend on Host headers. */
 export function publicOrigin(req: Request): string {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
   const h = req.headers;
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
@@ -58,26 +64,43 @@ export function protectedResourceMetadata(origin: string) {
   };
 }
 
-/** Optional allowlist. Unset = any signed-in user (each only sees their own data). */
-export function isAllowedUser(email: string): boolean {
-  const list = (process.env.MCP_ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return list.length === 0 || list.includes(email.toLowerCase());
-}
-
 // ---------------------------------------------------------------------------
 // Dynamic client registration
 // ---------------------------------------------------------------------------
 
+/**
+ * Registration is open (that's how Claude connects), so the redirect target
+ * is what keeps a look-alike client from phishing a token: only Claude's own
+ * callback hosts, loopback (Claude Code / Desktop, RFC 8252), and any hosts
+ * listed in OAUTH_REDIRECT_HOSTS.
+ */
+const DEFAULT_REDIRECT_HOSTS = ["claude.ai", "claude.com"];
+const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+
+export function redirectHostAllowed(host: string): boolean {
+  const extra = (process.env.OAUTH_REDIRECT_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  return [...DEFAULT_REDIRECT_HOSTS, ...extra].includes(host.toLowerCase());
+}
+
 export function isAcceptableRedirectUri(uri: string): boolean {
   try {
     const u = new URL(uri);
-    if (u.hash) return false;
-    if (u.protocol === "https:") return true;
-    // Loopback for desktop/CLI clients (RFC 8252).
-    return u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+    if (u.hash || u.username || u.password) return false;
+    if (u.protocol === "https:") return redirectHostAllowed(u.hostname);
+    return u.protocol === "http:" && LOOPBACK.includes(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Claude's hosted clients, as opposed to a local app on loopback. */
+export function isClaudeRedirect(uri: string): boolean {
+  try {
+    const u = new URL(uri);
+    return u.protocol === "https:" && DEFAULT_REDIRECT_HOSTS.includes(u.hostname);
   } catch {
     return false;
   }
@@ -208,6 +231,21 @@ export async function refreshTokens(input: { refreshToken: string; clientId: str
     .select()
     .from(oauthTokens)
     .where(and(eq(oauthTokens.tokenHash, hash), eq(oauthTokens.kind, "refresh")));
+  if (row?.revokedAt && row.clientId === input.clientId) {
+    // A rotated-out refresh token came back: assume it was stolen and kill
+    // every live token this client holds for the user (RFC 9700 §4.14.2).
+    await db
+      .update(oauthTokens)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(oauthTokens.userId, row.userId),
+          eq(oauthTokens.clientId, row.clientId),
+          isNull(oauthTokens.revokedAt)
+        )
+      );
+    throw new OAuthError("invalid_grant", "Refresh token reuse detected; all tokens revoked");
+  }
   if (!row || row.revokedAt || row.expiresAt.getTime() < Date.now()) {
     throw new OAuthError("invalid_grant", "Refresh token is invalid or expired");
   }

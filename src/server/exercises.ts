@@ -1,4 +1,6 @@
 import "server-only";
+import { isOwner } from "@/lib/allowlist";
+import { DomainError } from "./errors";
 import { db } from "@/lib/db";
 import { constraints, exercises } from "@/lib/db/schema";
 import { and, eq, isNull, or } from "drizzle-orm";
@@ -139,14 +141,23 @@ export async function setCarriage(
   exerciseId: string,
   kgPerSide: number | null
 ): Promise<void> {
-  // Global library rows are shared; custom rows are per user.
-  await db
+  // Custom rows belong to their creator. Global library rows are shared, so
+  // only an owner (listed in ALLOWED_EMAILS) may calibrate them.
+  const res = await db
     .update(exercises)
     .set({ carriageKgPerSide: kgPerSide == null ? null : kgPerSide.toFixed(2) })
     .where(
       and(
         eq(exercises.id, exerciseId),
-        or(isNull(exercises.createdBy), eq(exercises.createdBy, userId))
+        isOwner(userId)
+          ? or(isNull(exercises.createdBy), eq(exercises.createdBy, userId))
+          : eq(exercises.createdBy, userId)
       )
+    )
+    .returning({ id: exercises.id });
+  if (res.length === 0) {
+    throw new DomainError(
+      "Only the app owner can change shared machines. Add your email to ALLOWED_EMAILS."
     );
+  }
 }

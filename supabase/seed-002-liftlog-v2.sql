@@ -9,7 +9,7 @@ INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES
           'flat-palm push-up']),
   (NULL, 'Shoulder · impingement', 'No barbell overhead or behind-the-neck pressing',
     ARRAY['barbell OHP', 'behind-the-neck press']),
-  (NULL, 'Right knee', 'Machine squat to the depth stop only; knees track the 2nd–3rd toe',
+  (NULL, 'Right knee', 'Machine squat to the depth stop only, knees tracking the 2nd–3rd toe',
     ARRAY[]::TEXT[])
 ON CONFLICT (region) WHERE user_id IS NULL DO UPDATE
   SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;

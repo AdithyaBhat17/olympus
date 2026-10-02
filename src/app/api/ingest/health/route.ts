@@ -15,7 +15,15 @@ export const runtime = "nodejs";
 
 const day = z
   .object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}/)
+      .refine((d) => {
+        const iso = d.slice(0, 10);
+        const t = new Date(`${iso}T00:00:00Z`);
+        return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === iso;
+      }, "Not a real date")
+      .optional(),
     proteinG: z.coerce.number().min(0).max(1000).optional(),
     waterMl: z.coerce.number().min(0).max(20000).optional(),
     waterL: z.coerce.number().min(0).max(20).optional(),

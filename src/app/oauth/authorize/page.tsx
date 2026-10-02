@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getClient, isAllowedUser } from "@/server/oauth";
+import {
+  getClient,
+  isAcceptableRedirectUri,
+  isAllowedUser,
+  isClaudeRedirect,
+} from "@/server/oauth";
 import { decideAction, type AuthorizeParams } from "./actions";
 
 type SP = Record<string, string | string[] | undefined>;
@@ -30,6 +35,10 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
   if (!client) return <ErrorScreen message="Unknown client. Remove the connector in Claude and add it again." />;
   if (!client.redirectUris.includes(redirectUri)) {
     return <ErrorScreen message="redirect_uri isn't registered for this client." />;
+  }
+  // Clients registered before the redirect allowlist existed get re-checked here.
+  if (!isAcceptableRedirectUri(redirectUri)) {
+    return <ErrorScreen message="This client sends codes somewhere other than Claude. Not allowed." />;
   }
 
   const fail = (error: string, description: string) => {
@@ -64,6 +73,10 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     resource: one(sp.resource),
   };
   const host = new URL(redirectUri).host;
+  // The client's name is self-declared at registration, so the heading is
+  // driven by where the code goes, never by what the client calls itself.
+  const fromClaude = isClaudeRedirect(redirectUri);
+  const who = fromClaude ? "Claude" : "an app on this computer";
 
   return (
     <main className="min-h-screen flex items-center justify-center px-5 bg-bg">
@@ -71,11 +84,19 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         <div className="flex flex-col gap-2">
           <span className="eyebrow">Connect</span>
           <h1 className="font-display text-[40px] font-bold leading-none">
-            Let {client.clientName ?? "this app"} use your LiftLog?
+            Let {who} use your LiftLog?
           </h1>
           <p className="text-sm text-muted">
-            Signed in as <span className="text-fg-2">{email}</span>. Returns to{" "}
-            <span className="font-mono text-xs text-fg-2">{host}</span>.
+            Signed in as <span className="text-fg-2">{email}</span>. Access goes to{" "}
+            <span className="font-mono text-xs text-fg-2">{host}</span>
+            {client.clientName && (
+              <>
+                {" "}
+                (calls itself &ldquo;{client.clientName}&rdquo;)
+              </>
+            )}
+            .
+            {!fromClaude && " Only allow this if you just started a connection from Claude Code or Claude Desktop."}
           </p>
         </div>
         <ul className="card flex flex-col gap-3 text-sm leading-snug">

@@ -72,7 +72,9 @@ export async function saveSubscription(
     .values({ userId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth })
     .onConflictDoUpdate({
       target: pushSubscriptions.endpoint,
-      set: { userId, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+      set: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+      // Only refresh your own subscription; never take over another user's.
+      setWhere: eq(pushSubscriptions.userId, userId),
     });
 }
 

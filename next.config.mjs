@@ -9,6 +9,8 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // No next/image in this app: keep the optimizer (and sharp/libvips) unreachable.
+  images: { unoptimized: true, localPatterns: [], remotePatterns: [] },
   // OAuth discovery for the MCP connector lives under /.well-known.
   async rewrites() {
     return [

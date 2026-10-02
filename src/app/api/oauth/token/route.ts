@@ -4,8 +4,18 @@ import { json, preflight } from "../cors";
 async function readParams(req: Request): Promise<URLSearchParams> {
   const type = req.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
-    const body = (await req.json()) as Record<string, string>;
-    return new URLSearchParams(body);
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      throw new OAuthError("invalid_request", "Body must be JSON or form-encoded");
+    }
+    if (!body || typeof body !== "object") {
+      throw new OAuthError("invalid_request", "Body must be an object");
+    }
+    return new URLSearchParams(
+      Object.entries(body as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+    );
   }
   return new URLSearchParams(await req.text());
 }

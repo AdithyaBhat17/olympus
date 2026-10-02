@@ -2,7 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { createAuthCode, getClient, isAllowedUser, MCP_SCOPE } from "@/server/oauth";
+import {
+  createAuthCode,
+  getClient,
+  isAcceptableRedirectUri,
+  isAllowedUser,
+  MCP_SCOPE,
+} from "@/server/oauth";
 
 export interface AuthorizeParams {
   clientId: string;
@@ -24,7 +30,11 @@ export async function decideAction(params: AuthorizeParams, allow: boolean) {
   const session = await auth();
   const email = session?.user?.email;
   const client = await getClient(params.clientId);
-  if (!client || !client.redirectUris.includes(params.redirectUri)) {
+  if (
+    !client ||
+    !client.redirectUris.includes(params.redirectUri) ||
+    !isAcceptableRedirectUri(params.redirectUri)
+  ) {
     throw new Error("Invalid client or redirect_uri");
   }
   if (!email) redirect("/login");

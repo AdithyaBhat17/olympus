@@ -4,7 +4,7 @@ import { workingWeightOverrides } from "@/lib/db/schema";
 import { checkWeightJump, formatKg } from "@/domain";
 import { listExercises, resolveRef } from "./exercises";
 import { workingWeights } from "./history";
-import { DomainError } from "./sessions";
+import { DomainError } from "./errors";
 
 /**
  * Audited working-weight override. More than 2 increments needs force + reason

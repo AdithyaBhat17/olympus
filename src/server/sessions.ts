@@ -1,4 +1,5 @@
 import "server-only";
+import { DomainError } from "./errors";
 import { db } from "@/lib/db";
 import { planItems, sessionExercises, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
@@ -28,7 +29,7 @@ import { getPlan, setPlanStatus } from "./plans";
 type SessionRow = typeof sessions.$inferSelect;
 type SessionExerciseRow = typeof sessionExercises.$inferSelect;
 
-export class DomainError extends Error {}
+export { DomainError };
 
 // ---------------------------------------------------------------------------
 // View models (serializable — passed straight to client components)
@@ -374,9 +375,15 @@ export async function logSet(
   const sets = existing ? [...resolveSets(existing)] : [];
   const idx = Math.min(Math.max(0, input.setIndex), sets.length);
 
-  const [pi] = planItemId
-    ? await db.select().from(planItems).where(eq(planItems.id, planItemId))
-    : [];
+  // The plan item must belong to this session's own plan.
+  const [pi] =
+    planItemId && session.planId
+      ? await db
+          .select()
+          .from(planItems)
+          .where(and(eq(planItems.id, planItemId), eq(planItems.planId, session.planId)))
+      : [];
+  if (planItemId && !pi) throw new DomainError("Plan item isn't part of this session");
   const planned: PlanSet | null =
     pi?.sets[idx] ?? pi?.sets.find((s) => s.type === "working") ?? null;
   const nudge =
