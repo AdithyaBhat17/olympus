@@ -1,23 +1,39 @@
 import { requireUserEmail } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { exercises } from "@/lib/db/schema";
-import { or, isNull, eq } from "drizzle-orm";
-import ExerciseList from "@/components/exercise-list";
-import type { Exercise } from "@/lib/types";
+import { describeExercise, getConstraints, listExerciseRows, toDomainExercise } from "@/server/exercises";
+import ExerciseList, { type LibraryExercise } from "@/components/exercise-list";
+
+export const metadata = { title: "Library" };
 
 export default async function ExercisesPage() {
   const email = await requireUserEmail();
+  const [rows, cons] = await Promise.all([listExerciseRows(email), getConstraints(email)]);
+  const all = rows.map(toDomainExercise);
 
-  const allExercises = await db
-    .select()
-    .from(exercises)
-    .where(or(isNull(exercises.createdBy), eq(exercises.createdBy, email)))
-    .orderBy(exercises.category, exercises.name);
+  const items: LibraryExercise[] = rows.map((row, i) => {
+    const hit = describeExercise(all[i], all, cons);
+    return {
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      status: row.status,
+      isCustom: row.isCustom,
+      loadMode: all[i].loadMode,
+      carriageKgPerSide: all[i].carriageKgPerSide,
+      blocked: hit.blocked,
+      blockedReason: hit.blockedReason,
+      substitutes: hit.substitutes.map((s) => s.name),
+    };
+  });
 
   return (
-    <div className="py-6">
-      <h2 className="text-2xl font-black tracking-tight mb-6">EXERCISES</h2>
-      <ExerciseList exercises={allExercises as Exercise[]} />
+    <div className="flex flex-col pb-8">
+      <header className="px-5 pb-1 flex flex-col gap-0.5 pt-[max(56px,calc(env(safe-area-inset-top)_+_12px))]">
+        <span className="eyebrow font-normal">
+          {items.filter((e) => !e.blocked).length} available · {items.filter((e) => e.blocked).length} blocked
+        </span>
+        <h1 className="font-display font-bold text-[44px] leading-none">Library</h1>
+      </header>
+      <ExerciseList exercises={items} />
     </div>
   );
 }

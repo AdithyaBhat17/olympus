@@ -1,0 +1,151 @@
+{
+  "source": "Lift_Log.md (Obsidian), reconstructed 22/08/2026 + entries to 21/09/2026",
+  "userId": "evilpotato345@gmail.com",
+  "newExercises": [
+    { "name": "Push-Up (flat palm)", "category": "Upper Body — Push (Horizontal)", "status": "NO", "equipment": "bodyweight", "bodyRegion": "upper", "blockedReason": "Flat-palm loading. Left wrist (TFCC)." },
+    { "name": "Tricep Pushdown (straight bar)", "category": "Arms", "status": "NO", "equipment": "cable", "bodyRegion": "upper", "blockedReason": "Straight-bar pushdown. Left wrist (TFCC).", "substituteSlugs": ["rope-pushdown"] },
+    { "name": "Machine Chest Fly", "category": "Upper Body — Push (Horizontal)", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Machine Tricep Press", "category": "Arms", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Machine Torso Rotation", "category": "Core", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Machine Abdomen Crunch", "category": "Core", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Machine Abdomen Crunch (lower)", "category": "Core", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Ab Crunch (Matrix)", "category": "Core", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Ab Crunch (Life Fitness)", "category": "Core", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Machine Lateral Raise", "category": "Upper Body — Push (Vertical)", "equipment": "machine", "bodyRegion": "upper" },
+    { "name": "Forearm / Wrist Curl", "category": "Arms", "equipment": "dumbbell", "bodyRegion": "upper" },
+    { "name": "DB Pullover", "category": "Upper Body — Pull (Vertical)", "equipment": "dumbbell", "bodyRegion": "upper" },
+    { "name": "DB Romanian Deadlift", "category": "Lower Body — Posterior Chain", "status": "NO", "equipment": "dumbbell", "bodyRegion": "lower", "isCompound": true, "blockedReason": "Lower back pain on 21/09 — removed until the back is symptom-free." }
+  ],
+  "constraints": [
+    { "region": "Lower back · lumbar irritation", "rule": "Logged 19/08; DB RDL brought on pain 21/09. No loaded spinal hinging in Session A until symptom-free. Radiating pain below the knee, numbness or foot weakness = physio first.", "blockedPatterns": ["romanian deadlift", "stiff leg deadlift", "good morning"] },
+    { "region": "Thyroid · Hashimoto's", "rule": "Hypothyroid: recovery is the limiter, not effort. Sleep and protein come before load.", "blockedPatterns": [] }
+  ],
+  "sessions": [
+    {
+      "date": "2026-08-05", "type": "C", "title": "Chest, Triceps & Core",
+      "notes": "Machine gym (not Al Reef). Rest periods too short (60–90 s, including compounds) — paced like a circuit, which is why the horizontal press top set collapsed to 5. Pre-session 8 min walk + 4 min run. Garmin: 63 min, avg HR 132, max 163, 351 kcal. Next C: 6 exercises, 3 min rest on presses, open horizontal press at 20/side and rope pushdown at 15.",
+      "checkIn": { "sleepMin": 360 },
+      "exercises": [
+        { "name": "Push-Up (flat palm)", "rpe": 8, "blockedOverride": true, "notes": "Flat palm — retired movement (wrist).", "sets": [[0, 12], [0, 10]] },
+        { "name": "Iso-Lateral Horizontal Press", "rpe": 9, "plates": true, "notes": "Carriage not yet known at the time; true load = plates + 8.2.", "sets": [[15, 10], [20, 5], [20, 7], [15, 8]] },
+        { "name": "Rope Pushdown", "rpe": 8, "notes": "Set 1 at 15 reps — too light.", "sets": [[10, 15], [12.5, 10]] },
+        { "name": "Iso-Lateral Decline Press", "rpe": 9, "plates": true, "notes": "Best loading of the session.", "sets": [[27.5, 7], [27.5, 7], [22.5, 10]] },
+        { "name": "Tricep Pushdown (straight bar)", "rpe": 8, "blockedOverride": true, "notes": "Straight bar — retired movement (wrist).", "sets": [[15, 12], [15, 12], [17.5, 10]] },
+        { "name": "Machine Chest Fly", "rpe": 9, "sets": [[35, 12], [35, 9], [27.5, 15]] },
+        { "name": "Machine Tricep Press", "rpe": 9, "notes": "Clean ascending load.", "sets": [[42.5, 12], [50, 12], [57.5, 10]] },
+        { "name": "Machine Torso Rotation", "rpe": 8, "sets": [[35, 12], [42.5, 12], [42.5, 12]] },
+        { "name": "Machine Abdomen Crunch", "rpe": 8, "sets": [[35, 10], [35, 10], [35, 10]] },
+        { "name": "Machine Abdomen Crunch (lower)", "rpe": 8, "sets": [[27, 10], [27, 10], [27, 10]] }
+      ]
+    },
+    {
+      "date": "2026-08-10", "type": "A", "title": "Legs & Shoulders",
+      "notes": "Calibration. Romanian deadlift skipped (3rd consecutive Session A); leg extension not done; no post-session cardio. 6 of 8 first sets landed at 15 reps — systematic underloading. Right knee: pain at depth on hack squat. Garmin: 63:45, avg HR 125, max 154, 334 kcal.",
+      "checkIn": { "sleepMin": 350, "proteinG": 150, "waterMl": 3500 },
+      "exercises": [
+        { "name": "Machine Shoulder Press", "rpe": 6, "notes": "Far too light — never loaded up across 3 sets.", "sets": [[20, 15], [20, 15], [20, 12]] },
+        { "name": "Hack Squat (machine)", "rpe": 8, "notes": "Knee pain at depth, ROM cut short. RPE 6–8.", "sets": [[40, 17], [40, 12], [50, 8]] },
+        { "name": "Leg Press", "rpe": 8, "notes": "Added after hack squat was cut short.", "sets": [[173, 12], [173, 12], [213, 12]] },
+        { "name": "Machine Lateral Raise", "rpe": 8, "notes": "Good live self-correction upward.", "sets": [[15, 15], [20, 15], [25, 13]] },
+        { "name": "Leg Curl (lying)", "rpe": 8, "notes": "Set 1 too light.", "sets": [[25, 15], [32, 15], [32, 12]] },
+        { "name": "Rear Delt Fly (machine)", "rpe": 8, "notes": "First time programmed.", "sets": [[27.5, 15], [27.5, 12], [35, 11]] },
+        { "name": "Standing Calf Raise", "rpe": 7, "notes": "Flat, no top-set push.", "sets": [[35, 12], [35, 12], [35, 12]] },
+        { "name": "Machine Shrugs", "rpe": 7, "notes": "Wrist-safe substitution.", "sets": [[35, 12], [35, 12], [35, 12]] }
+      ]
+    },
+    {
+      "date": "2026-08-12", "type": "B", "title": "Back & Biceps",
+      "notes": "Deadlift 80×5 hit — 85 next cycle. Reverse barbell curl: second TFCC violation, retired for good. Grip (not biceps) ended the curls — straps on deadlifts and rows. Dead hang programmed, skipped. Sleep 5 h + 2 h nap (fragmented). Protein 120 g at logging, dinner outstanding. 3 g L-citrulline pre. Whoop/Strava: 59:39, 317 kcal, avg HR 117.",
+      "checkIn": { "sleepMin": 300, "proteinG": 120, "waterMl": 3000 },
+      "exercises": [
+        { "name": "Assisted Pull-Up", "rpe": 8, "notes": "Set 1 still a warm-up — open at 47.", "sets": [[54, 10], [47, 6], [47, 5]] },
+        { "name": "Barbell Deadlift", "rpe": 8, "notes": "First time in 3 cycles — top set as prescribed.", "sets": [[60, 12], [70, 10], [80, 5]] },
+        { "name": "Preacher Curl (rotating handles)", "rpe": 9, "notes": "23 too light; 30 is the new baseline. RPE 8–9.", "sets": [[23, 12], [30, 6], [30, 5]] },
+        { "name": "Lat Pulldown (wide)", "rpe": 8, "sets": [[40, 13], [47, 8], [47, 8]] },
+        { "name": "Cable Curl", "rpe": 9, "notes": "Grip-limited, not bicep-limited. Set 3 was 4.5 reps.", "sets": [[15, 7], [15, 8], [17.5, 4]] },
+        { "name": "Seated Cable Row", "rpe": 8, "notes": "Replaced machine row + chest-supported row.", "sets": [[47, 12], [57, 7], [57, 8]] },
+        { "name": "Reverse Barbell Curl", "blockedOverride": true, "notes": "PROHIBITED — TFCC. Second logged violation.", "sets": [[15, 12], [15, 12], [17.5, 7]] },
+        { "name": "Forearm / Wrist Curl", "sets": [[0, 20], [10, 10], [10, 10]] }
+      ]
+    },
+    {
+      "date": "2026-08-13", "type": "C", "title": "Chest, Triceps & Core",
+      "notes": "Carriage weights discovered mid-session (true load = plates + carriage). Key error: chest and triceps alternated set-for-set, so pushdowns pre-fatigued the press (10 → 4.5 collapse). Fix: alternate chest with core, triceps as a block at the end. Chest fly and plank skipped. 5 min incline walk (8°, 5 km/h, HR 120–140). Next C: horizontal 30.7 hold, decline 30.2, incline 21.1, tricep press 65, rope pushdown 30 (last), torso rotation 45.",
+      "exercises": [
+        { "name": "Iso-Lateral Horizontal Press", "rpe": 9.5, "plates": true, "notes": "22.5 plates + 8.2 carriage. Set 3 was 4.5 reps.", "sets": [[22.5, 10], [22.5, 8], [22.5, 4], [22.5, 5]] },
+        { "name": "Rope Pushdown", "rpe": 8, "notes": "Done first, alternated into chest work.", "sets": [[27.5, 12], [27.5, 12], [27.5, 9]] },
+        { "name": "Iso-Lateral Decline Press", "rpe": 8, "plates": true, "notes": "25 plates + 2.7 carriage. Clean curve.", "sets": [[25, 10], [25, 8], [25, 7]] },
+        { "name": "Machine Tricep Press", "rpe": 8, "notes": "Stack has no 60 — next increment is 65.", "sets": [[57.5, 10], [57.5, 10], [57.5, 8]] },
+        { "name": "Iso-Lateral Incline Press", "rpe": 9, "plates": true, "notes": "Set 2 attempted 21.1/side for 3, dropped back to 18.6.", "sets": [[15, 10], [17.5, 3], [15, 3], [15, 6]] },
+        { "name": "Machine Torso Rotation", "rpe": 8, "notes": "12 per side, top of range both sets.", "sets": [[42.5, 12], [42.5, 12]] },
+        { "name": "Ab Crunch (Matrix)", "rpe": 8, "sets": [[27, 10], [27, 10]] },
+        { "name": "Ab Crunch (Life Fitness)", "rpe": 8, "sets": [[27.5, 10], [27.5, 10]] }
+      ]
+    },
+    {
+      "date": "2026-08-17", "type": "A", "title": "Legs & Shoulders",
+      "notes": "Big loading day — first session with no first-set underloading. Undermined by 4 h sleep and a 42 g protein shortfall. RDL not performed (machine variant attempted, form broke down) — third consecutive skip. Hamstring failed leg curl set 3. Shrugs moved to Session B at 25 kg minimum. Leg press: add load on set 2.",
+      "checkIn": { "sleepMin": 240, "proteinG": 113, "waterMl": 3000 },
+      "exercises": [
+        { "name": "Machine Shoulder Press", "notes": "Opened at prescribed 27.5, jumped to 35.", "sets": [[27.5, 12], [35, 10], [35, 8]] },
+        { "name": "Machine Squat", "notes": "Right knee — monitor depth at 90. 50 → 90 in a week: confirm.", "sets": [[60, 12], [70, 12], [90, 10]] },
+        { "name": "Machine Lateral Raise", "notes": "Strong progression.", "sets": [[27.5, 15], [32, 12], [39, 9]] },
+        { "name": "Leg Press", "notes": "No load change across sets — test up next time.", "sets": [[233, 12], [233, 12], [233, 12]] },
+        { "name": "Rear Delt Fly (machine)", "sets": [[35, 12], [42.5, 9], [42.5, 9]] },
+        { "name": "Leg Curl (lying)", "notes": "Hamstring failed set 3 — stopped.", "sets": [[39, 15], [46, 10]] },
+        { "name": "Machine Shrugs", "notes": "Underloaded (floor is 25). Removed from Session A.", "sets": [[15, 10], [15, 10], [15, 10]] },
+        { "name": "Seated Calf Raise", "notes": "Overshot set 1, corrected down.", "sets": [[47.3, 6], [37.3, 10], [37.3, 10]] }
+      ]
+    },
+    {
+      "date": "2026-08-24", "type": "A", "title": "Legs & Shoulders",
+      "notes": "Leg extension back in rotation. Shoulder press and rear delt fly regressed vs 17/08 — likely sleep (5h20) and protein (110 g). DB RDL not performed — fourth consecutive skip. Shrugs back in Session A at the underloaded weight.",
+      "checkIn": { "sleepMin": 320, "proteinG": 110, "waterMl": 2500 },
+      "exercises": [
+        { "name": "Machine Shoulder Press", "notes": "Down from 35 on 17/08.", "sets": [[32, 8], [32, 8], [32, 6]] },
+        { "name": "Barbell Back Squat", "notes": "No reported knee issue — watch depth.", "sets": [[60, 8], [70, 6], [70, 6]] },
+        { "name": "Machine Lateral Raise", "sets": [[39, 8], [39, 8], [32, 12]] },
+        { "name": "Leg Extension (machine)", "notes": "First time since the gap flagged 10/08. Set 1 opened light.", "sets": [[54, 15], [61, 12], [68, 9]] },
+        { "name": "Rear Delt Fly (machine)", "notes": "Down from 42.5 on 17/08.", "sets": [[35, 12], [35, 12], [35, 9]] },
+        { "name": "Leg Curl (lying)", "notes": "Conservative restart after the 17/08 hamstring failure.", "sets": [[32, 15], [39, 12]] },
+        { "name": "Standing Calf Raise", "notes": "Flat, no top-set push.", "sets": [[35, 12], [35, 12], [35, 12]] },
+        { "name": "Machine Shrugs", "notes": "Below the 25 kg floor, wrong session.", "sets": [[15, 15], [15, 15], [15, 12]] }
+      ]
+    },
+    {
+      "date": "2026-08-26", "type": "B", "title": "Back & Biceps (home)",
+      "notes": "HOME — Bangalore, dumbbells up to 16 kg, incline bench. Maintenance load: not comparable to Al Reef weights. Skipped: bent-over DB row, DB shrugs, incline DB curl (16 of 25 sets). DB row ceiling hit at 16×15×3 — progress via tempo next time. Hammer curls grip-limited (third time) — run them first. Nutrition and sleep not logged.",
+      "exercises": [
+        { "name": "Dumbbell Row", "notes": "Single-arm, 15/side all sets. Ceiling hit at max available load.", "sets": [[16, 15], [16, 15], [16, 15]] },
+        { "name": "DB Pullover", "notes": "Clean ascending load — start at 14.5 next time.", "sets": [[10, 15], [12, 12], [14.5, 10]] },
+        { "name": "Chest Supported Row", "notes": "Incline DB, programmed at 2×16 — ran at 12.", "sets": [[12, 12], [12, 12], [12, 12]] },
+        { "name": "Dumbbell Curl", "notes": "Standing. Opened at 10, corrected up.", "sets": [[10, 12], [12, 8], [12, 8]] },
+        { "name": "Hammer Curl (DB)", "notes": "12 collapsed to 5 — grip fatigue after 3 gripping movements.", "sets": [[10, 12], [12, 5], [10, 8], [10, 6]] }
+      ]
+    },
+    {
+      "date": "2026-09-21", "type": "A", "title": "Legs & Shoulders",
+      "notes": "Re-entry (first gym Session A since 24/08). 7 min treadmill run at 8.5 km/h pre-lift. DB RDL performed for the first time — lower back pain within 5 min; removed from the programme (lumbar irritation logged 19/08). Barbell squat swapped for leg press. Next: leg press 232 → 240 → 250; shoulder press hold 32 until 3×10; leg extension 61 → 68 → 68 for 12s; calf raise open at 35, 3×12 with 3 s eccentric.",
+      "checkIn": { "sleepMin": 360, "proteinG": 110, "waterMl": 2000 },
+      "exercises": [
+        { "name": "DB Romanian Deadlift", "notes": "2 × 16 kg DBs. Lower back pain within 5 min — removed.", "sets": [[16, 10], [16, 10], [16, 10]] },
+        { "name": "Machine Shoulder Press", "notes": "Identical to 24/08 — stalled.", "sets": [[32, 8], [32, 8], [32, 6]] },
+        { "name": "Leg Press", "notes": "Same load all sets — third time flagged.", "sets": [[232, 12], [232, 12], [232, 10]] },
+        { "name": "Machine Lateral Raise", "notes": "Read from a handwritten log — confirm. Sharp fade after set 1.", "sets": [[39, 10], [39, 6], [32, 3], [32, 8]] },
+        { "name": "Leg Extension (machine)", "notes": "68 × 9 → 68 × 12. Set 1 still opens light.", "sets": [[54, 15], [61, 12], [68, 12]] },
+        { "name": "Standing Calf Raise", "notes": "Prescribed 40 — not attempted. Dropped load set 3.", "sets": [[35, 10], [35, 10], [27, 12]] },
+        { "name": "Rear Delt Fly (machine)", "notes": "Optional add-on, 2 sets as agreed.", "sets": [[35, 12], [35, 12]] }
+      ]
+    }
+  ],
+  "coachFlags": [
+    { "text": "Open heavier. First sets keep landing light — correct within the session, not across three.", "scope": "global" },
+    { "text": "Sleep and the 155 g protein floor are the primary limiters, unaddressed across every recent session.", "scope": "global" },
+    { "text": "Back: no loaded spinal hinging in Session A until symptom-free. Leg curl goes first; calibrate hip thrust / glute bridge.", "scope": "sessionType", "scopeValue": "A" },
+    { "text": "Straps on deadlifts and rows — grip quits before the back does.", "scope": "sessionType", "scopeValue": "B" },
+    { "text": "Add load on set 2: 232 → 240 → 250.", "scope": "exerciseId", "exercise": "Leg Press" },
+    { "text": "Stalled at 32 × 8, 8, 6. Hold 32 and hit 3 × 10 before moving to 35.", "scope": "exerciseId", "exercise": "Machine Shoulder Press" },
+    { "text": "Lives in Session B. Open at 25 kg minimum, first or second in the order.", "scope": "exerciseId", "exercise": "Machine Shrugs" },
+    { "text": "Right knee: depth under load is the historical trigger. Leg press is the primary quad compound if it flares.", "scope": "exerciseId", "exercise": "Machine Squat" }
+  ]
+}

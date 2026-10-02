@@ -1,17 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans } from "next/font/google";
+import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const dmSans = DM_Sans({
+const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
-  variable: "--font-dm-sans",
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+
+const barlow = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-barlow",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Olympus — Forge Your Strength",
-  description: "Personal gym session logger",
+  title: "Olympus — LiftLog",
+  description: "Personal training log, programmed by your PT",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -29,7 +44,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#0c0a09",
+  themeColor: "#0E0F11",
 };
 
 export default function RootLayout({
@@ -39,16 +54,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${dmSans.variable} font-sans antialiased`}>
+      <body
+        className={`${plexSans.variable} ${barlow.variable} ${plexMono.variable} font-sans antialiased`}
+      >
         {children}
         <Toaster
           theme="dark"
           position="top-center"
           toastOptions={{
             style: {
-              background: "#1c1917",
-              border: "1px solid #292524",
-              color: "#fafaf9",
+              background: "#17191C",
+              border: "1px solid #2C3036",
+              color: "#F2F0EA",
             },
           }}
         />

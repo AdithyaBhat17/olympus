@@ -2,75 +2,91 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  PlusCircleIcon as PlusCircleOutline,
-  ClockIcon as ClockOutline,
-  ListBulletIcon as ListBulletOutline,
-  ChartBarIcon as ChartBarOutline,
-} from "@heroicons/react/24/outline";
-import {
-  PlusCircleIcon as PlusCircleSolid,
-  ClockIcon as ClockSolid,
-  ListBulletIcon as ListBulletSolid,
-  ChartBarIcon as ChartBarSolid,
-} from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   {
-    href: "/log",
-    label: "Log",
-    outline: PlusCircleOutline,
-    solid: PlusCircleSolid,
+    href: "/today",
+    label: "Today",
+    match: ["/today"],
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
   },
   {
     href: "/history",
-    label: "History",
-    outline: ClockOutline,
-    solid: ClockSolid,
-  },
-  {
-    href: "/exercises",
-    label: "Exercises",
-    outline: ListBulletOutline,
-    solid: ListBulletSolid,
+    label: "Log",
+    match: ["/history", "/log"],
+    icon: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
   },
   {
     href: "/progress",
     label: "Progress",
-    outline: ChartBarOutline,
-    solid: ChartBarSolid,
+    match: ["/progress"],
+    icon: (
+      <>
+        <path d="M3 17l6-6 4 4 8-8" />
+        <path d="M15 7h6v6" />
+      </>
+    ),
+  },
+  {
+    href: "/exercises",
+    label: "Library",
+    match: ["/exercises"],
+    icon: <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />,
   },
 ];
 
+/** Hidden while training and on full-screen form cues. */
+const HIDE_ON = ["/session", "/form"];
+
 export default function BottomNav() {
   const pathname = usePathname();
+  if (HIDE_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-stone-950/90 backdrop-blur-xl border-t border-stone-800/60 safe-bottom">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-        {tabs.map((tab) => {
-          const isActive = pathname.startsWith(tab.href);
-          const Icon = isActive ? tab.solid : tab.outline;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={cn(
-                "flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-colors min-w-[60px]",
-                isActive
-                  ? "text-amber-500"
-                  : "text-stone-500 active:text-stone-300"
-              )}
-            >
-              <Icon className="w-6 h-6" />
-              <span className="text-[10px] font-semibold tracking-wide">
+    <>
+      <div aria-hidden className="h-[84px]" />
+      <nav
+        aria-label="Main"
+        className="fixed bottom-0 inset-x-0 z-50 bg-bg-nav border-t border-line safe-bottom"
+      >
+        <div className="grid grid-cols-4 max-w-lg mx-auto pt-2 pb-2">
+          {tabs.map((tab) => {
+            const active = tab.match.some((m) => pathname.startsWith(m));
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-1.5 text-[11px] min-h-[44px]",
+                  active ? "text-accent" : "text-muted hover:text-fg-2"
+                )}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {tab.icon}
+                </svg>
                 {tab.label}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }

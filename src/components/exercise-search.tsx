@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
-import { EXERCISE_CATEGORIES, STATUS_CONFIG } from "@/lib/constants";
+import { EXERCISE_CATEGORIES } from "@/lib/constants";
+
+const STATUS_DOT: Record<Exercise["status"], { cls: string; label: string }> = {
+  YES: { cls: "bg-info", label: "Active" },
+  SUB: { cls: "bg-accent", label: "Sub" },
+  NO: { cls: "bg-danger", label: "Blocked" },
+};
 import type { Exercise } from "@/lib/types";
 import { createCustomExercise } from "@/lib/actions";
 import { toast } from "sonner";
@@ -92,7 +97,10 @@ export default function ExerciseSearch({
   return (
     <div ref={ref} className="relative">
       <div className="relative">
-        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
         <input
           type="text"
           value={query}
@@ -102,16 +110,17 @@ export default function ExerciseSearch({
             setShowCategoryPicker(false);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search exercise..."
-          className="input-base pl-9 text-sm"
+          placeholder="Search exercise…"
+          aria-label="Exercise"
+          className="input-base pl-9"
         />
       </div>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-stone-900 border border-stone-800 rounded-xl max-h-64 overflow-y-auto z-50 shadow-xl shadow-black/30 animate-scale-in">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-line rounded-xl max-h-64 overflow-y-auto z-50 shadow-xl shadow-black/40 animate-scale-in">
           {Object.entries(grouped).map(([category, exs]) => (
             <div key={category}>
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-500 bg-stone-900 sticky top-0">
+              <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted bg-surface-2 sticky top-0">
                 {category}
               </div>
               {exs.map((exercise) => (
@@ -123,17 +132,20 @@ export default function ExerciseSearch({
                     setQuery(exercise.name);
                     setOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-stone-800 active:bg-stone-700 flex items-center justify-between gap-2 transition-colors"
+                  className="w-full text-left px-3 min-h-[44px] text-[15px] hover:bg-line active:bg-line-strong flex items-center justify-between gap-2 transition-colors"
                 >
-                  <span className="text-stone-200 truncate">
+                  <span className="text-fg truncate">
                     {exercise.name}
                   </span>
                   <span
+                    title={STATUS_DOT[exercise.status].label}
                     className={cn(
                       "w-2 h-2 rounded-full shrink-0",
-                      STATUS_CONFIG[exercise.status].dotClass
+                      STATUS_DOT[exercise.status].cls
                     )}
-                  />
+                  >
+                    <span className="sr-only">{STATUS_DOT[exercise.status].label}</span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -143,22 +155,22 @@ export default function ExerciseSearch({
             <button
               type="button"
               onClick={() => setShowCategoryPicker(true)}
-              className="w-full text-left px-3 py-3 text-sm text-amber-500 hover:bg-stone-800 border-t border-stone-800 font-medium transition-colors"
+              className="w-full text-left px-3 min-h-[44px] text-sm text-accent hover:bg-line border-t border-line font-medium transition-colors"
             >
               + Add &quot;{query.trim()}&quot; as custom exercise
             </button>
           )}
 
           {showCategoryPicker && (
-            <div className="p-3 border-t border-stone-800">
-              <p className="text-xs text-stone-500 mb-2">Pick a category:</p>
+            <div className="p-3 border-t border-line">
+              <p className="text-xs text-muted mb-2">Pick a category:</p>
               <div className="space-y-1">
                 {EXERCISE_CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => handleCreateCustom(cat)}
-                    className="w-full text-left px-3 py-2 text-xs text-stone-300 hover:bg-stone-800 rounded-lg transition-colors"
+                    className="w-full text-left px-3 min-h-[44px] text-sm text-fg-2 hover:bg-line rounded-lg transition-colors"
                   >
                     {cat}
                   </button>
@@ -168,7 +180,7 @@ export default function ExerciseSearch({
           )}
 
           {filtered.length === 0 && !query.trim() && (
-            <p className="px-3 py-4 text-sm text-stone-500 text-center">
+            <p className="px-3 py-4 text-sm text-muted text-center">
               No exercises found
             </p>
           )}
