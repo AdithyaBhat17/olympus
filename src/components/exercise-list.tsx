@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,10 @@ export interface LibraryExercise {
   isCustom: boolean;
   loadMode: LoadMode;
   carriageKgPerSide: number | null;
+  isCompound: boolean;
+  equipment: string | null;
+  hasFormCues: boolean;
+  workingKg: number | null;
   blocked: boolean;
   blockedReason: string | null;
   substitutes: string[];
@@ -27,40 +32,61 @@ interface ExerciseListProps {
   exercises: LibraryExercise[];
 }
 
-function StatusPill({ ex }: { ex: LibraryExercise }) {
-  const [label, cls] = ex.blocked
-    ? ["Blocked", "bg-danger-bg border-danger-line text-danger-text"]
-    : ex.status === "SUB"
-      ? ["Sub", "bg-accent-bg border-accent-line text-accent-soft"]
-      : ["Active", "bg-surface-2 border-line text-muted"];
-  return (
-    <span className={cn("shrink-0 text-xs font-medium rounded-full border px-2 py-0.5", cls)}>{label}</span>
-  );
+type Filter = "all" | "push" | "pull" | "legs" | "arms" | "core" | "cardio" | "blocked";
+
+const FILTERS: Array<{ id: Filter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "push", label: "Push" },
+  { id: "pull", label: "Pull" },
+  { id: "legs", label: "Legs" },
+  { id: "arms", label: "Arms" },
+  { id: "core", label: "Core" },
+  { id: "cardio", label: "Cardio" },
+  { id: "blocked", label: "Blocked" },
+];
+
+function groupOf(category: string): Exclude<Filter, "all" | "blocked"> {
+  if (/Push/.test(category)) return "push";
+  if (/Pull/.test(category)) return "pull";
+  if (/Lower Body|Calves/.test(category)) return "legs";
+  if (/Arms/.test(category)) return "arms";
+  if (/Cardio/.test(category)) return "cardio";
+  return "core";
 }
 
-function ModeBadge({ mode }: { mode: LoadMode }) {
-  if (mode === "TOTAL") return null;
-  return (
-    <span className="chip border-info-line text-info whitespace-nowrap">
-      {mode === "PER_SIDE" ? "per side" : "counterweight"}
-    </span>
-  );
+/** Geist Mono tags: equipment, COMPOUND, load-mode rules. */
+function tagsFor(ex: LibraryExercise): Array<{ text: string; ice?: boolean }> {
+  const tags: Array<{ text: string; ice?: boolean }> = [];
+  if (ex.equipment) tags.push({ text: ex.equipment.replace(/_/g, " ").toUpperCase() });
+  if (ex.isCompound) tags.push({ text: "COMPOUND" });
+  if (ex.loadMode === "COUNTERWEIGHT") tags.push({ text: "CW · LOWER = HARDER", ice: true });
+  if (ex.loadMode === "PER_SIDE")
+    tags.push({
+      text: `PER SIDE${ex.carriageKgPerSide != null ? ` · +${formatKg(ex.carriageKgPerSide)}` : ""}`,
+      ice: true,
+    });
+  if (ex.loadMode === "TIME") tags.push({ text: "TIMED" });
+  if (ex.status === "SUB") tags.push({ text: "SUB" });
+  if (ex.isCustom) tags.push({ text: "CUSTOM" });
+  if (ex.hasFormCues) tags.push({ text: "FORM CUES" });
+  return tags.slice(0, 3);
 }
 
 export default function ExerciseList({ exercises }: ExerciseListProps) {
   const [search, setSearch] = useState("");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<Filter>("all");
   const [creating, setCreating] = useState(false);
   const searchId = useId();
 
   const filtered = useMemo(() => {
     const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return exercises;
     return exercises.filter((e) => {
+      if (filter === "blocked" ? !e.blocked : filter !== "all" && groupOf(e.category) !== filter) return false;
+      if (!words.length) return true;
       const hay = `${e.name} ${e.category}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
-  }, [exercises, search]);
+  }, [exercises, search, filter]);
 
   const grouped = useMemo(() => {
     const known = EXERCISE_CATEGORIES as readonly string[];
@@ -72,25 +98,16 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
 
   const searching = search.trim().length > 0;
 
-  function toggle(cat: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  }
-
   return (
     <div className="flex flex-col">
-      <div className="px-4 pt-4 flex flex-col gap-2">
+      <div className="arrive arrive-1 px-3 pt-4">
         <label
           htmlFor={searchId}
-          className="flex items-center gap-2.5 h-12 px-3.5 rounded-xl bg-surface border border-line focus-within:border-accent"
+          className="flex items-center gap-2.5 h-12 px-3.5 rounded-2xl bg-surface-2 transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_1.5px_#FF6A2B]"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-muted shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8C87" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
             <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-3.5-3.5" />
+            <path d="M20 20l-4-4" />
           </svg>
           <span className="sr-only">Search exercises</span>
           <input
@@ -99,96 +116,113 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search exercises"
+            enterKeyHint="search"
             className="flex-1 min-w-0 bg-transparent text-[16px] text-fg placeholder:text-faint outline-none"
           />
         </label>
-        {!creating && (
+      </div>
+
+      <div role="group" aria-label="Filter" className="arrive arrive-2 scroller flex gap-1.5 px-3 pt-3 overflow-x-auto">
+        {FILTERS.map((f) => (
           <button
+            key={f.id}
             type="button"
-            onClick={() => setCreating(true)}
-            className="self-start min-h-[44px] text-sm text-accent hover:text-accent-hover flex items-center gap-1.5"
+            aria-pressed={filter === f.id}
+            onClick={() => setFilter(f.id)}
+            className={cn("chip h-11", filter === f.id && "chip-on")}
           >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-3 pt-2">
+        {!creating ? (
+          <button type="button" onClick={() => setCreating(true)} className="min-h-11 px-2 text-sm text-accent flex items-center gap-1.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
             </svg>
             {searching && filtered.length === 0 ? `Add “${search.trim()}” as a custom exercise` : "New custom exercise"}
           </button>
+        ) : (
+          <CreateExercise initialName={search.trim()} onDone={() => setCreating(false)} />
         )}
-        {creating && <CreateExercise initialName={search.trim()} onDone={() => setCreating(false)} />}
       </div>
 
       {grouped.length === 0 && (
-        <p className="px-5 py-8 text-sm text-muted text-center">No exercises match “{search.trim()}”.</p>
+        <p className="px-5 py-8 text-sm text-muted text-center">
+          {searching ? `No exercises match “${search.trim()}”.` : "Nothing in this filter."}
+        </p>
       )}
 
-      {grouped.map(({ category, exercises: exs }) => {
-        const open = searching || !collapsed.has(category);
-        const panelId = `lib-${category.replace(/[^a-z0-9]+/gi, "-")}`;
-        return (
-          <section key={category} className="px-4 mt-4">
-            <h2>
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={() => toggle(category)}
-                disabled={searching}
-                className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
-              >
-                <span className="eyebrow">
-                  {category} <span className="font-normal text-faint normal-case tracking-normal">· {exs.length}</span>
-                </span>
-                {!searching && (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={cn("text-muted transition-transform", open && "rotate-180")}>
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                )}
-              </button>
-            </h2>
-            {open && (
-              <ul id={panelId} className="flex flex-col gap-2">
-                {exs.map((ex) => (
-                  <ExerciseRow key={ex.id} ex={ex} />
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+      {grouped.map(({ category, exercises: exs }, gi) => (
+        <section key={category} aria-labelledby={`lib-${gi}`} className="arrive arrive-3 mx-3 mt-5">
+          <h2 id={`lib-${gi}`} className="section-label mx-2 mb-2.5">
+            {category.replace(/ — /g, " · ")}
+          </h2>
+          <ul className="card-group m-0 p-0 list-none">
+            {exs.map((ex) => (
+              <ExerciseRow key={ex.id} ex={ex} />
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }
 
 function ExerciseRow({ ex }: { ex: LibraryExercise }) {
+  const tags = tagsFor(ex);
+  const unit = ex.loadMode === "COUNTERWEIGHT" ? " cw" : ex.loadMode === "TIME" ? " min" : "";
+  if (ex.blocked) {
+    return (
+      <li className="flex flex-col gap-1 px-4 py-3.5 border-b border-line last:border-b-0">
+        <div className="flex items-center gap-3">
+          <span className="flex-1 min-w-0 flex flex-col gap-1">
+            <span className="font-semibold text-fg-2 line-through decoration-danger">{ex.name}</span>
+            {ex.blockedReason && (
+              <span className="text-xs text-danger-text flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M5.6 5.6l12.8 12.8" />
+                </svg>
+                {ex.blockedReason}
+              </span>
+            )}
+          </span>
+          <span className="font-mono text-[11px] text-muted">Blocked</span>
+        </div>
+        {ex.substitutes.length > 0 && <p className="m-0 text-xs text-info">Use instead → {ex.substitutes.join(", ")}</p>}
+      </li>
+    );
+  }
   return (
-    <li
-      className={cn(
-        "rounded-[14px] p-3.5 flex flex-col gap-1.5",
-        ex.blocked ? "bg-surface-sunk border border-line-soft" : "bg-surface"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {ex.blocked && (
-          <span className="mt-px w-6 h-6 rounded-full bg-danger-dot flex items-center justify-center shrink-0" aria-hidden="true">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-danger-soft">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+    <li className="border-b border-line last:border-b-0">
+      <Link href={`/progress/${ex.id}`} className="press-soft flex items-center gap-3 px-4 py-3.5 text-fg">
+        <span className="flex-1 min-w-0 flex flex-col gap-1">
+          <span className="font-semibold">{ex.name}</span>
+          {tags.length > 0 && (
+            <span className="flex flex-wrap gap-1">
+              {tags.map((t) => (
+                <span key={t.text} className={cn("tag", t.ice && "tag-ice")}>
+                  {t.text}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        {ex.workingKg != null && (
+          <span className="num text-[20px]">
+            {formatKg(ex.workingKg)}
+            {unit && <span className="text-[13px] text-muted">{unit}</span>}
           </span>
         )}
-        <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className={cn("font-semibold", ex.blocked && "text-fg-2")}>{ex.name}</span>
-          {ex.isCustom && <span className="chip border-line text-muted">custom</span>}
-          <ModeBadge mode={ex.loadMode} />
+      </Link>
+      {ex.loadMode === "PER_SIDE" && (
+        <div className="px-4 pb-3 -mt-1">
+          <CarriageEditor ex={ex} />
         </div>
-        <StatusPill ex={ex} />
-      </div>
-      {ex.blocked && ex.blockedReason && (
-        <p className={cn("text-[13px] text-danger-text leading-[1.4]", ex.blocked && "pl-9")}>{ex.blockedReason}</p>
       )}
-      {ex.blocked && ex.substitutes.length > 0 && (
-        <p className="pl-9 text-[13px] text-info">Use instead → {ex.substitutes.join(", ")}</p>
-      )}
-      {ex.loadMode === "PER_SIDE" && <CarriageEditor ex={ex} />}
     </li>
   );
 }
@@ -221,10 +255,10 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
 
   if (!editing) {
     return (
-      <div className={cn("flex items-center justify-between gap-3", ex.blocked && "pl-9")}>
+      <div className="flex items-center justify-between gap-3">
         <span className="text-[13px] text-muted">
           Carriage{" "}
-          <span className="font-display text-base font-semibold text-fg-2 tabular-nums">
+          <span className="num text-base text-fg-2">
             {ex.carriageKgPerSide != null ? `${formatKg(ex.carriageKgPerSide)} kg/side` : "not set"}
           </span>
         </span>
@@ -232,7 +266,7 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
           type="button"
           onClick={() => setEditing(true)}
           aria-label={`Edit carriage for ${ex.name}`}
-          className="h-11 -my-2 -mr-2 px-3 rounded-[10px] text-sm text-accent hover:bg-surface-2"
+          className="h-11 -my-2 -mr-2 px-3 rounded-[14px] text-sm text-accent"
         >
           Edit
         </button>
@@ -246,7 +280,7 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
         e.preventDefault();
         save();
       }}
-      className={cn("flex flex-col gap-2 pt-1", ex.blocked && "pl-9")}
+      className="flex flex-col gap-2 pt-1"
     >
       <label htmlFor={inputId} className="text-[13px] text-muted">
         Carriage per side (kg) — saved per machine, added to the plates you log.
@@ -261,7 +295,7 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. 8.2"
-          className="input-base h-11 py-0 w-28 font-display text-lg"
+          className="input-base h-11 w-28 num text-lg"
         />
         <button type="button" onClick={() => setEditing(false)} className="btn-ghost px-4 flex-1">
           Cancel
@@ -269,7 +303,7 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
         <button
           type="submit"
           disabled={pending}
-          className="h-11 px-4 flex-1 rounded-[10px] bg-accent text-accent-ink font-semibold text-sm disabled:opacity-50"
+          className="h-11 px-4 flex-1 rounded-[14px] bg-accent text-accent-ink font-semibold text-sm disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save"}
         </button>
@@ -322,14 +356,14 @@ function CreateExercise({ initialName, onDone }: { initialName: string; onDone: 
           maxLength={100}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="input-base h-12 py-0"
+          className="input-base"
         />
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor={catId} className="text-xs text-muted">
           Category
         </label>
-        <select id={catId} value={category} onChange={(e) => setCategory(e.target.value)} className="select-base h-12 py-0">
+        <select id={catId} value={category} onChange={(e) => setCategory(e.target.value)} className="select-base">
           {EXERCISE_CATEGORIES.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -344,7 +378,7 @@ function CreateExercise({ initialName, onDone }: { initialName: string; onDone: 
         <button
           type="submit"
           disabled={pending}
-          className="h-11 rounded-[10px] bg-accent text-accent-ink font-semibold text-sm disabled:opacity-50"
+          className="h-11 rounded-[14px] bg-accent text-accent-ink font-semibold text-sm disabled:opacity-50"
         >
           {pending ? "Adding…" : "Add exercise"}
         </button>

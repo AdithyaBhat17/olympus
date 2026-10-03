@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { renderSessionMarkdown, type ExportSession } from "@/domain/export";
 import type { SessionCatch } from "@/domain/flags";
+import { deleteSession } from "@/lib/actions";
 import { mutate } from "@/lib/offline/mutate";
 import { hapticTick } from "@/lib/haptics";
 import { saveRest } from "@/components/session/timers";
@@ -179,6 +180,18 @@ export default function FinishScreen({
     toast.success(`Saved ${fileName}`);
   }
 
+  async function handleDelete() {
+    if (!window.confirm("Delete this session? This cannot be undone.")) return;
+    try {
+      await deleteSession(sessionId);
+      toast.success("Session deleted");
+      router.push("/history");
+      router.refresh();
+    } catch {
+      toast.error("Couldn't delete — check your connection");
+    }
+  }
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(markdown);
@@ -296,7 +309,7 @@ export default function FinishScreen({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="transition-transform group-open:rotate-90">
             <path d="M9 6l6 6-6 6" />
           </svg>
-          Lift Log entry
+          {live ? "Lift Log entry" : "Export & delete"}
           <span className="font-mono text-[11px] normal-case tracking-normal text-faint truncate">{fileName}</span>
         </summary>
         <pre className="m-0 mt-1 p-3.5 rounded-[18px] bg-surface-sunk font-mono text-[11px] leading-[1.6] text-fg-2 whitespace-pre-wrap break-words max-h-[360px] overflow-auto">
@@ -310,6 +323,15 @@ export default function FinishScreen({
             Copy text
           </button>
         </div>
+        {!live && (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            className="mt-2 w-full h-12 rounded-2xl bg-surface shadow-[inset_0_0_0_1px_#232327] text-danger-soft text-[15px] font-semibold"
+          >
+            Delete session
+          </button>
+        )}
       </details>
 
       <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] bg-[linear-gradient(180deg,rgba(10,10,11,0),#0A0A0B_30%)]">
