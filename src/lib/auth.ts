@@ -1,8 +1,9 @@
+import { cache } from "react";
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { isAllowedUser } from "@/lib/allowlist";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const nextAuth = NextAuth({
   providers: [Google],
   pages: {
     signIn: "/login",
@@ -32,8 +33,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
+export const { handlers, signIn, signOut } = nextAuth;
+/**
+ * The session, decoded once per request: layout, page and every server helper
+ * share it instead of re-reading the JWT. `auth` also serves as the middleware.
+ */
+export const auth = nextAuth.auth;
+export const getSession = cache(() => nextAuth.auth());
+
 export async function requireUserEmail(): Promise<string> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.email || !isAllowedUser(session.user.email)) {
     throw new Error("Unauthorized");
   }

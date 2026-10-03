@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { auth, requireUserEmail } from "@/lib/auth";
+import { getSession, requireUserEmail } from "@/lib/auth";
 import { formatDayShort, formatTimeInTz, todayInTz } from "@/lib/dates";
 import { formatKg, isHarder, progressDelta } from "@/domain/load";
 import { holdMessage } from "@/domain/recovery";
@@ -31,7 +31,7 @@ function daysBetween(fromIso: string, toIso: string): number {
 }
 
 export default async function TodayPage() {
-  const [session, userId] = await Promise.all([auth(), requireUserEmail()]);
+  const [session, userId] = await Promise.all([getSession(), requireUserEmail()]);
   const today = todayInTz();
 
   const [recovery, plan, live, flags, all, recentTypes, rotation] = await Promise.all([

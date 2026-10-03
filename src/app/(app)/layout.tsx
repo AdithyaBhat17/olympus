@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import BottomNav from "@/components/bottom-nav";
 import { syncWhoopIfStale } from "@/server/integrations/whoop";
@@ -10,7 +10,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) {
     redirect("/login");

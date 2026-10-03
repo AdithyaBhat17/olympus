@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { auth, requireUserEmail } from "@/lib/auth";
+import { getSession, requireUserEmail } from "@/lib/auth";
 import { formatTimeInTz } from "@/lib/dates";
 import { formatSleep } from "@/domain";
 import { connectionStatus, publicOrigin } from "@/server/oauth";
@@ -59,7 +59,7 @@ export default async function SettingsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const userId = await requireUserEmail();
-  const session = await auth();
+  const session = await getSession();
   const sp = await searchParams;
   const h = await headers();
   const origin = publicOrigin(new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h }));
