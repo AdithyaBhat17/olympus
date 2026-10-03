@@ -269,3 +269,31 @@ main {
 html[data-sheet] main {
   transform: scale(0.94);
 }
+
+/* Form-cue scrubber: ember fill + chalk thumb. */
+.scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  margin: 0;
+  border-radius: 3px;
+  background: linear-gradient(#ff6a2b, #ff6a2b) 0 0 / 0% 100% no-repeat, #26262a;
+  outline: none;
+}
+.scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: #f5f3ee;
+  border: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+.scrub::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: #f5f3ee;
+  border: 0;
+}
