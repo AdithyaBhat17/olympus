@@ -31,10 +31,16 @@ export interface PushPayload {
   title: string;
   body: string;
   url?: string;
+  /** Notification tag; same tag replaces. Defaults to the plan tag in the worker. */
+  tag?: string;
 }
 
 /** Best-effort fan-out to every device the user subscribed. Prunes dead endpoints. */
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<number> {
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+  opts: { ttlSec?: number } = {}
+): Promise<number> {
   if (!configure()) return 0;
   const subs = await db
     .select()
@@ -47,7 +53,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify(payload),
-          { TTL: 60 * 60 * 6 }
+          { TTL: opts.ttlSec ?? 60 * 60 * 6 }
         );
         sent++;
       } catch (err: unknown) {

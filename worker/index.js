@@ -1,22 +1,32 @@
 // Custom service-worker code, bundled by @ducanh2912/next-pwa into the
-// generated worker. Shows "plan's ready" pushes and opens the app on tap.
+// generated worker. Shows "plan's ready" and "rest's up" pushes and opens the
+// app on tap.
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Olympus", body: "", url: "/today" };
+  let data = { title: "Olympus", body: "", url: "/today", tag: "liftlog-plan" };
   try {
     data = { ...data, ...event.data.json() };
   } catch {
     if (event.data) data.body = event.data.text();
   }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
-      tag: "liftlog-plan",
-      renotify: true,
-      data: { url: data.url },
-    })
+    (async () => {
+      // A rest push is only for a backgrounded app: if a window is on screen,
+      // the in-app timer already ticked.
+      if (data.tag === "olympus-rest") {
+        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        if (wins.some((w) => w.visibilityState === "visible")) return;
+      }
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        tag: data.tag,
+        renotify: true,
+        vibrate: data.tag === "olympus-rest" ? [30, 40, 30] : undefined,
+        data: { url: data.url },
+      });
+    })()
   );
 });
 

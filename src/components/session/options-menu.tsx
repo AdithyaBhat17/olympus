@@ -35,7 +35,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
   }, [open]);
 
   const itemClass =
-    "w-full min-h-11 px-4 flex items-center text-left text-[15px] hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:opacity-40";
+    "w-full min-h-12 px-4 flex items-center text-left text-[15px] active:bg-surface-3 focus:bg-surface-3 focus:outline-none disabled:opacity-40";
 
   return (
     <div ref={rootRef} className="relative shrink-0">
@@ -46,7 +46,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-11 h-11 -mr-2 -mt-1 flex items-center justify-center rounded-[10px] hover:bg-surface-2"
+        className="w-11 h-11 flex items-center justify-center rounded-full bg-surface-2 text-fg-2"
       >
         <DotsIcon />
       </button>
@@ -54,7 +54,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
         <div
           role="menu"
           aria-label={label}
-          className="absolute right-0 top-12 z-40 w-56 py-1.5 rounded-xl bg-surface border border-line shadow-2xl shadow-black/60 animate-scale-in origin-top-right"
+          className="absolute right-0 top-12 z-40 w-56 py-1.5 rounded-[18px] bg-surface-2 shadow-[inset_0_0_0_1px_#2A2A2E,0_16px_40px_rgba(0,0,0,.6)] animate-scale-in origin-top-right"
         >
           {entries.map((e) =>
             "href" in e ? (
