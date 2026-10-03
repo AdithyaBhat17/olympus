@@ -16,6 +16,19 @@ interface SheetProps {
 }
 
 let openCount = 0;
+/** Pops we caused ourselves (closing from the UI) — not a user "back". */
+let ignorePops = 0;
+let popIsOurs = false;
+let popWatcher = false;
+/** Registered before any sheet's listener, so it classifies each pop first. */
+function watchPops() {
+  if (popWatcher) return;
+  popWatcher = true;
+  window.addEventListener("popstate", () => {
+    popIsOurs = ignorePops > 0;
+    if (popIsOurs) ignorePops -= 1;
+  });
+}
 
 /**
  * Modal sheet, portalled to <body>:
@@ -45,16 +58,20 @@ export function Sheet({ open, onClose, label, children, variant = "bottom", clas
     openCount += 1;
     document.documentElement.dataset.sheet = "open";
 
-    // One history entry per open sheet so the back gesture closes it.
-    const marker = `sheet-${Date.now().toString(36)}`;
-    try {
-      window.history.pushState({ ...(window.history.state ?? {}), __olympusSheet: marker }, "");
-      pushed.current = marker;
-    } catch {
-      pushed.current = null;
-    }
+    // One history entry per open sheet so the back gesture closes it. Deferred
+    // a tick so an immediate unmount (StrictMode, fast close) never pushes.
+    const pushTimer = window.setTimeout(() => {
+      const marker = `sheet-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      try {
+        window.history.pushState({ ...(window.history.state ?? {}), __olympusSheet: marker }, "");
+        pushed.current = marker;
+      } catch {
+        pushed.current = null;
+      }
+    }, 0);
+    watchPops();
     const onPop = () => {
-      if (pushed.current == null) return;
+      if (popIsOurs || pushed.current == null) return;
       pushed.current = null;
       onCloseRef.current();
     };
@@ -72,6 +89,7 @@ export function Sheet({ open, onClose, label, children, variant = "bottom", clas
     };
     document.addEventListener("keydown", onKey);
     return () => {
+      window.clearTimeout(pushTimer);
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
       document.body.style.overflow = prevOverflow;
@@ -80,6 +98,7 @@ export function Sheet({ open, onClose, label, children, variant = "bottom", clas
       // Closed from the UI: drop our history entry — but only if we're still on
       // it (a link inside the sheet may have navigated away).
       if (pushed.current && window.history.state?.__olympusSheet === pushed.current) {
+        ignorePops += 1;
         window.history.back();
       }
       pushed.current = null;
