@@ -55,7 +55,7 @@ function SignIn() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex flex-col justify-end px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-16 bg-bg">
+    <main className="min-h-dvh flex flex-col justify-end px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-16 bg-bg">
       <div className="flex-1 flex flex-col justify-center gap-3">
         <span className="eyebrow">LiftLog</span>
         <h1 className="font-display font-bold text-[72px] leading-[0.9] tracking-tight">

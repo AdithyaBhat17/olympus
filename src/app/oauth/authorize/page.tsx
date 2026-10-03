@@ -13,7 +13,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 
 function ErrorScreen({ message }: { message: string }) {
   return (
-    <main className="min-h-screen flex items-center justify-center px-6">
+    <main className="min-h-dvh flex items-center justify-center px-6">
       <div className="card max-w-sm w-full flex flex-col gap-3">
         <h1 className="font-display text-3xl font-bold">Can&apos;t connect</h1>
         <p className="text-muted text-sm leading-relaxed">{message}</p>
@@ -79,7 +79,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
   const who = fromClaude ? "Claude" : "an app on this computer";
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-5 bg-bg">
+    <main className="min-h-dvh flex items-center justify-center px-5 bg-bg">
       <div className="w-full max-w-sm flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <span className="eyebrow">Connect</span>
