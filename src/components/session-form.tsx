@@ -267,7 +267,7 @@ export default function SessionForm({
           </Link>
           <span className="eyebrow font-normal">Manual entry</span>
         </div>
-        <h1 className="px-1 font-display font-bold text-[44px] leading-none">Log a session</h1>
+        <h1 className="px-1 page-title">Log a session</h1>
       </header>
 
       {/* Session info */}
@@ -408,7 +408,7 @@ export default function SessionForm({
                     key={setIdx}
                     className="grid grid-cols-[2rem_1fr_1fr_2.75rem] gap-2 items-center"
                   >
-                    <span className="font-display text-lg font-semibold text-muted text-center">
+                    <span className="num text-lg text-muted text-center">
                       {setIdx + 1}
                     </span>
                     <input

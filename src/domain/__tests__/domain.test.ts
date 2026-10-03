@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   annotateSets,
+  estimatedOneRepMax,
   blockedReason,
   checkWeightJump,
   gateMessage,
@@ -158,6 +159,17 @@ const codes = (r: { errors: { code: string }[]; warnings: { code: string }[] }) 
 });
 
 // --- True-load maths --------------------------------------------------------
+
+describe("estimated 1RM", () => {
+  it("uses Epley for stack and per-side loads", () => {
+    expect(estimatedOneRepMax("TOTAL", 55, 8)).toBe(69.7);
+    expect(estimatedOneRepMax("PER_SIDE", 20, 1)).toBe(20);
+  });
+  it("is undefined where lower is harder or work is timed", () => {
+    expect(estimatedOneRepMax("COUNTERWEIGHT", 32.5, 8)).toBeNull();
+    expect(estimatedOneRepMax("TIME", 0, 30)).toBeNull();
+  });
+});
 
 describe("true load", () => {
   it("adds carriage per side for iso-lateral machines (17.5 + 3.6 = 21.1)", () => {

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { auth, requireUserEmail } from "@/lib/auth";
+import { getSession, requireUserEmail } from "@/lib/auth";
+import { formatTimeInTz } from "@/lib/dates";
 import { formatSleep } from "@/domain";
 import { connectionStatus, publicOrigin } from "@/server/oauth";
 import { recentToolCalls } from "@/server/audit";
 import { getWhoop, whoopConfigured } from "@/server/integrations/whoop";
 import { getAppleHealth } from "@/server/integrations/apple-health";
 import { getRecovery } from "@/server/checkins";
+import { BackIcon } from "@/components/page-header";
 import { CopyField } from "@/components/settings/copy-field";
 import {
   DisconnectClaudeButton,
@@ -14,9 +16,11 @@ import {
   WhoopButtons,
 } from "@/components/settings/connection-buttons";
 import { PushToggle } from "@/components/settings/push-toggle";
+import { GymFloorPrefs } from "@/components/settings/gym-floor-prefs";
 import SignOutButton from "@/components/sign-out-button";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Settings · Olympus" };
 
 function ago(d: Date | null | undefined): string {
   if (!d) return "never";
@@ -27,33 +31,10 @@ function ago(d: Date | null | undefined): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
-function Status({ on, label }: { on: boolean; label: string }) {
-  return (
-    <span className={`flex items-center gap-1.5 text-[13px] ${on ? "text-info" : "text-muted"}`}>
-      <span aria-hidden className={`w-2 h-2 rounded-full ${on ? "bg-info" : "bg-line-strong"}`} />
-      {label}
-    </span>
-  );
-}
-
-function Section({
-  title,
-  status,
-  children,
-}: {
-  title: string;
-  status?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mx-4 mt-4 p-4 rounded-2xl bg-surface flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-[22px] font-bold leading-none">{title}</h2>
-        {status}
-      </div>
-      {children}
-    </section>
-  );
+/** "07:12" today, else "3 d ago". */
+function syncedAt(d: Date | null | undefined): string {
+  if (!d) return "never";
+  return Date.now() - d.getTime() < 20 * 3600 * 1000 ? formatTimeInTz(d) : ago(d);
 }
 
 const WHOOP_FLASH: Record<string, string> = {
@@ -64,18 +45,24 @@ const WHOOP_FLASH: Record<string, string> = {
   not_configured: "Set WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET first.",
 };
 
+const ico = "w-8 h-8 shrink-0 rounded-[9px] flex items-center justify-center";
+const row = "flex items-center gap-3 min-h-14 px-4 py-2";
+const chevron = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-faint transition-transform group-open:rotate-90">
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+);
+
 export default async function SettingsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const userId = await requireUserEmail();
-  const session = await auth();
+  const session = await getSession();
   const sp = await searchParams;
   const h = await headers();
-  const origin = publicOrigin(
-    new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h })
-  );
+  const origin = publicOrigin(new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h }));
 
   const [clients, calls, whoop, health, recovery] = await Promise.all([
     connectionStatus(userId),
@@ -84,157 +71,193 @@ export default async function SettingsPage({
     getAppleHealth(userId),
     getRecovery(userId),
   ]);
-  const lastCall = calls[0] ?? null;
   const writes = calls.filter((c) => c.kind === "write");
+  const lastPush = calls.find((c) => c.tool === "push_plan" && c.ok) ?? writes[0] ?? null;
   const sleepSource = recovery.today?.sources.sleep;
   const nutritionSource = recovery.today?.sources.protein;
+  const name = session?.user?.name?.trim() || session?.user?.email || "You";
+  const connected = clients.length > 0;
 
   return (
-    <div className="pb-8">
-      <header className="px-4 pt-[max(3.25rem,env(safe-area-inset-top))] pb-2 flex items-center gap-2">
-        <Link
-          href="/today"
-          aria-label="Back to Today"
-          className="w-11 h-11 flex items-center justify-center text-fg"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+    <div className="flex flex-col">
+      <header className="page-top px-3 flex items-center">
+        <Link href="/today" aria-label="Back to Today" className="btn-pill pl-2">
+          <BackIcon />
+          Today
         </Link>
-        <div className="flex flex-col">
-          <span className="text-[13px] text-muted">{session?.user?.email}</span>
-          <h1 className="font-display text-[38px] font-bold leading-none">Settings</h1>
-        </div>
       </header>
 
-      <h2 className="eyebrow px-5 mt-4">Connections</h2>
+      <div className="arrive flex items-center gap-3.5 px-5 pt-5">
+        <span className="w-14 h-14 rounded-full bg-accent text-accent-ink flex items-center justify-center num text-[28px]">
+          {name.charAt(0).toUpperCase()}
+        </span>
+        <span className="flex flex-col gap-0.5 min-w-0">
+          <span className="font-display font-extrabold stretch-80 text-[30px] leading-none truncate">{name}</span>
+          <span className="text-[13px] text-muted truncate">Signed in with Google · {session?.user?.email}</span>
+        </span>
+      </div>
 
-      {/* Claude ----------------------------------------------------------- */}
-      <Section
-        title="Claude (LiftLog MCP)"
-        status={<Status on={clients.length > 0} label={clients.length ? "Connected" : "Not connected"} />}
-      >
-        <CopyField label="Custom connector URL" value={`${origin}/api/mcp`} />
-        <p className="text-[13px] text-muted leading-relaxed">
-          In Claude: Settings › Connectors › Add custom connector, paste the URL, then sign in with
-          Google when asked. Works on phone, web and desktop.
-        </p>
-
-        {clients.length > 0 && (
-          <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">
-            {clients.map((c) => (
-              <li key={c.clientId} className="py-2.5 flex justify-between gap-3 text-sm">
-                <span className="text-fg-2 truncate">{c.name}</span>
-                <span className="text-muted shrink-0">used {ago(c.lastUsedAt)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col gap-0.5 text-sm">
-            <span className="text-muted text-xs">Last tool call</span>
-            <span className="text-fg-2">
-              {lastCall ? (
-                <>
-                  <span className="font-mono text-[13px]">{lastCall.tool}</span> · {ago(lastCall.createdAt)}
-                </>
-              ) : (
-                "None yet"
-              )}
+      {/* Your PT ---------------------------------------------------------- */}
+      <section aria-labelledby="pt-h" className="arrive arrive-1 mx-3 mt-6">
+        <h2 id="pt-h" className="section-label mx-2 mb-2.5">
+          Your PT
+        </h2>
+        <div className="p-4 rounded-[20px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <span className={`${ico} bg-[rgba(140,200,255,.12)] text-info`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 12h4l2-5 4 10 2-5h4" />
+              </svg>
             </span>
+            <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+              <span className="font-semibold">Claude connector</span>
+              <span className={`text-[13px] ${connected ? "text-info" : "text-muted"}`}>
+                {connected
+                  ? `Connected${lastPush ? ` · last ${lastPush.tool === "push_plan" ? "push" : "write"} ${syncedAt(lastPush.createdAt)}` : ""}`
+                  : "Not connected"}
+              </span>
+            </span>
+            {connected && <DisconnectClaudeButton />}
           </div>
-          {clients.length > 0 && <DisconnectClaudeButton />}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="eyebrow">Audit log · writes</h3>
-          {writes.length === 0 ? (
-            <p className="text-sm text-muted">Claude hasn&apos;t changed anything yet.</p>
-          ) : (
-            <ol className="flex flex-col">
-              {writes.slice(0, 15).map((c) => (
-                <li key={c.id} className="py-2.5 border-b border-line-soft last:border-0 flex flex-col gap-1">
-                  <div className="flex justify-between gap-3 text-sm">
-                    <span className="font-mono text-[13px] text-fg-2">{c.tool}</span>
-                    <span className={`text-xs ${c.ok ? "text-muted" : "text-danger-soft"}`}>
-                      {c.ok ? "" : "rejected · "}
-                      {c.createdAt.toLocaleString("en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: process.env.APP_TIMEZONE || "Asia/Dubai" })}
-                    </span>
-                  </div>
-                  {c.summary && <span className="text-[13px] text-muted leading-snug line-clamp-3">{c.summary}</span>}
-                </li>
-              ))}
-            </ol>
+          <CopyField label="Custom connector URL" value={`${origin}/api/mcp`} />
+          {!connected && (
+            <p className="m-0 px-1 text-[13px] text-muted leading-relaxed">
+              In Claude: Settings › Connectors › Add custom connector, paste the URL, then sign in with Google when
+              asked.
+            </p>
+          )}
+          {(clients.length > 0 || writes.length > 0) && (
+            <details className="group">
+              <summary className="min-h-11 px-1 flex items-center justify-between text-sm text-fg-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                Clients &amp; audit log
+                {chevron}
+              </summary>
+              <ul className="m-0 p-0 list-none flex flex-col">
+                {clients.map((c) => (
+                  <li key={c.clientId} className="py-2.5 px-1 flex justify-between gap-3 text-sm border-b border-line">
+                    <span className="text-fg-2 truncate">{c.name}</span>
+                    <span className="text-muted shrink-0">used {ago(c.lastUsedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+              {writes.length === 0 ? (
+                <p className="m-0 mt-2 px-1 text-sm text-muted">Claude hasn&apos;t changed anything yet.</p>
+              ) : (
+                <ol className="m-0 p-0 list-none flex flex-col">
+                  {writes.slice(0, 15).map((c) => (
+                    <li key={c.id} className="py-2.5 px-1 border-b border-line last:border-0 flex flex-col gap-1">
+                      <div className="flex justify-between gap-3 text-sm">
+                        <span className="font-mono text-[13px] text-fg-2">{c.tool}</span>
+                        <span className={`font-mono text-[11px] ${c.ok ? "text-muted" : "text-danger-text"}`}>
+                          {c.ok ? "" : "REJECTED · "}
+                          {c.createdAt.toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: process.env.APP_TIMEZONE || "Asia/Dubai",
+                          })}
+                        </span>
+                      </div>
+                      {c.summary && <span className="text-[13px] text-muted leading-snug line-clamp-3">{c.summary}</span>}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </details>
           )}
         </div>
-      </Section>
+      </section>
 
-      {/* Whoop ------------------------------------------------------------ */}
-      <Section
-        title="Whoop · sleep"
-        status={<Status on={!!whoop?.accessToken} label={whoop?.accessToken ? `Synced ${ago(whoop.lastSyncAt)}` : "Off"} />}
-      >
+      {/* Recovery sources -------------------------------------------------- */}
+      <section aria-labelledby="src-h" className="arrive arrive-2 mx-3 mt-[22px]">
+        <h2 id="src-h" className="section-label mx-2 mb-2.5">
+          Recovery sources
+        </h2>
         {sp.whoop && WHOOP_FLASH[sp.whoop] && (
-          <p role="status" className="text-sm p-3 rounded-xl bg-surface-2 text-fg-2">
+          <p role="status" className="m-0 mb-2 text-sm p-3 rounded-[14px] bg-surface-2 text-fg-2">
             {WHOOP_FLASH[sp.whoop]}
           </p>
         )}
-        <p className="text-[13px] text-muted leading-relaxed">
-          Pulls last night&apos;s sleep (time asleep, not time in bed) into the recovery check-in every
-          30 minutes while you use the app, and whenever Claude asks for recovery. A value you type
-          yourself always wins.
-          {sleepSource === "whoop" && recovery.today?.sleepMin != null && (
-            <> Today: <span className="text-fg-2">{formatSleep(recovery.today.sleepMin)}</span>.</>
-          )}
-        </p>
-        {whoop?.lastError && <p className="text-[13px] text-danger-soft">Last error: {whoop.lastError}</p>}
-        {whoopConfigured() ? (
-          <WhoopButtons connected={!!whoop?.accessToken} />
-        ) : (
-          <p className="text-[13px] text-accent-soft">
-            Server needs WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET (developer.whoop.com) — see README.
-          </p>
-        )}
-      </Section>
+        <div className="card-group">
+          <div className={`${row} border-b border-line`}>
+            <span className={`${ico} bg-surface-3 text-fg font-display font-black text-[15px]`}>W</span>
+            <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+              <span>Whoop</span>
+              <span className="text-xs text-muted">
+                {whoop?.accessToken ? `Sleep · synced ${syncedAt(whoop.lastSyncAt)}` : "Sleep · not connected"}
+                {sleepSource === "whoop" && recovery.today?.sleepMin != null && ` · ${formatSleep(recovery.today.sleepMin)}`}
+              </span>
+              {whoop?.lastError && <span className="text-xs text-danger-text">Last error: {whoop.lastError}</span>}
+            </span>
+            {whoopConfigured() ? (
+              <WhoopButtons connected={!!whoop?.accessToken} />
+            ) : (
+              <span className="text-xs text-muted">Not configured</span>
+            )}
+          </div>
+          <details className="group">
+            <summary className={`${row} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
+              <span className={`${ico} bg-surface-3 text-danger`}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 21s-7.5-4.6-9.3-9.2C1.5 8.6 3.6 5 7.2 5c2 0 3.4 1 4.8 2.6C13.4 6 14.8 5 16.8 5c3.6 0 5.7 3.6 4.5 6.8C19.5 16.4 12 21 12 21z" />
+                </svg>
+              </span>
+              <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+                <span>Apple Health</span>
+                <span className="text-xs text-muted">
+                  Protein · water via Shortcut
+                  {health?.ingestTokenHash ? ` · last push ${ago(health.lastSyncAt)}` : ""}
+                  {nutritionSource === "apple_health" && recovery.today?.proteinG != null && ` · ${recovery.today.proteinG} g today`}
+                </span>
+              </span>
+              <span className="h-11 px-3 rounded-[10px] bg-surface-3 text-fg-2 text-[13px] flex items-center">Get Shortcut</span>
+            </summary>
+            <div className="px-4 pb-4 flex flex-col gap-3">
+              <HealthTokenControls hasToken={!!health?.ingestTokenHash} endpoint={`${origin}/api/ingest/health`} />
+              <ol className="m-0 list-decimal pl-5 flex flex-col gap-2 text-[13px] text-muted leading-relaxed">
+                <li>
+                  MyFitnessPal › More › Settings › Sharing &amp; Privacy › Apple Health: allow it to write{" "}
+                  <span className="text-fg-2">Protein</span> and <span className="text-fg-2">Water</span>.
+                </li>
+                <li>
+                  Shortcuts › New Shortcut. Add <span className="text-fg-2">Find Health Samples</span>: Type = Protein,
+                  Start Date is Today. Then <span className="text-fg-2">Calculate Statistics</span> › Sum.
+                </li>
+                <li>Repeat for Type = Water (unit mL).</li>
+                <li>
+                  Add <span className="text-fg-2">Get Contents of URL</span>: the endpoint above, Method POST, Header{" "}
+                  <span className="font-mono">Authorization</span> = <span className="font-mono">Bearer &lt;token&gt;</span>,
+                  Request Body JSON with <span className="font-mono">proteinG</span> and{" "}
+                  <span className="font-mono">waterMl</span> set to the two sums.
+                </li>
+                <li>
+                  Automation › Personal › <span className="text-fg-2">App: MyFitnessPal is closed</span> (and/or a time of
+                  day) › run the shortcut, without asking.
+                </li>
+              </ol>
+            </div>
+          </details>
+        </div>
+      </section>
 
-      {/* Apple Health ----------------------------------------------------- */}
-      <Section
-        title="Apple Health · protein & water"
-        status={<Status on={!!health?.ingestTokenHash} label={health?.ingestTokenHash ? `Last push ${ago(health.lastSyncAt)}` : "Off"} />}
-      >
-        <p className="text-[13px] text-muted leading-relaxed">
-          MyFitnessPal has no public API and Apple Health has no web API, so this runs from your
-          iPhone: MyFitnessPal writes nutrition to Apple Health, and a Shortcut sends today&apos;s
-          totals here.
-          {nutritionSource === "apple_health" && recovery.today?.proteinG != null && (
-            <> Today: <span className="text-fg-2">{recovery.today.proteinG} g protein</span>.</>
-          )}
-        </p>
-        <HealthTokenControls hasToken={!!health?.ingestTokenHash} endpoint={`${origin}/api/ingest/health`} />
-        <details className="group">
-          <summary className="cursor-pointer text-sm text-fg-2 py-2 list-none flex justify-between items-center min-h-[44px]">
-            Set it up (5 min)
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
-          </summary>
-          <ol className="list-decimal pl-5 flex flex-col gap-2 text-[13px] text-muted leading-relaxed">
-            <li>MyFitnessPal › More › Settings › Sharing &amp; Privacy › Apple Health: allow it to write <span className="text-fg-2">Protein</span> and <span className="text-fg-2">Water</span>.</li>
-            <li>Shortcuts › New Shortcut. Add <span className="text-fg-2">Find Health Samples</span>: Type = Protein, Start Date is Today. Then <span className="text-fg-2">Calculate Statistics</span> › Sum.</li>
-            <li>Repeat for Type = Water (unit mL).</li>
-            <li>Add <span className="text-fg-2">Get Contents of URL</span>: the endpoint above, Method POST, Header <span className="font-mono">Authorization</span> = <span className="font-mono">Bearer &lt;token&gt;</span>, Request Body JSON with <span className="font-mono">proteinG</span> and <span className="font-mono">waterMl</span> set to the two sums.</li>
-            <li>Automation › Personal › <span className="text-fg-2">App: MyFitnessPal is closed</span> (and/or a time of day) › run the shortcut, without asking.</li>
-          </ol>
-        </details>
-      </Section>
+      {/* On the gym floor --------------------------------------------------- */}
+      <section aria-labelledby="pref-h" className="arrive arrive-3 mx-3 mt-[22px]">
+        <h2 id="pref-h" className="section-label mx-2 mb-2.5">
+          On the gym floor
+        </h2>
+        <div className="card-group">
+          <PushToggle vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+          <GymFloorPrefs />
+        </div>
+      </section>
 
-      {/* Push ------------------------------------------------------------- */}
-      <Section title="Notifications">
-        <PushToggle vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
-      </Section>
-
-      <div className="mx-4 mt-6 flex items-center justify-between">
-        <Link href="/form" className="text-sm text-muted hover:text-fg-2 min-h-[44px] flex items-center">
+      <div className="mx-3 mt-[22px] flex flex-col gap-2">
+        <Link href="/form" className="btn-secondary">
           Form cues
         </Link>
         <SignOutButton />
+        <p className="m-0 mt-1 text-center text-xs text-faint">Olympus · offline-ready · v3</p>
       </div>
     </div>
   );

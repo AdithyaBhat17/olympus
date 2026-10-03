@@ -895,3 +895,38 @@ export async function recentSessionTypes(userId: string, limit = 10): Promise<st
   return rows.map((r) => r.t).filter((t): t is string => !!t);
 }
 
+
+export interface RotationSummary {
+  /** Newest DONE rotation type ("A" | "B" | "C"), cardio skipped. */
+  lastType: string | null;
+  /** Per type: the most recent DONE session's date and title ("Push + legs"). */
+  lastByType: Record<string, { date: string; title: string }>;
+  /** First session ever, for "DAY 47". */
+  firstDate: string | null;
+}
+
+/** What the Today rotation control needs, in two small queries. */
+export async function rotationSummary(userId: string, rotation: readonly string[]): Promise<RotationSummary> {
+  const [recent, [first]] = await Promise.all([
+    db
+      .select({ date: sessions.date, type: sessions.sessionType, name: sessions.sessionName })
+      .from(sessions)
+      .where(and(eq(sessions.userId, userId), eq(sessions.status, "DONE")))
+      .orderBy(desc(sessions.date), desc(sessions.createdAt))
+      .limit(60),
+    db
+      .select({ date: sessions.date })
+      .from(sessions)
+      .where(eq(sessions.userId, userId))
+      .orderBy(asc(sessions.date))
+      .limit(1),
+  ]);
+  const lastByType: RotationSummary["lastByType"] = {};
+  let lastType: string | null = null;
+  for (const r of recent) {
+    if (!r.type || !rotation.includes(r.type)) continue;
+    lastType ??= r.type;
+    lastByType[r.type] ??= { date: r.date, title: r.name.replace(/^Session \S+\s*·\s*/, "") };
+  }
+  return { lastType, lastByType, firstDate: first?.date ?? null };
+}

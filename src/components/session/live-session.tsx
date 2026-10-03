@@ -1,28 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { trueKg } from "@/domain/load";
 import type { SetLogEntry } from "@/domain/types";
-import type { LiveItemView, SessionView } from "@/server/sessions";
-import {
-  discardSessionAction,
-  logSetAction,
-  removeSetAction,
-  swapExerciseAction,
-} from "@/lib/liftlog-actions";
+import type { LiveItemView, LogSetResult, SessionView } from "@/server/sessions";
+import { discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions";
+import { mutate } from "@/lib/offline/mutate";
+import { subscribePending } from "@/lib/offline/outbox";
+import { useWakeLock } from "@/lib/wake-lock";
 import { ChevronDownIcon, WarnIcon } from "./icons";
-import { Elapsed, RestTimer, loadRest, saveRest, type RestState } from "./timers";
+import { Elapsed, RestPill, loadRest, saveRest, type RestState } from "./timers";
 import { ExerciseCard } from "./exercise-card";
-import { SetTable, type LogInput, type LogKind } from "./set-table";
+import { SetTable, setLabels, type LogInput, type LogKind } from "./set-table";
 import { CompletedList, UpNextList } from "./session-lists";
 import { SwapSheet, type SwapCandidate } from "./swap-sheet";
-import { useAction } from "./use-action";
+import { Sheet } from "./sheet";
 
 /** Optimistic set edits per item key: index → entry (null = removed). */
 type Overlay = Record<string, Record<number, SetLogEntry | null>>;
+/** Optimistic swaps per item key. */
+type SwapOverlay = Record<string, LiveItemView>;
 
 interface LiveSessionProps {
   view: SessionView;
@@ -43,22 +43,47 @@ function mergeItem(
   const sets = Array.from({ length: count }, (_, i) => {
     const base = it.sets[i] ?? { index: i, planned: null, logged: null, last: null };
     const logged = ov && i in ov ? ov[i] : base.logged;
-    return { ...base, logged };
+    return { ...base, index: i, logged };
   });
   const planned = sets.filter((s) => s.planned).length;
   const logged = sets.filter((s) => s.logged).length;
   return { ...it, sets, done: planned > 0 ? logged >= planned : logged > 0 };
 }
 
+/** Logged / planned for the progress segment. */
+function itemProgress(it: LiveItemView): number {
+  const planned = Math.max(1, it.sets.filter((s) => s.planned).length || it.sets.length);
+  return Math.min(1, it.sets.filter((s) => s.logged).length / planned);
+}
+
 export function LiveSession({ view, swap }: LiveSessionProps) {
   const router = useRouter();
-  const { run, busy } = useAction();
+  useWakeLock(true);
 
   const [overlay, setOverlay] = useState<Overlay>({});
+  const [swaps, setSwaps] = useState<SwapOverlay>({});
   const [setCounts, setSetCounts] = useState<Record<string, number>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [swapKey, setSwapKey] = useState<string | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [notes, setNotes] = useState(view.notes ?? "");
   const [rest, setRestState] = useState<RestState | null>(null);
+  const [pending, setPending] = useState(0);
+  const overlayRef = useRef(overlay);
+  overlayRef.current = overlay;
+
+  useEffect(() => subscribePending(setPending), []);
+  useEffect(() => setNotes(view.notes ?? ""), [view.notes]);
+
+  // No rubber-band / pull-to-refresh mid-set.
+  useEffect(() => {
+    const html = document.documentElement;
+    const prev = html.style.overscrollBehavior;
+    html.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overscrollBehavior = prev;
+    };
+  }, []);
 
   // Rest timer survives reloads via localStorage (read after mount only).
   useEffect(() => {
@@ -71,6 +96,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     },
     [view.id]
   );
+  const skipRest = useCallback(() => setRest(null), [setRest]);
 
   // Drop optimistic entries the server view now reflects.
   useEffect(() => {
@@ -80,36 +106,45 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         const serverItem = view.items.find((x) => x.key === key);
         for (const [k, v] of Object.entries(entries)) {
           const server = serverItem?.sets[Number(k)]?.logged ?? null;
-          const reflected = v === null ? server === null : server?.doneAt != null && server.doneAt === v.doneAt;
+          const reflected =
+            v === null
+              ? server === null
+              : server != null && server.reps === v.reps && server.weight === v.weight && (server.rpe ?? null) === (v.rpe ?? null);
           if (!reflected) (next[key] ??= {})[Number(k)] = v;
         }
       }
       return next;
     });
+    setSwaps({});
   }, [view]);
 
   const items = useMemo(
-    () => view.items.map((it) => mergeItem(it, overlay[it.key], setCounts[it.key] ?? 0)),
-    [view.items, overlay, setCounts]
+    () =>
+      view.items.map((it) =>
+        mergeItem(swaps[it.key] ?? it, swaps[it.key] ? undefined : overlay[it.key], setCounts[it.key] ?? 0)
+      ),
+    [view.items, overlay, swaps, setCounts]
   );
 
   const current =
-    (selectedKey ? items.find((i) => i.key === selectedKey) : undefined) ??
-    items.find((i) => !i.done) ??
-    null;
+    (selectedKey ? items.find((i) => i.key === selectedKey) : undefined) ?? items.find((i) => !i.done) ?? null;
   const currentIdx = current ? items.indexOf(current) : -1;
   const completed = items.filter((i) => i.done && i.key !== current?.key);
   const upNext = items.filter((i) => !i.done && i.key !== current?.key);
-  const nextItem = current
-    ? items.slice(currentIdx + 1).find((i) => !i.done) ?? upNext[0] ?? null
-    : null;
-  const doneCount = items.filter((i) => i.done).length;
+  const nextItem = current ? items.slice(currentIdx + 1).find((i) => !i.done) ?? upNext[0] ?? null : null;
   const swapItem = swapKey ? items.find((i) => i.key === swapKey) ?? null : null;
+  const positions = useMemo(() => new Map(items.map((it, i) => [it.key, i + 1])), [items]);
 
+  const restNext = useMemo(() => {
+    if (!current) return null;
+    const idx = current.sets.findIndex((s) => !s.logged);
+    if (idx >= 0) return `set ${setLabels(current.sets)[idx]}`;
+    return nextItem ? nextItem.exercise.name : null;
+  }, [current, nextItem]);
+
+  const typeLabel = view.sessionType ? `Session ${view.sessionType}` : null;
   const headerTitle =
-    view.sessionType && !view.title.startsWith("Session ")
-      ? `Session ${view.sessionType} · ${view.title}`
-      : view.title;
+    typeLabel && !view.title.startsWith("Session ") ? `${typeLabel} · ${view.title}` : view.title;
 
   const putOverlay = (key: string, index: number, v: SetLogEntry | null | undefined) =>
     setOverlay((prev) => {
@@ -119,48 +154,60 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       return { ...prev, [key]: entries };
     });
 
-  const onLog = async (item: LiveItemView, index: number, input: LogInput, kind: LogKind) => {
+  const onLog = async (item: LiveItemView, index: number, input: LogInput, kind: LogKind): Promise<LogSetResult | null> => {
     const s = item.sets[index];
     const type = s?.logged?.type ?? s?.planned?.type ?? "working";
     const weight = input.platesKg != null ? trueKg(item.exercise, input.platesKg) : input.weight;
-    const before = overlay[item.key] && index in overlay[item.key] ? overlay[item.key][index] : undefined;
+    const prev = overlayRef.current[item.key];
+    const before = prev && index in prev ? prev[index] : undefined;
 
-    putOverlay(item.key, index, {
-      reps: input.reps,
-      weight,
-      platesKg: input.platesKg,
-      rpe: input.rpe,
-      type,
-      flags: s?.logged?.flags,
-      doneAt: new Date().toISOString(),
-    });
-    if (kind === "new") {
-      setSelectedKey(item.key);
-      setRest({
-        endAt: Date.now() + item.restSec * 1000,
-        totalSec: item.restSec,
-        label: item.exercise.isCompound ? "Rest · compound" : "Rest · accessory",
-      });
-    }
-
-    const res = await run(() =>
-      logSetAction(view.id, {
-        exerciseId: item.exercise.id,
-        planItemId: item.planItemId,
-        setIndex: index,
-        reps: input.reps,
-        rpe: input.rpe,
-        type,
-        blockedOverride: item.blockedReason ? true : undefined,
-        ...(input.platesKg != null ? { platesKg: input.platesKg } : { weight: input.weight }),
-      })
+    let result: LogSetResult | null = null;
+    await mutate<LogSetResult>(
+      {
+        kind: "logSet",
+        sessionId: view.id,
+        input: {
+          exerciseId: item.exercise.id,
+          planItemId: item.planItemId,
+          setIndex: index,
+          reps: input.reps,
+          rpe: input.rpe,
+          type,
+          blockedOverride: item.blockedReason ? true : undefined,
+          ...(input.platesKg != null ? { platesKg: input.platesKg } : { weight: input.weight }),
+        },
+      },
+      {
+        apply: () => {
+          putOverlay(item.key, index, {
+            reps: input.reps,
+            weight,
+            platesKg: input.platesKg,
+            rpe: input.rpe,
+            type,
+            flags: s?.logged?.flags,
+            doneAt: s?.logged?.doneAt ?? new Date().toISOString(),
+          });
+          if (kind === "new") {
+            setSelectedKey(item.key);
+            setRest({
+              endAt: Date.now() + item.restSec * 1000,
+              totalSec: item.restSec,
+              label: item.exercise.isCompound ? "Rest · compound" : "Rest · accessory",
+            });
+          }
+        },
+        rollback: () => {
+          putOverlay(item.key, index, before);
+          if (kind === "new") setRest(null);
+        },
+        onOk: (data) => {
+          putOverlay(item.key, index, data.set);
+          result = data;
+        },
+      }
     );
-    if (!res.ok) {
-      putOverlay(item.key, index, before);
-      return null;
-    }
-    putOverlay(item.key, index, res.data.set);
-    return res.data;
+    return result;
   };
 
   const addSet = (item: LiveItemView) => {
@@ -168,10 +215,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     setSelectedKey(item.key);
   };
 
-  const lastLoggedIndex = (item: LiveItemView) =>
-    item.sets.reduce((acc, s) => (s.logged ? s.index : acc), -1);
+  const lastLoggedIndex = (item: LiveItemView) => item.sets.reduce((acc, s) => (s.logged ? s.index : acc), -1);
 
-  const removeLastSet = async (item: LiveItemView) => {
+  const removeLastSet = (item: LiveItemView) => {
     const last = item.sets[item.sets.length - 1];
     if (last && !last.logged && !last.planned && item.sets.length > 1) {
       setSetCounts((c) => ({ ...c, [item.key]: item.sets.length - 1 }));
@@ -179,41 +225,110 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     }
     const idx = lastLoggedIndex(item);
     if (idx < 0) return;
-    const before = overlay[item.key]?.[idx];
-    putOverlay(item.key, idx, null);
-    setSetCounts((c) => ({ ...c, [item.key]: Math.min(c[item.key] ?? 0, item.sets.length - 1) }));
-    const res = await run(() =>
-      removeSetAction(view.id, {
-        exerciseId: item.exercise.id,
-        planItemId: item.planItemId,
-        setIndex: idx,
-      })
+    const prev = overlayRef.current[item.key];
+    const before = prev && idx in prev ? prev[idx] : undefined;
+    void mutate(
+      {
+        kind: "removeSet",
+        sessionId: view.id,
+        input: { exerciseId: item.exercise.id, planItemId: item.planItemId, setIndex: idx },
+      },
+      {
+        apply: () => {
+          putOverlay(item.key, idx, null);
+          setSetCounts((c) => ({ ...c, [item.key]: Math.min(c[item.key] ?? 0, item.sets.length - 1) }));
+          setRest(null);
+          toast(`Set ${setLabels(item.sets)[idx]} removed`, { id: "set-removed" });
+        },
+        rollback: () => putOverlay(item.key, idx, before),
+      }
     );
-    if (!res.ok) putOverlay(item.key, idx, before);
   };
 
+  /** Optimistic swap: show the new exercise now, reconcile on the next server view. */
   const doSwap = async (exerciseId: string, overrideReason?: string) => {
     if (!swapItem?.planItemId) return;
-    const res = await run(() =>
-      swapExerciseAction(view.id, {
-        planItemId: swapItem.planItemId!,
+    const c = swap.candidates.find((x) => x.id === exerciseId);
+    const item = swapItem;
+    setSwapKey(null);
+    setSelectedKey(item.key);
+    if (c) {
+      setSwaps((s) => ({
+        ...s,
+        [item.key]: {
+          ...item,
+          swapped: true,
+          plannedExercise: item.plannedExercise ?? item.exercise,
+          exercise: {
+            ...item.exercise,
+            id: c.id,
+            slug: c.slug,
+            name: c.name,
+            category: c.category,
+            loadMode: c.loadMode as LiveItemView["exercise"]["loadMode"],
+            carriageKgPerSide: c.carriageKgPerSide,
+            formCueId: null,
+          },
+          blockedReason: c.blockedReason,
+          lastTopKg: c.lastKg,
+          sets: item.sets.map((s) => ({
+            ...s,
+            logged: null,
+            last: null,
+            planned: s.planned ? { ...s.planned, openKg: c.lastKg ?? undefined } : null,
+          })),
+        },
+      }));
+    }
+    const rollback = () =>
+      setSwaps((s) => {
+        const next = { ...s };
+        delete next[item.key];
+        return next;
+      });
+    try {
+      const res = await swapExerciseAction(view.id, {
+        planItemId: item.planItemId!,
         exerciseId,
         overrideReason: overrideReason ?? null,
-      })
-    );
-    if (res.ok) {
-      setSwapKey(null);
-      setSelectedKey(swapItem.key);
+      });
+      if (!res.ok) {
+        rollback();
+        toast.error(res.error);
+        return;
+      }
       toast.success(overrideReason ? "Swapped — flagged for your PT" : "Exercise swapped");
+      router.refresh();
+    } catch {
+      rollback();
+      toast.error("Swapping needs a connection — try again in a moment.");
     }
+  };
+
+  const saveNote = (text: string) => {
+    const name = current?.exercise.name;
+    const line = name ? `${name}: ${text}` : text;
+    const next = notes.trim() ? `${notes.trim()}\n${line}` : line;
+    const before = notes;
+    setNoteOpen(false);
+    void mutate({ kind: "saveNotes", sessionId: view.id, notes: next.slice(0, 2000) }, {
+      apply: () => {
+        setNotes(next);
+        toast.success("Note added for your PT", { id: "note" });
+      },
+      rollback: () => setNotes(before),
+    });
   };
 
   const discard = async () => {
     if (!window.confirm("Discard this session? Logged sets are deleted and the plan goes back to ready.")) return;
-    const res = await run(() => discardSessionAction(view.id), { refresh: false });
-    if (res.ok) {
+    try {
+      const res = await discardSessionAction(view.id);
+      if (!res.ok) return void toast.error(res.error);
       setRest(null);
       router.push("/today");
+    } catch {
+      toast.error("Discarding needs a connection.");
     }
   };
 
@@ -227,94 +342,112 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen pb-10">
-      <header className="sticky top-0 z-30 safe-top px-4 pb-3 flex items-center gap-2 border-b border-line bg-bg">
-        <Link
-          href="/today"
-          aria-label="Back to Today"
-          className="w-11 h-11 -ml-2 flex items-center justify-center text-fg shrink-0"
-        >
-          <ChevronDownIcon size={22} />
+    <div className="flex flex-col pb-[calc(env(safe-area-inset-bottom)+40px)]">
+      <header className="page-top px-3 grid grid-cols-[44px_1fr_auto] items-center gap-2">
+        <Link href="/today" prefetch aria-label="Back to Today" className="btn-round">
+          <ChevronDownIcon size={20} strokeWidth={2.4} />
         </Link>
-        <div className="grow flex flex-col min-w-0">
-          <span className="font-semibold text-base truncate">{headerTitle}</span>
-          <span className="font-display text-lg text-muted tabular-nums">
-            <Elapsed startedAt={view.startedAt} /> · {doneCount} of {items.length} done
+        <div className="flex flex-col items-center gap-0.5 min-w-0">
+          <span className="text-[13px] text-muted truncate max-w-full">{headerTitle}</span>
+          <span className="flex items-center gap-[7px]">
+            <span className="w-[7px] h-[7px] rounded-full bg-accent animate-live-dot" aria-hidden />
+            <span className="num text-[20px]" role="timer" aria-label="Session time">
+              <Elapsed startedAt={view.startedAt} />
+            </span>
           </span>
         </div>
-        <Link
-          href={`/session/${view.id}/finish`}
-          className="h-11 px-4 rounded-[10px] bg-surface-2 text-fg font-semibold flex items-center shrink-0"
-        >
+        <Link href={`/session/${view.id}/finish`} prefetch className="btn-pill font-semibold">
           Finish
         </Link>
       </header>
 
-      <RestTimer rest={rest} onAdd={addRest} onSkip={() => setRest(null)} />
-
-      {view.progressionOnHold && (
-        <p className="mx-4 mt-3 flex gap-2 items-center text-[13px] text-muted">
-          <WarnIcon size={16} className="text-danger-soft shrink-0" />
-          Progression on hold — hit last session&apos;s loads, no bumps.
+      {pending > 0 && (
+        <p role="status" className="m-0 mt-2 text-center text-xs text-muted">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-faint mr-1.5 align-middle" />
+          {pending} change{pending === 1 ? "" : "s"} saved on this phone · will sync
         </p>
       )}
 
-      <CompletedList items={completed} onSelect={setSelectedKey} />
+      <div
+        role="progressbar"
+        aria-label={`Exercise ${Math.max(1, currentIdx + 1)} of ${items.length}`}
+        aria-valuemin={0}
+        aria-valuemax={items.length}
+        aria-valuenow={items.filter((i) => i.done).length}
+        className="flex gap-1 px-5 pt-4"
+      >
+        {items.map((it) => {
+          const p = it.done ? 1 : it.key === current?.key ? itemProgress(it) : 0;
+          return (
+            <span key={it.key} className="relative h-1 flex-1 rounded-sm bg-key overflow-hidden">
+              <span
+                className="absolute inset-0 bg-accent origin-left transition-transform duration-300 ease-arrive"
+                style={{ transform: `scaleX(${p})` }}
+              />
+            </span>
+          );
+        })}
+      </div>
+
+      {view.progressionOnHold && (
+        <p className="mx-5 mt-3 mb-0 flex gap-2 items-center text-[13px] text-muted">
+          <WarnIcon size={16} className="text-danger shrink-0" />
+          Progression on hold — hit last session&apos;s loads, no bumps.
+        </p>
+      )}
 
       {current ? (
         <ExerciseCard
           item={current}
           position={currentIdx + 1}
           total={items.length}
-          disabled={busy}
           canRemoveSet={
-            lastLoggedIndex(current) >= 0 ||
-            (!current.sets[current.sets.length - 1]?.planned && current.sets.length > 1)
+            lastLoggedIndex(current) >= 0 || (!current.sets[current.sets.length - 1]?.planned && current.sets.length > 1)
           }
           next={nextItem ? { name: nextItem.exercise.name } : null}
           onSwap={current.planItemId ? () => setSwapKey(current.key) : null}
           onAddSet={() => addSet(current)}
-          onRemoveSet={() => void removeLastSet(current)}
-          onNote={() => toast("Notes go on the Finish screen")}
+          onRemoveSet={() => removeLastSet(current)}
+          onNote={() => setNoteOpen(true)}
           onNext={() => nextItem && setSelectedKey(nextItem.key)}
         >
           <SetTable
             key={`${current.key}:${current.exercise.id}`}
             item={current}
-            disabled={busy}
             onLog={(index, input, kind) => onLog(current, index, input, kind)}
+            onUndoLast={() => removeLastSet(current)}
           />
         </ExerciseCard>
       ) : (
-        <section className="mx-4 mt-4 card flex flex-col gap-3 items-start">
-          <h1 className="font-display font-bold text-[32px] leading-none">
-            {items.length ? "All exercises done" : "No exercises in this session"}
-          </h1>
-          <p className="text-sm text-muted">
+        <section className="mx-3 mt-3.5 p-5 rounded-[28px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3 items-start">
+          <h1 className="m-0 num text-[36px]">{items.length ? "All exercises done" : "No exercises in this session"}</h1>
+          <p className="m-0 text-sm text-muted">
             {items.length
               ? "Tap a completed exercise to edit it, or wrap up."
               : "This plan has no items. Discard it and start from Today."}
           </p>
           {items.length > 0 && (
-            <Link href={`/session/${view.id}/finish`} className="btn-primary">
+            <Link href={`/session/${view.id}/finish`} prefetch className="btn-primary">
               Finish session
             </Link>
           )}
         </section>
       )}
 
-      <UpNextList items={upNext} onSelect={setSelectedKey} />
+      <UpNextList items={upNext} positions={positions} onSelect={setSelectedKey} />
+      <CompletedList items={completed} onSelect={setSelectedKey} />
 
-      <div className="mt-8 flex justify-center">
+      <div className="mt-8 mb-24 flex justify-center">
         <button
           type="button"
           onClick={() => void discard()}
-          disabled={busy}
-          className="min-h-11 px-4 text-sm text-faint hover:text-danger-soft underline underline-offset-4 disabled:opacity-50"
+          className="min-h-11 px-4 text-sm text-faint underline underline-offset-4"
         >
           Discard session
         </button>
       </div>
+
+      <RestPill sessionId={view.id} rest={rest} nextLabel={restNext} onAdd={addRest} onSkip={skipRest} />
 
       {swapItem?.planItemId && (
         <SwapSheet
@@ -328,10 +461,43 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           candidates={swap.candidates}
           constraintRegions={swap.constraintRegions}
           inSessionIds={items.map((i) => i.exercise.id)}
-          disabled={busy}
           onSwap={(id, reason) => void doSwap(id, reason)}
         />
       )}
+
+      <Sheet open={noteOpen} onClose={() => setNoteOpen(false)} label="Note for your PT">
+        {noteOpen && <NoteForm exercise={current?.exercise.name ?? null} onSave={saveNote} />}
+      </Sheet>
     </div>
+  );
+}
+
+function NoteForm({ exercise, onSave }: { exercise: string | null; onSave: (text: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text.trim()) onSave(text.trim());
+      }}
+    >
+      <div className="flex flex-col px-1.5">
+        <span className="text-[17px] font-cta">Note for your PT</span>
+        {exercise && <span className="text-[13px] text-muted">{exercise} · added to the session notes</span>}
+      </div>
+      <textarea
+        data-autofocus
+        rows={3}
+        value={text}
+        maxLength={300}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Grip slipped on set 3…"
+        className="w-full rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327] text-fg text-[16px] leading-[1.45] p-3.5 resize-none outline-none focus:shadow-[inset_0_0_0_1.5px_#FF6A2B] placeholder:text-faint"
+      />
+      <button type="submit" className="btn-primary" disabled={!text.trim()}>
+        Add note
+      </button>
+    </form>
   );
 }

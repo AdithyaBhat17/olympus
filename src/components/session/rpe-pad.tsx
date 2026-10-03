@@ -4,24 +4,22 @@ import { cn } from "@/lib/utils";
 
 export const RPE_VALUES = [6, 7, 7.5, 8, 8.5, 9, 10] as const;
 
-interface RpePadProps {
+interface RpeStripProps {
   setLabel: string;
   value: number | null | undefined;
-  onPick: (rpe: number) => void;
-  disabled?: boolean;
+  /** Same value again clears it. */
+  onPick: (rpe: number | null) => void;
 }
 
-export function RpePad({ setLabel, value, onPick, disabled }: RpePadProps) {
+/** Inline RPE chips for the last logged set — optional, one tap. */
+export function RpeStrip({ setLabel, value, onPick }: RpeStripProps) {
+  const id = `rpe-label-${setLabel}`;
   return (
-    <div className="flex flex-col gap-2 pt-2 px-0.5">
-      <span className="text-xs text-muted" id={`rpe-label-${setLabel}`}>
-        RPE for set {setLabel} — tap after the set
+    <div className="mt-1 p-2.5 rounded-[18px] bg-surface-sunk flex flex-col gap-2 animate-slide-up">
+      <span id={id} className="px-0.5 text-[13px] text-fg-2">
+        How hard was set {setLabel}? <span className="text-faint">· optional</span>
       </span>
-      <div
-        role="radiogroup"
-        aria-labelledby={`rpe-label-${setLabel}`}
-        className="grid grid-cols-7 gap-1.5"
-      >
+      <div role="radiogroup" aria-labelledby={id} className="grid grid-cols-7 gap-[2px]">
         {RPE_VALUES.map((v) => {
           const checked = value === v;
           return (
@@ -30,13 +28,10 @@ export function RpePad({ setLabel, value, onPick, disabled }: RpePadProps) {
               type="button"
               role="radio"
               aria-checked={checked}
-              disabled={disabled}
-              onClick={() => onPick(v)}
+              onClick={() => onPick(checked ? null : v)}
               className={cn(
-                "h-11 rounded-[10px] font-display text-lg tabular-nums disabled:opacity-60",
-                checked
-                  ? "border-2 border-accent bg-accent-bg font-bold"
-                  : "border border-line bg-surface-2 font-semibold"
+                "h-11 min-w-0 rounded-xl num text-[18px]",
+                checked ? "bg-fg text-bg" : "bg-surface-2 text-fg-2"
               )}
             >
               {v}

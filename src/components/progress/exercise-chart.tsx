@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { formatKg } from "@/domain/load";
 import type { LoadMode } from "@/domain/types";
 import { formatDdMm } from "@/lib/dates";
@@ -9,27 +9,21 @@ import { cn } from "@/lib/utils";
 export interface ChartPoint {
   date: string;
   top: number | null;
-  volume: number;
-  rpe: number | null;
 }
 
-type Metric = "top" | "volume" | "rpe";
-
-const METRICS: Array<{ key: Metric; tab: string; title: string; noun: string }> = [
-  { key: "top", tab: "Top set", title: "Top set · kg", noun: "Top set" },
-  { key: "volume", tab: "Volume", title: "Volume · kg", noun: "Volume" },
-  { key: "rpe", tab: "RPE", title: "Top RPE", noun: "RPE" },
+type Range = "4w" | "12w" | "all";
+const RANGES: Array<{ key: Range; label: string; days: number | null }> = [
+  { key: "4w", label: "4W", days: 28 },
+  { key: "12w", label: "12W", days: 84 },
+  { key: "all", label: "All", days: null },
 ];
 
-// Geometry from the Exercise artboard (viewBox 326 × 170).
-const W = 326;
+// Geometry (viewBox 342 × 170): plot spans x 0–310, y 40 (hi) → 140 (lo).
+const W = 342;
 const H = 170;
-const Y_TOP = 20;
-const Y_BOTTOM = 120;
-const X_FIRST = 60;
-const X_NEXT = 290;
-const X_LAST_NO_NEXT = 300;
-const GRID_X0 = 32;
+const PLOT_W = 310;
+const Y_TOP = 40;
+const Y_BOTTOM = 140;
 
 const NICE = [1, 2, 2.5, 5];
 
@@ -41,7 +35,7 @@ function niceStep(raw: number): number {
 }
 
 /** Three gridlines (two intervals) that contain every value. */
-function scale(values: number[]): { lo: number; hi: number; step: number } {
+function scale(values: number[]): { lo: number; hi: number } {
   const min = Math.min(...values);
   const max = Math.max(...values);
   let range = max - min;
@@ -49,253 +43,150 @@ function scale(values: number[]): { lo: number; hi: number; step: number } {
   let step = niceStep(range / 2);
   for (let guard = 0; guard < 20; guard++) {
     const lo = Math.floor(min / step) * step;
-    if (lo + 2 * step >= max - 1e-9) return { lo, hi: lo + 2 * step, step };
+    if (lo + 2 * step >= max - 1e-9) return { lo, hi: lo + 2 * step };
     step = niceStep(step * 1.01);
   }
-  return { lo: min, hi: max, step: (max - min) / 2 };
+  return { lo: min, hi: max };
 }
 
-function fmt(metric: Metric, v: number): string {
-  if (metric === "volume" && v >= 1000) {
-    const k = v / 1000;
-    return `${k >= 10 ? Math.round(k) : Math.round(k * 10) / 10}k`;
-  }
-  return formatKg(Math.round(v * 100) / 100);
-}
-
+/**
+ * Top set over time: ember line draws on, the area fades in, the last point
+ * pulses. Range control 4W / 12W / All. Screen readers get a summary and the
+ * data table.
+ */
 export default function ExerciseChart({
   points,
-  nextKg,
+  today,
   loadMode,
 }: {
   points: ChartPoint[];
-  nextKg: number | null;
+  /** YYYY-MM-DD, for the range cut-off. */
+  today: string;
   loadMode: LoadMode;
 }) {
-  const [metric, setMetric] = useState<Metric>("top");
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [range, setRange] = useState<Range>("12w");
   const baseId = useId();
-  const meta = METRICS.find((m) => m.key === metric)!;
 
-  const series = points
-    .map((p, i) => ({ i, date: p.date, v: p[metric] }))
-    .filter((p): p is { i: number; date: string; v: number } => p.v != null);
-  const showNext = metric === "top" && nextKg != null && series.length > 0;
-  const n = points.length;
+  const series = useMemo(() => {
+    const days = RANGES.find((r) => r.key === range)!.days;
+    const cutoff = days == null ? null : Date.parse(`${today}T12:00:00Z`) - days * 86_400_000;
+    return points.filter(
+      (p): p is { date: string; top: number } =>
+        p.top != null && (cutoff == null || Date.parse(`${p.date}T12:00:00Z`) >= cutoff)
+    );
+  }, [points, range, today]);
 
-  const xs = (i: number) => {
-    if (showNext) return X_FIRST + (i * (X_NEXT - X_FIRST)) / n;
-    if (n <= 1) return (X_FIRST + X_LAST_NO_NEXT) / 2;
-    return X_FIRST + (i * (X_LAST_NO_NEXT - X_FIRST)) / (n - 1);
+  const { lo, hi } = series.length ? scale(series.map((p) => p.top)) : { lo: 0, hi: 1 };
+  // Counterweight: lower is harder, so flip the axis to keep "up = progress".
+  const flip = loadMode === "COUNTERWEIGHT";
+  const ys = (v: number) => {
+    const t = (v - lo) / (hi - lo || 1);
+    return flip ? Y_TOP + t * (Y_BOTTOM - Y_TOP) : Y_BOTTOM - t * (Y_BOTTOM - Y_TOP);
   };
-
-  const domainValues = series.map((p) => p.v).concat(showNext ? [nextKg!] : []);
-  const { lo, hi } = domainValues.length ? scale(domainValues) : { lo: 0, hi: 1 };
-  const ys = (v: number) => Y_BOTTOM - ((v - lo) / (hi - lo || 1)) * (Y_BOTTOM - Y_TOP);
-  const ticks = [hi, (lo + hi) / 2, lo];
+  const xs = (i: number) => (series.length <= 1 ? PLOT_W / 2 : (i * PLOT_W) / (series.length - 1));
+  const pts = series.map((p, i) => [Math.round(xs(i) * 10) / 10, Math.round(ys(p.top) * 10) / 10] as const);
+  const last = pts[pts.length - 1];
+  const ticks = [
+    { y: Y_TOP, v: flip ? lo : hi },
+    { y: (Y_TOP + Y_BOTTOM) / 2, v: (lo + hi) / 2 },
+    { y: Y_BOTTOM, v: flip ? hi : lo },
+  ];
+  const unit = loadMode === "PER_SIDE" ? " kg per side" : " kg";
 
   const first = series[0];
-  const last = series[series.length - 1];
-  const unit = metric === "rpe" ? "" : " kg";
-  const unitLabel = loadMode === "PER_SIDE" && metric === "top" ? " kg per side" : unit;
-
-  let summary = `No ${meta.noun.toLowerCase()} data yet`;
-  if (first && last && first !== last) {
-    const verb = last.v > first.v ? "rose" : last.v < first.v ? "fell" : "held";
-    summary =
-      verb === "held"
-        ? `${meta.noun} held at ${fmt(metric, last.v)}${unitLabel} from ${formatDdMm(first.date)} to ${formatDdMm(last.date)}`
-        : `${meta.noun} ${verb} from ${fmt(metric, first.v)}${unitLabel} on ${formatDdMm(first.date)} to ${fmt(metric, last.v)}${unitLabel} on ${formatDdMm(last.date)}`;
-  } else if (last) {
-    summary = `${meta.noun} ${fmt(metric, last.v)}${unitLabel} on ${formatDdMm(last.date)}`;
-  }
-  if (showNext) summary += `; next target ${formatKg(nextKg!)}${unitLabel}`;
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, idx: number) {
-    let next = -1;
-    if (e.key === "ArrowRight") next = (idx + 1) % METRICS.length;
-    else if (e.key === "ArrowLeft") next = (idx - 1 + METRICS.length) % METRICS.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = METRICS.length - 1;
-    if (next < 0) return;
-    e.preventDefault();
-    setMetric(METRICS[next].key);
-    tabRefs.current[next]?.focus();
+  const end = series[series.length - 1];
+  let summary = "No top sets in this range";
+  if (first && end && first !== end) {
+    summary = `Top set went from ${formatKg(first.top)} to ${formatKg(end.top)}${unit} between ${formatDdMm(first.date)} and ${formatDdMm(end.date)}`;
+  } else if (end) {
+    summary = `Top set ${formatKg(end.top)}${unit} on ${formatDdMm(end.date)}`;
   }
 
-  const lastX = last ? xs(last.i) : 0;
-  const lastY = last ? ys(last.v) : 0;
-  const nextY = showNext ? ys(nextKg!) : 0;
-  const firstX = first ? xs(first.i) : 0;
-  const showFirstLabel = first && last && first !== last && lastX - firstX > 44;
+  const lineLen = pts.reduce((acc, p, i) => (i ? acc + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
 
   return (
-    <section aria-label="Progress chart" className="card mx-4 mt-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="eyebrow">{meta.title}</h2>
-        <div role="tablist" aria-label="Chart metric" className="flex bg-bg rounded-[10px] p-[3px]">
-          {METRICS.map((m, idx) => {
-            const selected = m.key === metric;
-            return (
-              <button
-                key={m.key}
-                ref={(el) => {
-                  tabRefs.current[idx] = el;
-                }}
-                type="button"
-                role="tab"
-                id={`${baseId}-tab-${m.key}`}
-                aria-selected={selected}
-                aria-controls={`${baseId}-panel`}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => setMetric(m.key)}
-                onKeyDown={(e) => onKeyDown(e, idx)}
-                className={cn(
-                  "relative h-8 px-2.5 rounded-lg text-[13px] after:absolute after:inset-x-0 after:-inset-y-1.5",
-                  selected ? "bg-line font-semibold text-fg" : "text-muted hover:text-fg-2"
-                )}
-              >
-                {m.tab}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <figure
-        id={`${baseId}-panel`}
-        role="tabpanel"
-        aria-labelledby={`${baseId}-tab-${metric}`}
-        className="m-0"
-      >
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full h-auto block"
-          role="img"
-          aria-label={summary}
-        >
-          {[Y_TOP, (Y_TOP + Y_BOTTOM) / 2, Y_BOTTOM].map((y) => (
-            <line key={y} x1={GRID_X0} y1={y} x2={W} y2={y} className="stroke-line-soft" />
+    <section
+      aria-label="Top set over time"
+      className="arrive arrive-1 mx-3 mt-4 pt-4 px-3 pb-3 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327]"
+    >
+      <figure id={`${baseId}-panel`} className="m-0">
+        <svg key={range} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label={summary}>
+          <defs>
+            <linearGradient id={`${baseId}-g`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#FF6A2B" stopOpacity=".28" />
+              <stop offset="1" stopColor="#FF6A2B" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {ticks.map((t) => (
+            <g key={t.y}>
+              <line x1={0} y1={t.y} x2={W} y2={t.y} stroke="#232327" strokeWidth={1} strokeDasharray="2 4" />
+              <text x={W - 4} y={t.y - 4} textAnchor="end" fill="#5E5C58" fontSize={10} className="font-mono">
+                {formatKg(Math.round(t.v * 100) / 100)}
+              </text>
+            </g>
           ))}
-          {ticks.map((t, k) => (
-            <text
-              key={k}
-              x={0}
-              y={[Y_TOP, (Y_TOP + Y_BOTTOM) / 2, Y_BOTTOM][k] + 4}
-              className="fill-muted font-sans"
-              fontSize={11}
-            >
-              {fmt(metric, t)}
-            </text>
-          ))}
-
-          {series.length > 1 && (
-            <polyline
-              points={series.map((p) => `${xs(p.i)},${ys(p.v)}`).join(" ")}
-              fill="none"
-              className="stroke-info"
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
-          {showNext && last && (
-            <line
-              x1={lastX}
-              y1={lastY}
-              x2={X_NEXT}
-              y2={nextY}
-              className="stroke-accent"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-            />
-          )}
-
-          {series.map((p, k) => {
-            const isLast = k === series.length - 1;
-            const r = series.length > 6 ? 4.5 : 6;
-            return isLast ? (
-              <circle key={p.i} cx={xs(p.i)} cy={ys(p.v)} r={6} className="fill-info" />
-            ) : (
-              <circle
-                key={p.i}
-                cx={xs(p.i)}
-                cy={ys(p.v)}
-                r={r}
-                className="fill-bg stroke-info"
-                strokeWidth={3}
+          {pts.length > 1 && (
+            <>
+              <path
+                d={`M${pts[0][0]},${H} L${pts.map((p) => p.join(",")).join(" L")} L${last[0]},${H} Z`}
+                fill={`url(#${baseId}-g)`}
+                className="animate-fade-late"
               />
-            );
-          })}
-
-          {showNext && (
-            <circle
-              cx={X_NEXT}
-              cy={nextY}
-              r={6}
-              className="fill-bg stroke-accent"
-              strokeWidth={2}
-              strokeDasharray="3 2"
-            />
-          )}
-
-          {last && (
-            <text
-              x={lastX}
-              y={Math.max(12, lastY - 11)}
-              textAnchor="middle"
-              className="fill-fg font-display"
-              fontSize={13}
-              fontWeight={600}
-            >
-              {fmt(metric, last.v)}
-            </text>
-          )}
-          {showNext && (
-            <text
-              x={Math.min(W - 2, X_NEXT)}
-              y={Math.max(12, nextY - 11)}
-              textAnchor="middle"
-              className="fill-accent font-display"
-              fontSize={13}
-              fontWeight={600}
-            >
-              {formatKg(nextKg!)}?
-            </text>
-          )}
-
-          {showFirstLabel && (
-            <text x={firstX} y={150} textAnchor="middle" className="fill-muted font-sans" fontSize={11}>
-              {formatDdMm(first.date)}
-            </text>
+              <polyline
+                points={pts.map((p) => p.join(",")).join(" ")}
+                fill="none"
+                stroke="#FF6A2B"
+                strokeWidth={3}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                strokeDasharray={Math.ceil(lineLen)}
+                className="animate-draw"
+                style={{ ["--len" as string]: Math.ceil(lineLen) }}
+              />
+            </>
           )}
           {last && (
-            <text x={lastX} y={150} textAnchor="middle" className="fill-muted font-sans" fontSize={11}>
-              {formatDdMm(last.date)}
-            </text>
+            <>
+              <circle
+                cx={last[0]}
+                cy={last[1]}
+                r={5}
+                fill="none"
+                stroke="#FF6A2B"
+                strokeWidth={2}
+                className="animate-ping"
+                style={{ transformBox: "fill-box", transformOrigin: "center" }}
+              />
+              <circle cx={last[0]} cy={last[1]} r={5} fill="#FF6A2B" stroke="#141416" strokeWidth={2} />
+            </>
           )}
-          {showNext && (
-            <text x={X_NEXT} y={150} textAnchor="middle" className="fill-muted font-sans" fontSize={11}>
-              Next
-            </text>
+          {first && end && first !== end && (
+            <>
+              <text x={2} y={H - 4} fill="#5E5C58" fontSize={10} className="font-mono">
+                {formatDdMm(first.date)}
+              </text>
+              <text x={PLOT_W} y={H - 4} textAnchor="end" fill="#5E5C58" fontSize={10} className="font-mono">
+                {formatDdMm(end.date)}
+              </text>
+            </>
           )}
         </svg>
         <figcaption className="sr-only">
           <table>
-            <caption>{meta.title} by session</caption>
+            <caption>Top set by session</caption>
             <thead>
               <tr>
                 <th scope="col">Date</th>
-                <th scope="col">{meta.noun}</th>
+                <th scope="col">Top set</th>
               </tr>
             </thead>
             <tbody>
               {series.map((p) => (
-                <tr key={p.i}>
+                <tr key={p.date}>
                   <td>{formatDdMm(p.date)}</td>
                   <td>
-                    {fmt(metric, p.v)}
-                    {unitLabel}
+                    {formatKg(p.top)}
+                    {unit}
                   </td>
                 </tr>
               ))}
@@ -303,6 +194,21 @@ export default function ExerciseChart({
           </table>
         </figcaption>
       </figure>
+      <div role="radiogroup" aria-label="Range" className="seg mt-2.5">
+        {RANGES.map((r) => (
+          <button
+            key={r.key}
+            type="button"
+            role="radio"
+            aria-checked={range === r.key}
+            aria-controls={`${baseId}-panel`}
+            onClick={() => setRange(r.key)}
+            className={cn("seg-btn h-11", range === r.key && "seg-on")}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

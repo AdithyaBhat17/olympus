@@ -1,27 +1,21 @@
 import { notFound } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
 import { getConstraints, listExerciseRows, toDomainExercise } from "@/server/exercises";
-import { exerciseHistory, workingWeights } from "@/server/history";
-import { formatKg, topSet, type LoadMode } from "@/domain";
+import { workingWeights } from "@/server/history";
+import { formatKg, type LoadMode } from "@/domain";
 import { FORM_CUE_TITLES, isFormCueId } from "@/components/form-cues/cue-ids";
-import FormDeadlift from "@/components/form-cues/form-deadlift";
-import FormSquat from "@/components/form-cues/form-squat";
-import FormPushdown from "@/components/form-cues/form-pushdown";
+import { FORM_DEFS } from "@/components/form-cues/defs";
+import FormViewer from "@/components/form-cues/form-viewer-lazy";
 
 function loadText(mode: LoadMode, kg: number): string {
-  if (mode === "PER_SIDE") return `${formatKg(kg)} kg/side`;
-  if (mode === "COUNTERWEIGHT") return `${formatKg(kg)} kg cw`;
-  return `${formatKg(kg)} kg`;
-}
-
-function sessionLabel(t: string | null | undefined): string | null {
-  if (!t) return null;
-  return /^[A-Z0-9]{1,2}$/.test(t) ? `Session ${t}` : null;
+  if (mode === "PER_SIDE") return `${formatKg(kg)} KG/SIDE`;
+  if (mode === "COUNTERWEIGHT") return `${formatKg(kg)} KG CW`;
+  return `${formatKg(kg)} KG`;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ cue: string }> }) {
   const { cue } = await params;
-  return { title: isFormCueId(cue) ? `${FORM_CUE_TITLES[cue].title} form` : "Form cues" };
+  return { title: isFormCueId(cue) ? `${FORM_CUE_TITLES[cue].title} form · Olympus` : "Form cues" };
 }
 
 export default async function FormCuePage({
@@ -47,57 +41,20 @@ export default async function FormCuePage({
     candidates.find((c) => c.id === wanted) ??
     [...candidates].sort((a, b) => (ww.get(b.id)?.date ?? "").localeCompare(ww.get(a.id)?.date ?? ""))[0] ??
     null;
-
-  const history = ex ? await exerciseHistory(userId, ex.id, 12) : [];
   const current = ex ? ww.get(ex.id) ?? null : null;
 
-  const title = ex?.name ?? FORM_CUE_TITLES[cue].title;
-  const focus = (needle: string) => {
-    const c = constraints.find((k) => k.region.toLowerCase().includes(needle));
-    return c ? { label: c.region.split(" · ")[0], constraint: c } : null;
-  };
-  const subtitleFor = (region: string | null) =>
-    ["Form cues", sessionLabel(history[0]?.sessionType), region].filter(Boolean).join(" · ");
+  // Constraint region the cue protects, e.g. "RIGHT KNEE" on the squat.
+  const needle = cue === "squat" ? "knee" : cue === "pushdown" ? "wrist" : null;
+  const region = needle ? constraints.find((k) => k.region.toLowerCase().includes(needle))?.region.split(" · ")[0] : null;
 
-  if (cue === "deadlift") {
-    let load: string | null = null;
-    if (ex && current) {
-      const top = history[0] ? topSet(ex.loadMode, history[0].sets) : null;
-      load =
-        top && top.weight === current.kg
-          ? `${loadText(ex.loadMode, current.kg)} × ${top.reps}`
-          : loadText(ex.loadMode, current.kg);
-    }
-    return <FormDeadlift title={title} subtitle={subtitleFor(null)} load={load} />;
-  }
+  const eyebrow = [
+    "FORM · 3D",
+    ex && current ? loadText(ex.loadMode, current.kg) : null,
+    region?.toUpperCase(),
+    FORM_DEFS[cue].copy.tag,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  if (cue === "squat") {
-    const knee = focus("knee");
-    let upFrom: string | null = null;
-    if (ex && current && history.length >= 2) {
-      const first = topSet(ex.loadMode, history[history.length - 1].sets);
-      if (first && first.weight < current.kg) upFrom = `up from ${formatKg(first.weight)}`;
-    }
-    return (
-      <FormSquat
-        title={title}
-        subtitle={subtitleFor(knee?.label ?? null)}
-        load={ex && current ? loadText(ex.loadMode, current.kg) : null}
-        upFrom={upFrom}
-      />
-    );
-  }
-
-  const wrist = focus("wrist");
-  const prohibited = (wrist?.constraint.blockedPatterns ?? [])
-    .filter((p) => /pushdown/i.test(p))
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1));
-  return (
-    <FormPushdown
-      title={title}
-      subtitle={subtitleFor(wrist?.label ?? null)}
-      prohibited={prohibited}
-      region={wrist ? "wrist" : null}
-    />
-  );
+  return <FormViewer cue={cue} title={ex?.name ?? FORM_CUE_TITLES[cue].title} eyebrow={eyebrow} />;
 }

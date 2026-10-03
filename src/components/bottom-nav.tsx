@@ -8,7 +8,7 @@ const tabs = [
   {
     href: "/today",
     label: "Today",
-    match: ["/today"],
+    match: ["/today", "/settings"],
     icon: (
       <>
         <circle cx="12" cy="12" r="9" />
@@ -44,49 +44,51 @@ const tabs = [
 /** Hidden while training and on full-screen form cues. */
 const HIDE_ON = ["/session", "/form"];
 
+/**
+ * Floating capsule tab bar: 12px from the sides, 26px above the safe area,
+ * blurred glass, chalk pill on the active tab.
+ */
 export default function BottomNav() {
   const pathname = usePathname();
   if (HIDE_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
-    <>
-      <div aria-hidden className="h-[84px]" />
-      <nav
-        aria-label="Main"
-        className="fixed bottom-0 inset-x-0 z-50 bg-bg-nav border-t border-line safe-bottom"
-      >
-        <div className="grid grid-cols-4 max-w-lg mx-auto pt-2 pb-2">
-          {tabs.map((tab) => {
-            const active = tab.match.some((m) => pathname.startsWith(m));
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-1.5 text-[11px] min-h-[44px]",
-                  active ? "text-accent" : "text-muted hover:text-fg-2"
-                )}
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  {tab.icon}
-                </svg>
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-    </>
+    <nav
+      aria-label="Primary"
+      className="glass fixed z-50 left-3 right-3 mx-auto max-w-[480px] h-16 rounded-[32px] p-1.5 grid grid-cols-4"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 26px)" }}
+    >
+      {tabs.map((tab) => {
+        const active = tab.match.some((m) => pathname.startsWith(m));
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            prefetch
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "rounded-[26px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold",
+              active ? "bg-fg text-bg" : "text-muted"
+            )}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={cn("transition-transform duration-200 ease-press", active && "-translate-y-px")}
+            >
+              {tab.icon}
+            </svg>
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

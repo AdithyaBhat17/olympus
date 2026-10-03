@@ -1,26 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const plexSans = IBM_Plex_Sans({
+// Self-hosted through next/font: no layout shift (size-adjusted fallbacks), no
+// third-party request on cold open.
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-sans",
+  axes: ["wdth"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
-const barlow = Barlow_Condensed({
+const geist = Geist({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-barlow",
+  variable: "--font-geist",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-plex-mono",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -44,7 +44,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#0E0F11",
+  interactiveWidget: "resizes-content",
+  themeColor: "#0A0A0B",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -53,19 +55,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${plexSans.variable} ${barlow.variable} ${plexMono.variable} font-sans antialiased`}
-      >
+    <html lang="en" className={`dark ${archivo.variable} ${geist.variable} ${geistMono.variable}`}>
+      <body className="font-sans antialiased">
         {children}
         <Toaster
           theme="dark"
           position="top-center"
+          offset="max(12px, env(safe-area-inset-top))"
           toastOptions={{
             style: {
-              background: "#17191C",
-              border: "1px solid #2C3036",
-              color: "#F2F0EA",
+              background: "#1C1C1F",
+              border: "0",
+              boxShadow: "inset 0 0 0 1px #2A2A2E, 0 12px 32px rgba(0,0,0,.5)",
+              color: "#F5F3EE",
+              borderRadius: "16px",
+              fontFamily: "var(--font-geist), system-ui, sans-serif",
             },
           }}
         />

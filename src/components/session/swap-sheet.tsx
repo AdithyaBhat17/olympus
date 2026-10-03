@@ -87,7 +87,7 @@ function SwapBody({
           </button>
           <div className="flex flex-col min-w-0">
             <span className="text-[13px] text-muted truncate">Replacing · {replacing.name}</span>
-            <h1 className="m-0 font-display font-bold text-[30px] leading-none">Swap exercise</h1>
+            <h1 className="m-0 num text-[30px]">Swap exercise</h1>
           </div>
         </div>
         <label className="flex items-center gap-2.5 h-12 px-3.5 rounded-xl bg-surface border border-line focus-within:border-accent">
@@ -156,7 +156,7 @@ function SwapBody({
               {c.lastKg != null ? (
                 <span
                   className={cn(
-                    "font-display text-[22px] font-semibold tabular-nums shrink-0",
+                    "num text-[22px] shrink-0",
                     already && "text-muted"
                   )}
                 >

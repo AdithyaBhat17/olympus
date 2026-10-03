@@ -1,17 +1,17 @@
 "use client";
 
-import { formatKg } from "@/domain/load";
+import Link from "next/link";
+import { formatKg, isHarder, progressDelta } from "@/domain/load";
 import type { LiveItemView } from "@/server/sessions";
 import { cn } from "@/lib/utils";
 import { WarnIcon, InfoIcon } from "./icons";
 import { OptionsMenu, type MenuEntry } from "./options-menu";
-import { loadWithUnit, openKg, plannedMinutes, targetLabel, targetRpe } from "./format";
+import { openKg, plannedMinutes, targetLabel, targetRpe } from "./format";
 
 interface ExerciseCardProps {
   item: LiveItemView;
   position: number;
   total: number;
-  disabled: boolean;
   canRemoveSet: boolean;
   next: { name: string } | null;
   onSwap: (() => void) | null;
@@ -23,35 +23,31 @@ interface ExerciseCardProps {
 }
 
 export function StrapsChip() {
-  return <span className="chip ml-1 text-info border-info-line whitespace-nowrap">straps</span>;
+  return <span className="chip-outline ml-1.5 text-info border-info-line align-middle font-sans">straps</span>;
 }
 
-function Tile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Tile({ label, children, ember }: { label: string; children: React.ReactNode; ember?: boolean }) {
   return (
     <div
       className={cn(
-        "p-2.5 rounded-[10px] flex flex-col gap-0.5 min-w-0",
-        accent ? "bg-accent-bg border border-accent-line" : "bg-surface-2"
+        "px-3 py-2.5 rounded-[14px] flex flex-col gap-0.5 min-w-0",
+        ember ? "bg-accent-bg shadow-[inset_0_0_0_1px_rgba(255,106,43,.35)]" : "bg-surface-2"
       )}
     >
-      <span
-        className={cn(
-          "text-[11px] uppercase tracking-[0.05em]",
-          accent ? "text-accent-soft" : "text-muted"
-        )}
-      >
+      <span className={cn("text-[11px] tracking-[0.06em] uppercase", ember ? "text-accent-soft" : "text-muted")}>
         {label}
       </span>
-      <span className="font-display text-xl font-semibold tabular-nums truncate">{value}</span>
+      <span className="num text-[22px] truncate">{children}</span>
     </div>
   );
 }
+
+const btn = "h-11 rounded-[14px] bg-surface-2 text-fg-2 text-sm font-medium disabled:opacity-40";
 
 export function ExerciseCard({
   item,
   position,
   total,
-  disabled,
   canRemoveSet,
   next,
   onSwap,
@@ -62,85 +58,104 @@ export function ExerciseCard({
   children,
 }: ExerciseCardProps) {
   const { exercise } = item;
+  const mode = exercise.loadMode;
   const target = targetLabel(item);
   const rpe = targetRpe(item);
-  const open = openKg(item) ?? item.lastTopKg;
+  const planned = openKg(item);
+  const open = planned ?? item.lastTopKg;
+  const delta =
+    planned != null && item.lastTopKg != null && isHarder(mode, planned, item.lastTopKg)
+      ? Math.abs(progressDelta(mode, item.lastTopKg, planned))
+      : null;
 
   const entries: MenuEntry[] = [];
-  if (onSwap) entries.push({ label: "Swap exercise", onSelect: onSwap, disabled });
+  if (onSwap) entries.push({ label: "Swap exercise", onSelect: onSwap });
   if (exercise.formCueId) entries.push({ label: "Form cues", href: `/form/${exercise.formCueId}` });
-  entries.push({ label: "Add set", onSelect: onAddSet, disabled });
-  entries.push({ label: "Remove last set", onSelect: onRemoveSet, disabled: disabled || !canRemoveSet, danger: true });
+  entries.push({ label: "Add set", onSelect: onAddSet });
+  entries.push({ label: "Remove last set", onSelect: onRemoveSet, disabled: !canRemoveSet, danger: true });
+
+  const cueLines = [...item.coachFlags, ...item.cues];
 
   return (
     <section
       aria-label="Current exercise"
-      className="mx-4 mt-4 px-4 py-[18px] rounded-[18px] bg-surface border border-accent-ring flex flex-col gap-3.5"
+      className="mx-3 mt-3.5 pt-[18px] px-3.5 pb-3.5 rounded-[28px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3.5"
     >
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col gap-1 min-w-0">
-          <span className="text-xs font-semibold tracking-[0.06em] uppercase text-accent">
-            Now · {position} of {total}
+      <div className="flex justify-between items-start gap-2 px-1">
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <span className="font-mono text-xs tracking-[0.08em] text-accent">
+            NOW · {position} OF {total}
           </span>
-          <h1 className="m-0 font-display font-bold text-[32px] leading-none">
+          <h1 key={exercise.id} className="m-0 num text-[36px] leading-[0.95] animate-slide-up">
             {exercise.name}
-            {item.straps && (
-              <span className="align-middle font-sans">
-                {" "}
-                <StrapsChip />
-              </span>
-            )}
+            {item.straps && <StrapsChip />}
           </h1>
         </div>
         <OptionsMenu entries={entries} />
       </div>
 
       {item.swapped && item.plannedExercise && (
-        <p className="flex gap-2 items-center text-[13px] text-muted -mt-1">
+        <p className="m-0 px-1 -mt-1 flex gap-2 items-center text-[13px] text-muted">
           <InfoIcon size={16} className="text-info shrink-0" />
           Swapped in for {item.plannedExercise.name}
         </p>
       )}
       {item.blockedReason && (
-        <div className="flex gap-2.5 items-start px-3 py-2.5 rounded-[10px] bg-danger-bg border border-danger-line text-[13px] text-danger-text leading-[1.4]">
-          <WarnIcon size={18} className="shrink-0 text-danger-soft mt-px" />
-          <span>
-            Blocked for you — {item.blockedReason}. Sets log with an override flag for your PT.
-          </span>
+        <div className="mx-1 flex gap-2.5 items-start px-3 py-2.5 rounded-[14px] bg-danger-bg text-[13px] text-danger-text leading-[1.4]">
+          <WarnIcon size={18} className="shrink-0 text-danger mt-px" />
+          <span>Blocked for you — {item.blockedReason}. Sets log with an override flag for your PT.</span>
         </div>
       )}
 
-      {(item.cues.length > 0 || item.coachFlags.length > 0) && (
-        <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-sm leading-[1.4]">
-          {item.coachFlags.map((f) => (
-            <li key={`f-${f}`} className="flex gap-2 text-fg">
-              <span aria-hidden className="text-accent font-display font-bold">!</span>
-              <span>
-                <span className="sr-only">Coach flag: </span>
-                {f}
+      {(cueLines.length > 0 || exercise.formCueId) && (
+        <div className="mx-1 flex gap-2.5 items-center min-h-11 py-2 pl-3 pr-2 rounded-[14px] bg-[rgba(140,200,255,.08)] text-info-text text-[13px] leading-[1.4]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8CC8FF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 self-start mt-0.5">
+            <path d="M12 3l9 16H3z" />
+            <path d="M12 10v4M12 17h.01" />
+          </svg>
+          <ul className="m-0 p-0 list-none flex-1 flex flex-col gap-1">
+            {cueLines.length ? (
+              cueLines.map((c, i) => (
+                <li key={`${i}-${c}`}>
+                  {i < item.coachFlags.length && <span className="sr-only">Coach flag: </span>}
+                  {i === 0 ? `PT: ${c}` : c}
+                </li>
+              ))
+            ) : (
+              <li>Form cues from your PT</li>
+            )}
+          </ul>
+          {exercise.formCueId && (
+            <Link
+              href={`/form/${exercise.formCueId}`}
+              prefetch
+              className="shrink-0 self-start flex items-center gap-1 h-11 -my-1.5 px-2.5"
+            >
+              <span className="flex items-center gap-1 h-[30px] px-2.5 rounded-full bg-[rgba(140,200,255,.14)] text-info text-xs font-semibold">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" />
+                </svg>
+                Form
               </span>
-            </li>
-          ))}
-          {item.cues.map((c) => (
-            <li key={`c-${c}`} className="flex gap-2 text-fg-2">
-              <span aria-hidden className="text-faint">·</span>
-              <span>{c}</span>
-            </li>
-          ))}
-        </ul>
+            </Link>
+          )}
+        </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        <Tile label="Target" value={target ?? `${item.sets.length} sets`} />
-        <Tile label="RPE" value={rpe != null ? formatKg(rpe) : "—"} />
-        {exercise.loadMode === "TIME" ? (
-          <Tile label="Total" value={`${plannedMinutes(item)?.total ?? "—"} min`} accent />
+      <div className="grid grid-cols-3 gap-1.5">
+        <Tile label="Target">{target ?? `${item.sets.length} sets`}</Tile>
+        <Tile label="RPE">{rpe != null ? formatKg(rpe) : "—"}</Tile>
+        {mode === "TIME" ? (
+          <Tile label="Total" ember>
+            {plannedMinutes(item)?.total ?? "—"}
+            <span className="text-sm text-muted"> min</span>
+          </Tile>
         ) : (
-          <Tile
-            label="Open at"
-            value={open != null ? loadWithUnit(exercise.loadMode, open) : "Calibrate"}
-            accent
-          />
+          <Tile label="Open at" ember>
+            {open != null ? formatKg(open) : "—"}
+            {mode === "COUNTERWEIGHT" && <span className="text-sm text-muted"> cw</span>}
+            {delta != null && delta > 0 && <span className="text-sm text-info"> ↑{formatKg(delta)}</span>}
+          </Tile>
         )}
       </div>
 
@@ -152,16 +167,14 @@ export function ExerciseCard({
         </button>
       )}
 
-      <div className="flex gap-2">
-        <button type="button" onClick={onAddSet} disabled={disabled} className="btn-ghost grow basis-0 disabled:opacity-50">
-          + Add set
+      <div className="grid grid-cols-3 gap-1.5">
+        <button type="button" onClick={onAddSet} className={btn}>
+          + Set
         </button>
-        {onSwap && (
-          <button type="button" onClick={onSwap} disabled={disabled} className="btn-ghost grow basis-0 disabled:opacity-50">
-            Swap exercise
-          </button>
-        )}
-        <button type="button" onClick={onNote} className="btn-ghost grow basis-0">
+        <button type="button" onClick={onSwap ?? undefined} disabled={!onSwap} className={btn}>
+          Swap
+        </button>
+        <button type="button" onClick={onNote} className={btn}>
           Note
         </button>
       </div>

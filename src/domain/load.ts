@@ -65,6 +65,16 @@ export function topSet(
   return best;
 }
 
+/**
+ * Estimated 1RM (Epley) from a set: kg × (1 + reps / 30). Only meaningful for
+ * loads where heavier is harder; null for counterweight and timed work.
+ */
+export function estimatedOneRepMax(mode: LoadMode, weight: number, reps: number): number | null {
+  if (mode === "COUNTERWEIGHT" || mode === "TIME" || reps <= 0 || weight <= 0) return null;
+  if (reps === 1) return roundKg(weight);
+  return Math.round(weight * (1 + reps / 30) * 10) / 10;
+}
+
 export function formatKg(kg: number): string {
   return Number.isInteger(kg) ? String(kg) : String(roundKg(kg));
 }

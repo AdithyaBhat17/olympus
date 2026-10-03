@@ -6,6 +6,7 @@ import {
   deletePushSubscriptionAction,
   savePushSubscriptionAction,
 } from "@/lib/liftlog-actions";
+import { Switch } from "@/components/ui/switch";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -81,19 +82,19 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
     on: "On for this device.",
   };
 
+  const usable = state === "off" || state === "on";
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-muted leading-snug">{note[state]}</span>
-      {(state === "off" || state === "on") && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={state === "on" ? disable : enable}
-          className="btn-ghost px-4 shrink-0"
-        >
-          {state === "on" ? "Turn off" : "Turn on"}
-        </button>
-      )}
+    <div className="flex items-center gap-3 min-h-14 px-4 py-2 border-b border-line">
+      <span className="flex-1 flex flex-col gap-0.5">
+        <span id="pref-push">Push when your PT sends a plan</span>
+        {!usable || state === "off" ? <span className="text-xs text-muted leading-snug">{note[state]}</span> : null}
+      </span>
+      <Switch
+        checked={state === "on"}
+        labelledBy="pref-push"
+        disabled={!usable || busy}
+        onChange={(v) => void (v ? enable() : disable())}
+      />
     </div>
   );
 }

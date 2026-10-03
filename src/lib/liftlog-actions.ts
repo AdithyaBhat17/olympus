@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireUserEmail } from "@/lib/auth";
 import { todayInTz } from "@/lib/dates";
 import {
@@ -26,7 +27,7 @@ import { upsertCheckIn } from "@/server/checkins";
 import { addFlag, resolveFlag } from "@/server/flags";
 import { setCarriage } from "@/server/exercises";
 import { updateWorkingWeight } from "@/server/working-weight";
-import { deleteSubscription, saveSubscription } from "@/server/push";
+import { deleteSubscription, saveSubscription, sendPushToUser } from "@/server/push";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -298,6 +299,54 @@ export async function deletePushSubscriptionAction(endpoint: string): Promise<Ac
   return run(async () => {
     const userId = await requireUserEmail();
     await deleteSubscription(userId, z.string().url().parse(endpoint));
+    return undefined;
+  });
+}
+
+// --- Rest timer push ----------------------------------------------------------
+
+/**
+ * Latest rest-push token per user. In-process only: a reschedule or cancel
+ * that lands on another instance can't stop an earlier push, so the client
+ * only schedules when the app is backgrounded and the worker drops rest
+ * pushes while a window is visible.
+ */
+const restPushTokens = new Map<string, string>();
+const MAX_REST_MS = 10 * 60 * 1000;
+
+/** The app went to the background mid-rest: push "Rest's up" at endAt. */
+export async function scheduleRestPushAction(input: {
+  sessionId: string;
+  endAt: number;
+  body: string;
+}): Promise<ActionResult> {
+  return run(async () => {
+    const userId = await requireUserEmail();
+    const v = z
+      .object({ sessionId: uuid, endAt: z.number().int().positive(), body: z.string().max(120) })
+      .parse(input);
+    const delay = v.endAt - Date.now();
+    if (delay <= 0 || delay > MAX_REST_MS) return undefined;
+    const token = `${v.endAt}-${Math.random().toString(36).slice(2)}`;
+    restPushTokens.set(userId, token);
+    after(async () => {
+      await new Promise((r) => setTimeout(r, delay));
+      if (restPushTokens.get(userId) !== token) return;
+      restPushTokens.delete(userId);
+      await sendPushToUser(
+        userId,
+        { title: "Rest's up", body: v.body, url: `/session/${v.sessionId}`, tag: "olympus-rest" },
+        { ttlSec: 60 }
+      );
+    });
+    return undefined;
+  });
+}
+
+export async function cancelRestPushAction(): Promise<ActionResult> {
+  return run(async () => {
+    const userId = await requireUserEmail();
+    restPushTokens.delete(userId);
     return undefined;
   });
 }

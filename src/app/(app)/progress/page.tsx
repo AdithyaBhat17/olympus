@@ -7,10 +7,9 @@ import { resolveSets, workingWeights } from "@/server/history";
 import { EXERCISE_CATEGORIES } from "@/lib/constants";
 import { formatLoad, progressDelta, topSet } from "@/domain";
 import ProgressList, { type ProgressRow } from "@/components/progress/progress-list";
+import { PageHeader } from "@/components/page-header";
 
-export const metadata = { title: "Progress" };
-
-const HEADER_PAD = "pt-[max(56px,calc(env(safe-area-inset-top)_+_12px))]";
+export const metadata = { title: "Progress · Olympus" };
 
 export default async function ProgressPage() {
   const userId = await requireUserEmail();
@@ -73,13 +72,8 @@ export default async function ProgressPage() {
   );
 
   return (
-    <div className="flex flex-col pb-8">
-      <header className={`px-5 flex flex-col gap-0.5 ${HEADER_PAD}`}>
-        <span className="eyebrow font-normal">
-          {rows.length} {rows.length === 1 ? "lift" : "lifts"} tracked
-        </span>
-        <h1 className="font-display font-bold text-[44px] leading-none">Progress</h1>
-      </header>
+    <div className="flex flex-col">
+      <PageHeader eyebrow={`${rows.length} ${rows.length === 1 ? "lift" : "lifts"} tracked`} title="Progress" />
       <ProgressList rows={rows} />
     </div>
   );
