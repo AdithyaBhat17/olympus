@@ -9,8 +9,8 @@ describe("monotoneCubic keyframes", () => {
   });
 
   it("holds stay perfectly still", () => {
-    for (let t = 0; t <= 0.14; t += 0.01) expect(monotoneCubic(BAR, t)).toBe(0.225);
-    for (let t = 0.44; t <= 0.58; t += 0.01) expect(monotoneCubic(BAR, t)).toBeCloseTo(0.865, 9);
+    for (let i = 0; i <= 14; i++) expect(monotoneCubic(BAR, i / 100)).toBeCloseTo(0.225, 12);
+    for (let i = 44; i <= 58; i++) expect(monotoneCubic(BAR, i / 100)).toBeCloseTo(0.865, 12);
   });
 
   it("never overshoots the keys", () => {
