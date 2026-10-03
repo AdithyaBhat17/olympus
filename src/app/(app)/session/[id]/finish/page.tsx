@@ -63,6 +63,7 @@ export default async function FinishPage({
       status={view.status}
       sentAt={view.sentAt}
       eyebrow={`${formatDayShort(view.date)} · ${label}`}
+      label={label}
       startedAt={view.startedAt}
       durationSec={durationSec}
       workingSets={working.length}

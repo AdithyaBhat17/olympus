@@ -17,6 +17,8 @@ vi.mock("@/lib/liftlog-actions", () => ({
   resolveFlagAction: fake("resolveFlag"),
   saveSessionNotesAction: fake("saveNotes"),
   upsertCheckInAction: fake("checkIn"),
+  finishSessionAction: fake("finish"),
+  sendToPTAction: fake("sendToPT"),
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
 

@@ -15,10 +15,12 @@
  */
 
 import {
+  finishSessionAction,
   logSetAction,
   removeSetAction,
   resolveFlagAction,
   saveSessionNotesAction,
+  sendToPTAction,
   upsertCheckInAction,
   type ActionResult,
 } from "@/lib/liftlog-actions";
@@ -33,7 +35,9 @@ export type OutboxOp =
   | { kind: "removeSet"; sessionId: string; input: RemoveSetInput }
   | { kind: "resolveFlag"; id: string }
   | { kind: "checkIn"; input: CheckInInput }
-  | { kind: "saveNotes"; sessionId: string; notes: string | null };
+  | { kind: "saveNotes"; sessionId: string; notes: string | null }
+  | { kind: "finish"; sessionId: string; notes: string | null }
+  | { kind: "sendToPT"; sessionId: string; notes: string | null };
 
 interface Entry {
   id: string;
@@ -60,6 +64,9 @@ function keyOf(op: OutboxOp): string {
       return `checkin:${op.input.date ?? "today"}`;
     case "saveNotes":
       return `notes:${op.sessionId}`;
+    case "finish":
+    case "sendToPT":
+      return `${op.kind}:${op.sessionId}`;
   }
 }
 
@@ -75,6 +82,10 @@ function execute(op: OutboxOp): Promise<ActionResult<unknown>> {
       return upsertCheckInAction(op.input);
     case "saveNotes":
       return saveSessionNotesAction(op.sessionId, op.notes);
+    case "finish":
+      return finishSessionAction(op.sessionId, op.notes);
+    case "sendToPT":
+      return sendToPTAction(op.sessionId, op.notes);
   }
 }
 
