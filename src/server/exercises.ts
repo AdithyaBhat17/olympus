@@ -2,42 +2,58 @@ import "server-only";
 import { isOwner } from "@/lib/allowlist";
 import { DomainError } from "./errors";
 import { db } from "@/lib/db";
-import { constraints, exercises } from "@/lib/db/schema";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { constraints, exerciseBlocks, exercises } from "@/lib/db/schema";
+import { and, asc, eq, getTableColumns, isNull, or } from "drizzle-orm";
 import {
   blockedReason,
   type DomainConstraint,
   type DomainExercise,
 } from "@/domain";
 
-export type ExerciseRow = typeof exercises.$inferSelect;
+/** A library row as one athlete sees it: their own block, if they set one. */
+export type ExerciseRow = typeof exercises.$inferSelect & {
+  userBlock: { reason: string | null } | null;
+};
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function toDomainExercise(row: ExerciseRow): DomainExercise {
+  // Shared rows are blocked per athlete (exercise_blocks); their global
+  // status = 'NO' is legacy single-athlete data and doesn't apply to anyone.
+  // A custom row is its creator's alone, so its own status still counts.
+  const custom = row.createdBy != null;
+  const status = row.userBlock ? "NO" : !custom && row.status === "NO" ? "YES" : row.status;
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     category: row.category,
-    status: row.status,
+    status,
     loadMode: row.loadMode,
     carriageKgPerSide:
       row.carriageKgPerSide != null ? parseFloat(row.carriageKgPerSide) : null,
     isCompound: row.isCompound,
     bodyRegion: row.bodyRegion ?? null,
     equipment: row.equipment,
-    blockedReason: row.blockedReason,
+    blockedReason: row.userBlock ? row.userBlock.reason : custom ? row.blockedReason : null,
     substituteIds: row.substituteIds ?? [],
   };
 }
 
 export async function listExerciseRows(userId: string): Promise<ExerciseRow[]> {
-  return db
-    .select()
+  const rows = await db
+    .select({ ...getTableColumns(exercises), blockedBy: exerciseBlocks.userId, blockReason: exerciseBlocks.reason })
     .from(exercises)
+    .leftJoin(
+      exerciseBlocks,
+      and(eq(exerciseBlocks.exerciseId, exercises.id), eq(exerciseBlocks.userId, userId))
+    )
     .where(or(isNull(exercises.createdBy), eq(exercises.createdBy, userId)))
     .orderBy(exercises.category, exercises.name);
+  return rows.map(({ blockedBy, blockReason, ...row }) => ({
+    ...row,
+    userBlock: blockedBy ? { reason: blockReason } : null,
+  }));
 }
 
 export async function listExercises(userId: string): Promise<DomainExercise[]> {
@@ -45,20 +61,88 @@ export async function listExercises(userId: string): Promise<DomainExercise[]> {
 }
 
 export async function getConstraints(userId: string): Promise<DomainConstraint[]> {
-  const rows = await db
-    .select()
-    .from(constraints)
-    .where(
-      and(
-        eq(constraints.active, true),
-        or(isNull(constraints.userId), eq(constraints.userId, userId))
-      )
-    );
-  return rows.map((r) => ({
+  return (await listConstraintRows(userId)).map((r) => ({
     region: r.region,
     rule: r.rule,
     blockedPatterns: r.blockedPatterns,
   }));
+}
+
+export type ConstraintRow = typeof constraints.$inferSelect;
+
+/** The athlete's own active constraints. Rows without an owner apply to no one. */
+export async function listConstraintRows(userId: string): Promise<ConstraintRow[]> {
+  return db
+    .select()
+    .from(constraints)
+    .where(and(eq(constraints.active, true), eq(constraints.userId, userId)))
+    .orderBy(asc(constraints.region));
+}
+
+export interface ConstraintInput {
+  region: string;
+  rule: string;
+  blockedPatterns: string[];
+}
+
+/** Add an injury, or rewrite (and re-activate) the one with the same region. */
+export async function saveConstraint(userId: string, input: ConstraintInput): Promise<void> {
+  const region = input.region.trim();
+  const rule = input.rule.trim();
+  const blockedPatterns = Array.from(
+    new Set(input.blockedPatterns.map((p) => p.trim().toLowerCase()).filter(Boolean))
+  );
+  if (!region || region.length > 80) throw new DomainError("Name the injury in 1–80 characters");
+  if (!rule || rule.length > 500) throw new DomainError("Describe the rule in 1–500 characters");
+  if (blockedPatterns.length > 30 || blockedPatterns.some((p) => p.length > 60)) {
+    throw new DomainError("Up to 30 blocked movements, 60 characters each");
+  }
+  const [existing] = await db
+    .select({ id: constraints.id })
+    .from(constraints)
+    .where(and(eq(constraints.userId, userId), eq(constraints.region, region)));
+  if (existing) {
+    await db
+      .update(constraints)
+      .set({ rule, blockedPatterns, active: true })
+      .where(eq(constraints.id, existing.id));
+  } else {
+    await db.insert(constraints).values({ userId, region, rule, blockedPatterns });
+  }
+}
+
+/** Retire a constraint. Kept as a row (inactive), like resolved coach flags. */
+export async function retireConstraint(userId: string, id: string): Promise<void> {
+  const res = await db
+    .update(constraints)
+    .set({ active: false })
+    .where(and(eq(constraints.id, id), eq(constraints.userId, userId)))
+    .returning({ id: constraints.id });
+  if (res.length === 0) throw new DomainError("Constraint not found");
+}
+
+/** Take a library exercise off the table for this athlete, or put it back (null). */
+export async function setExerciseBlock(
+  userId: string,
+  exerciseId: string,
+  reason: string | null
+): Promise<void> {
+  if (reason === null) {
+    await db
+      .delete(exerciseBlocks)
+      .where(and(eq(exerciseBlocks.userId, userId), eq(exerciseBlocks.exerciseId, exerciseId)));
+    return;
+  }
+  const visible = (await listExerciseRows(userId)).some((r) => r.id === exerciseId);
+  if (!visible) throw new DomainError("Exercise not found");
+  const why = reason.trim().slice(0, 200) || null;
+  await db
+    .insert(exerciseBlocks)
+    .values({ userId, exerciseId, reason: why })
+    .onConflictDoUpdate({
+      target: [exerciseBlocks.userId, exerciseBlocks.exerciseId],
+      set: { reason: why },
+    });
 }
 
 /**
@@ -157,7 +241,7 @@ export async function setCarriage(
   kgPerSide: number | null
 ): Promise<void> {
   // Custom rows belong to their creator. Global library rows are shared, so
-  // only an owner (listed in ALLOWED_EMAILS) may calibrate them.
+  // only an owner (OWNER_EMAILS, else ALLOWED_EMAILS) may calibrate them.
   const res = await db
     .update(exercises)
     .set({ carriageKgPerSide: kgPerSide == null ? null : kgPerSide.toFixed(2) })
@@ -172,7 +256,7 @@ export async function setCarriage(
     .returning({ id: exercises.id });
   if (res.length === 0) {
     throw new DomainError(
-      "Only the app owner can change shared machines. Add your email to ALLOWED_EMAILS."
+      "Only the app owner can change shared machines."
     );
   }
 }

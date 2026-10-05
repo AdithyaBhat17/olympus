@@ -29,9 +29,9 @@ INSERT INTO exercises (name, category, status, equipment, body_region, is_compou
 
 INSERT INTO exercises (name, category, status, equipment, body_region, is_compound, blocked_reason) VALUES ('DB Romanian Deadlift', 'Lower Body — Posterior Chain', 'NO', 'dumbbell', 'lower', TRUE, 'Lower back pain on 21/09 — removed until the back is symptom-free.') ON CONFLICT DO NOTHING;
 
-INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES (NULL, 'Lower back · lumbar irritation', 'Logged 19/08, DB RDL brought on pain 21/09. No loaded spinal hinging in any session (A, B or C) until symptom-free. Radiating pain below the knee, numbness or foot weakness = physio first.', ARRAY['deadlift', 'rdl', 'good morning', 'bent over row', 'pendlay row', 'back extension', 'hyperextension']::TEXT[]) ON CONFLICT (region) WHERE user_id IS NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;
+INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES ('evilpotato345@gmail.com', 'Lower back · lumbar irritation', 'Logged 19/08, DB RDL brought on pain 21/09. No loaded spinal hinging in any session (A, B or C) until symptom-free. Radiating pain below the knee, numbness or foot weakness = physio first.', ARRAY['deadlift', 'rdl', 'good morning', 'bent over row', 'pendlay row', 'back extension', 'hyperextension']::TEXT[]) ON CONFLICT (user_id, region) WHERE user_id IS NOT NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;
 
-INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES (NULL, 'Thyroid · Hashimoto''s', 'Hypothyroid: recovery is the limiter, not effort. Sleep and protein come before load.', ARRAY[]::TEXT[]) ON CONFLICT (region) WHERE user_id IS NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;
+INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES ('evilpotato345@gmail.com', 'Thyroid · Hashimoto''s', 'Hypothyroid: recovery is the limiter, not effort. Sleep and protein come before load.', ARRAY[]::TEXT[]) ON CONFLICT (user_id, region) WHERE user_id IS NOT NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;
 
 WITH s AS (
   INSERT INTO sessions (user_id, date, session_name, session_type, notes, status, week_number, block_number)

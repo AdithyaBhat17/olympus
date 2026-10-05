@@ -2,8 +2,9 @@ import "server-only";
 import { db } from "@/lib/db";
 import { dailyCheckIns, type CheckInSource } from "@/lib/db/schema";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
-import { addDays, todayInTz } from "@/lib/dates";
+import { addDays } from "@/lib/dates";
 import { summarizeRecovery, type CheckIn, type RecoverySummary } from "@/domain";
+import { getProfile, todayFor } from "./profile";
 
 export type CheckInRow = typeof dailyCheckIns.$inferSelect;
 
@@ -15,12 +16,13 @@ export async function getCheckIn(userId: string, date: string): Promise<CheckInR
   return row ?? null;
 }
 
-/** Newest first, `days` days ending at `date`. Missing days are omitted. */
+/** Newest first, `days` days ending at `date` (default today). Missing days are omitted. */
 export async function listCheckIns(
   userId: string,
-  date: string = todayInTz(),
+  date?: string,
   days = 7
 ): Promise<CheckInRow[]> {
+  date ??= await todayFor(userId);
   return db
     .select()
     .from(dailyCheckIns)
@@ -105,9 +107,11 @@ export function toDomainCheckIn(r: CheckInRow): CheckIn {
  */
 export async function getRecovery(
   userId: string,
-  date: string = todayInTz(),
+  date?: string,
   days = 7
 ): Promise<{ checkIns: CheckInRow[]; summary: RecoverySummary; today: CheckInRow | null }> {
+  const profile = await getProfile(userId);
+  date ??= await todayFor(userId);
   const rows = await listCheckIns(userId, date, days);
   const contiguous: CheckInRow[] = [];
   let expect = date;
@@ -118,7 +122,7 @@ export async function getRecovery(
   }
   return {
     checkIns: rows,
-    summary: summarizeRecovery(contiguous.map(toDomainCheckIn)),
+    summary: summarizeRecovery(contiguous.map(toDomainCheckIn), profile.targets),
     today: rows[0]?.date === date ? rows[0] : null,
   };
 }

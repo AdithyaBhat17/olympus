@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, kindClass } from "@/lib/utils";
 
-/** A/B/C rotation, X = cardio, O = other / manual. */
-export type SessionKind = "A" | "B" | "C" | "X" | "O";
+/** A session letter (A, B, C…), "cardio", or "other" (manual / unlabelled). */
+export type SessionKind = string;
 
 export interface HistorySession {
   id: string;
@@ -29,20 +29,13 @@ export interface HistoryDay {
 /** Session colour block for a kind: same palette as Today and the lifting screen. */
 const cell = (kind: SessionKind) => cn(kindClass(kind), "bg-k text-k-on");
 
-const FILTERS: Array<{ id: SessionKind | null; label: string }> = [
-  { id: null, label: "All" },
-  { id: "A", label: "A" },
-  { id: "B", label: "B" },
-  { id: "C", label: "C" },
-  { id: "X", label: "Cardio" },
-];
 
 function KindTile({ kind }: { kind: SessionKind }) {
   return (
     <span aria-hidden className={cn(cell(kind), "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 num text-[20px]")}>
-      {kind === "X" || kind === "O" ? (
+      {kind === "cardio" || kind === "other" ? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          {kind === "X" ? <path d="M3 12h4l3-8 4 16 3-8h4" /> : <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />}
+          {kind === "cardio" ? <path d="M3 12h4l3-8 4 16 3-8h4" /> : <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />}
         </svg>
       ) : (
         kind
@@ -64,6 +57,7 @@ export default function HistoryList({
   stats,
   thisMonday,
   lastMonday,
+  rotation,
 }: {
   sessions: HistorySession[];
   days: HistoryDay[];
@@ -71,9 +65,16 @@ export default function HistoryList({
   stats: { thisWeek: number; avg: number; streak: number };
   thisMonday: string;
   lastMonday: string;
+  /** The athlete's session letters, in order. */
+  rotation: string[];
 }) {
   const [filter, setFilter] = useState<SessionKind | null>(null);
-  const match = (k: SessionKind) => filter == null || k === filter || (filter === "X" && k === "O");
+  const filters: Array<{ id: SessionKind | null; label: string }> = [
+    { id: null, label: "All" },
+    ...rotation.map((k) => ({ id: k, label: k })),
+    { id: "cardio", label: "Cardio" },
+  ];
+  const match = (k: SessionKind) => filter == null || k === filter || (filter === "cardio" && k === "other");
 
   const groups = useMemo(() => {
     const out: Array<{ label: string; rows: HistorySession[] }> = [];
@@ -97,14 +98,14 @@ export default function HistoryList({
         <div className="flex justify-between items-center mb-3">
           <span className="text-[20px] font-extrabold">{range}</span>
           <span className="flex gap-2.5 text-[13px] font-semibold text-muted">
-            {(["A", "B", "C"] as const).map((k) => (
+            {rotation.map((k) => (
               <span key={k} className="flex items-center gap-[5px]">
                 <span className={cn("w-2.5 h-2.5 rounded-full", cell(k))} />
                 {k}
               </span>
             ))}
             <span className="flex items-center gap-[5px]">
-              <span className={cn("w-2.5 h-2.5 rounded-full", cell("X"))} />
+              <span className={cn("w-2.5 h-2.5 rounded-full", cell("cardio"))} />
               Cardio
             </span>
           </span>
@@ -121,7 +122,7 @@ export default function HistoryList({
               <span
                 key={d.date}
                 role="listitem"
-                aria-label={`${d.date}${d.kind ? `: ${d.kind === "X" ? "cardio" : d.kind === "O" ? "session" : `Session ${d.kind}`}` : ""}${d.today ? ", today" : ""}`}
+                aria-label={`${d.date}${d.kind ? `: ${d.kind === "cardio" ? "cardio" : d.kind === "other" ? "session" : `Session ${d.kind}`}` : ""}${d.today ? ", today" : ""}`}
                 className={cn(
                   "aspect-square rounded-full flex items-center justify-center num text-[15px] animate-pop-in transition-colors duration-200",
                   on ? cn(cell(d.kind!), "font-extrabold") : "text-muted font-semibold",
@@ -150,7 +151,7 @@ export default function HistoryList({
       </section>
 
       <div role="group" aria-label="Filter" className="arrive arrive-2 flex gap-2 px-4 pt-4 overflow-x-auto scroller">
-        {FILTERS.map((f) => (
+        {filters.map((f) => (
           <button
             key={f.label}
             type="button"
@@ -194,7 +195,7 @@ export default function HistoryList({
                       <span className="w-1.5 h-1.5 rounded-full bg-accent animate-live-dot" />
                       Live
                     </span>
-                  ) : s.kind !== "X" ? (
+                  ) : s.kind !== "cardio" ? (
                     <span
                       className={cn("tag font-extrabold", s.sent ? "bg-bg text-muted" : "tag-apricot")}
                     >

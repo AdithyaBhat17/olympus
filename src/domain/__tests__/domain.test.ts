@@ -9,6 +9,7 @@ import {
   holdMessage,
   matchesPattern,
   nextSessionType,
+  parseRotation,
   plateBreakdown,
   platesFor,
   progressionStatus,
@@ -543,6 +544,21 @@ describe("rotation", () => {
     expect(nextSessionType(["Cardio", "B"])).toBe("C");
     expect(nextSessionType(["C"])).toBe("A");
   });
+  it("follows the athlete's own rotation", () => {
+    expect(nextSessionType([], ["A", "B"])).toBe("A");
+    expect(nextSessionType(["A"], ["A", "B"])).toBe("B");
+    expect(nextSessionType(["B"], ["A", "B"])).toBe("A");
+    // A C left over from an older A/B/C rotation doesn't count.
+    expect(nextSessionType(["C", "A"], ["A", "B"])).toBe("B");
+  });
+  it("parses and validates a rotation", () => {
+    expect(parseRotation("a, b ,c")).toEqual({ rotation: ["A", "B", "C"] });
+    expect(parseRotation("A B C D")).toEqual({ rotation: ["A", "B", "C", "D"] });
+    expect(parseRotation("")).toHaveProperty("error");
+    expect(parseRotation("A, A")).toHaveProperty("error");
+    expect(parseRotation("Push, Pull")).toHaveProperty("error");
+    expect(parseRotation("A B C D E F G")).toHaveProperty("error");
+  });
 });
 
 // --- Export -----------------------------------------------------------------
@@ -574,12 +590,20 @@ describe("markdown export", () => {
         },
       ],
       checkIn: { sleepMin: 340, proteinG: 42, waterMl: 1200 },
+      targets: { proteinG: 155, waterMl: 3500 },
       notes: "Grip held with straps.",
     });
     expect(md).toContain("## 02/10/2026 — Session B: Back & Biceps");
     expect(md).toContain("| Barbell Deadlift | 8, 5, 5 | 75/85/85 | 8.5 | Straps. Top set ↑ |");
     expect(md).toContain("| Assisted Pull-Up | 8, 7 | 47 cw | 8 |  |");
     expect(md).toContain("Sleep 5:40 · Protein 42/155 g · Water 1.2/3.5 L");
+    const untracked = renderSessionMarkdown({
+      date: "2026-10-02",
+      title: "x",
+      exercises: [],
+      checkIn: { sleepMin: 340, proteinG: 42, waterMl: 1200 },
+    });
+    expect(untracked).toContain("Sleep 5:40 · Protein 42 g · Water 1.2 L");
     expect(sessionFileName({ date: "2026-10-02", sessionType: "B", title: "x" })).toBe(
       "2026-10-02 Session B.md"
     );
@@ -632,6 +656,18 @@ describe("recovery gate", () => {
     const d = (sleepMin: number) => [{ date: "d", sleepMin, proteinG: null, waterMl: null }];
     expect(summarizeRecovery(d(420)).gate).toBe("clear");
     expect(summarizeRecovery(d(300)).gate).toBe("hold");
+  });
+  it("judges sleep and protein against the athlete's own targets", () => {
+    const d = [{ date: "d", sleepMin: 400, proteinG: 120, waterMl: null }];
+    const strict = summarizeRecovery(d, { minSleepMin: 450, proteinG: 150 });
+    expect(strict.gate).toBe("hold");
+    expect(strict.daysUnderProtein).toBe(1);
+    expect(holdMessage(strict)).toMatch(/under 7.5 h/);
+    // No protein target: nobody is "under" it.
+    const loose = summarizeRecovery(d, { minSleepMin: 360, proteinG: null });
+    expect(loose.gate).toBe("clear");
+    expect(loose.daysUnderProtein).toBe(0);
+    expect(loose.streaks).toEqual([]);
   });
   it("V4 warns on a bump when sleep isn't logged", () => {
     const r = validatePlan(

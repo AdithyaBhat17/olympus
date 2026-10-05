@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import BottomNav from "@/components/bottom-nav";
 import { syncWhoopIfStale } from "@/server/integrations/whoop";
+import { getProfile } from "@/server/profile";
+import { TimezoneSync } from "@/components/timezone-sync";
 
 export default async function AppLayout({
   children,
@@ -21,9 +23,11 @@ export default async function AppLayout({
   if (email) {
     after(() => syncWhoopIfStale(email).catch((err) => console.error("whoop sync", err)));
   }
+  const profile = email ? await getProfile(email) : null;
 
   return (
     <Providers>
+      {profile && !profile.timezoneSet && <TimezoneSync />}
       <div className="min-h-dvh flex flex-col bg-bg">
         <main className="flex-1 w-full max-w-lg mx-auto tab-clearance">{children}</main>
         <BottomNav />

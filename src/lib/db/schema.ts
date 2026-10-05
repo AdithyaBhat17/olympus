@@ -158,6 +158,27 @@ export const planItems = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Athlete profile: what "today" means, their targets, their rotation
+// ---------------------------------------------------------------------------
+
+export const athleteProfiles = pgTable("athlete_profiles", {
+  userId: text("user_id").primaryKey(),
+  /** IANA zone. NULL until the browser reports one (or the athlete picks it). */
+  timezone: text("timezone"),
+  /** Nutrition targets. NULL = not tracked; nothing is judged against it. */
+  kcal: integer("kcal"),
+  proteinG: integer("protein_g"),
+  waterMl: integer("water_ml"),
+  /** Sleep floor for the progression gate. */
+  minSleepMin: integer("min_sleep_min").notNull().default(360),
+  /** Session letters in rotation order, e.g. {A,B,C}. */
+  rotation: text("rotation").array().notNull().default(["A", "B", "C"]),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+// ---------------------------------------------------------------------------
 // Recovery, flags, constraints
 // ---------------------------------------------------------------------------
 
@@ -202,15 +223,32 @@ export const coachFlags = pgTable(
   (t) => [index("idx_coach_flags_user").on(t.userId)]
 );
 
-/** user_id NULL = applies to every user (single-athlete seed data). */
+/** An athlete's injuries and the movement patterns they rule out. */
 export const constraints = pgTable("constraints", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** Nullable for legacy rows only; the app ignores rows without an owner. */
   userId: text("user_id"),
   region: text("region").notNull(),
   rule: text("rule").notNull(),
   blockedPatterns: text("blocked_patterns").array().notNull().default([]),
   active: boolean("active").notNull().default(true),
 });
+
+/** One athlete taking a library exercise off the table, whatever the reason. */
+export const exerciseBlocks = pgTable(
+  "exercise_blocks",
+  {
+    userId: text("user_id").notNull(),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.exerciseId] })]
+);
 
 export const workingWeightOverrides = pgTable("working_weight_overrides", {
   id: uuid("id").defaultRandom().primaryKey(),

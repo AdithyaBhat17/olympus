@@ -3,14 +3,14 @@ import { getSession, requireUserEmail } from "@/lib/auth";
 import { formatDayShort, formatTimeInTz, todayInTz } from "@/lib/dates";
 import { formatKg, isHarder, progressDelta } from "@/domain/load";
 import { holdMessage } from "@/domain/recovery";
-import { nextSessionType, ROTATION } from "@/domain/rotation";
-import { TARGETS } from "@/domain/targets";
+import { nextSessionType } from "@/domain/rotation";
 import { getRecovery } from "@/server/checkins";
 import { getUpcomingPlan } from "@/server/plans";
 import { getLiveSession, recentSessionTypes, rotationSummary } from "@/server/sessions";
 import { listOpenFlags } from "@/server/flags";
 import { listExercises } from "@/server/exercises";
 import { workingWeights } from "@/server/history";
+import { getProfile } from "@/server/profile";
 import { PageHeader } from "@/components/page-header";
 import { RecoveryCard } from "@/components/today/recovery-card";
 import { FlagsList } from "@/components/today/flags-list";
@@ -32,7 +32,8 @@ function daysBetween(fromIso: string, toIso: string): number {
 
 export default async function TodayPage() {
   const [session, userId] = await Promise.all([getSession(), requireUserEmail()]);
-  const today = todayInTz();
+  const profile = await getProfile(userId);
+  const today = todayInTz(profile.timezone);
 
   const [recovery, plan, live, flags, all, recentTypes, rotation] = await Promise.all([
     getRecovery(userId, today),
@@ -41,14 +42,15 @@ export default async function TodayPage() {
     listOpenFlags(userId),
     listExercises(userId),
     recentSessionTypes(userId),
-    rotationSummary(userId, ROTATION),
+    rotationSummary(userId, profile.rotation),
   ]);
   const byId = new Map(all.map((e) => [e.id, e]));
 
   // A live session that isn't this plan's (e.g. started yesterday) wins the card.
   const livePlan = live && plan && live.planId === plan.id ? plan : null;
   const showPlan = live ? livePlan : plan;
-  const plannedType = live?.sessionType ?? showPlan?.sessionType ?? nextSessionType(recentTypes);
+  const plannedType =
+    live?.sessionType ?? showPlan?.sessionType ?? nextSessionType(recentTypes, profile.rotation);
 
   let items: NextSessionItem[] = [];
   let more: string[] = [];
@@ -90,7 +92,7 @@ export default async function TodayPage() {
     estMin = totalSec > 0 ? Math.max(5, Math.round(totalSec / 60 / 5) * 5) : 0;
   }
 
-  const sessions = ROTATION.map((type) => {
+  const sessions = profile.rotation.map((type) => {
     const last = rotation.lastByType[type];
     const isPlanned = type === plannedType;
     let sub: string;
@@ -116,7 +118,7 @@ export default async function TodayPage() {
     lastType: rotation.lastType,
     hasPtPlan: !!showPlan && showPlan.source === "claude",
     planId: showPlan?.id ?? null,
-    fromPtAt: showPlan?.source === "claude" ? formatTimeInTz(showPlan.pushedAt) : null,
+    fromPtAt: showPlan?.source === "claude" ? formatTimeInTz(showPlan.pushedAt, profile.timezone) : null,
     dayLabel: showPlan && showPlan.date !== today ? formatDayShort(showPlan.date) : null,
     warnings: showPlan?.warnings ?? [],
     items,
@@ -154,7 +156,13 @@ export default async function TodayPage() {
         sleepMin={t?.sleepMin ?? null}
         proteinG={t?.proteinG ?? null}
         waterMl={t?.waterMl ?? null}
-        targets={{ sleepMin: 7 * 60, proteinG: TARGETS.proteinG, waterMl: TARGETS.waterMl }}
+        targets={{
+          // The bubble fills toward an hour past the floor; "short" is under the floor.
+          sleepMin: profile.targets.minSleepMin + 60,
+          minSleepMin: profile.targets.minSleepMin,
+          proteinG: profile.targets.proteinG,
+          waterMl: profile.targets.waterMl,
+        }}
         sources={t?.sources ?? {}}
         holdMessage={holdMessage(recovery.summary)}
       />

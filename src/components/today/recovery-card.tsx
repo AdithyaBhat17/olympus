@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatSleep } from "@/domain/recovery";
-import { TARGETS } from "@/domain/targets";
+import { formatHours } from "@/domain/recovery";
 import { mutate } from "@/lib/offline/mutate";
 import { hapticTick } from "@/lib/haptics";
 import { cn, kindClass } from "@/lib/utils";
@@ -21,7 +21,8 @@ interface Values {
 
 export interface RecoveryCardProps extends Values {
   date: string;
-  targets: { sleepMin: number; proteinG: number; waterMl: number };
+  /** sleepMin fills the bubble; minSleepMin is the floor. A null target isn't tracked. */
+  targets: { sleepMin: number; minSleepMin: number; proteinG: number | null; waterMl: number | null };
   sources: Partial<Record<Field, Source>>;
   holdMessage: string | null;
 }
@@ -50,13 +51,14 @@ function Fill({
   children,
 }: {
   value: number | null;
-  target: number;
+  /** null = not tracked: the value shows, the bubble stays empty. */
+  target: number | null;
   kind: "A" | "B" | "C";
   danger?: boolean;
   delay?: number;
   children: React.ReactNode;
 }) {
-  const frac = value == null ? 0 : Math.min(1, value / target);
+  const frac = value == null || !target ? 0 : Math.min(1, value / target);
   const color = danger ? "text-danger" : "text-k";
   return (
     <span
@@ -109,7 +111,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
     save({ waterMl: Math.min(20000, (vals.waterMl ?? 0) + WATER_STEP) });
   };
 
-  const short = vals.sleepMin != null && vals.sleepMin < TARGETS.minSleepMin;
+  const short = vals.sleepMin != null && vals.sleepMin < targets.minSleepMin;
   const srcLine = Array.from(
     new Set(Object.values(sources).filter((s): s is Source => !!s && s !== "manual").map((s) => SOURCE_LABEL[s]))
   ).join(", ");
@@ -132,7 +134,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
         <button
           type="button"
           onClick={() => setEditing("sleep")}
-          aria-label={`Sleep ${formatSleep(vals.sleepMin)} of ${targets.sleepMin / 60} h. Edit`}
+          aria-label={`Sleep ${formatSleep(vals.sleepMin)} of ${formatHours(targets.sleepMin)} h. Edit`}
           className={tile}
         >
           <Fill value={vals.sleepMin} target={targets.sleepMin} kind="B" danger={short}>
@@ -143,24 +145,24 @@ export function RecoveryCard(props: RecoveryCardProps) {
         <button
           type="button"
           onClick={() => setEditing("protein")}
-          aria-label={`Protein ${vals.proteinG ?? 0} of ${targets.proteinG} grams. Edit`}
+          aria-label={`Protein ${vals.proteinG ?? 0}${targets.proteinG != null ? ` of ${targets.proteinG}` : ""} grams. Edit`}
           className={tile}
         >
           <Fill value={vals.proteinG} target={targets.proteinG} kind="A" delay={80}>
             <span className="num text-[20px]">{vals.proteinG ?? "—"}</span>
-            <span className="text-[11px] font-bold opacity-75">of {targets.proteinG} g</span>
+            <span className="text-[11px] font-bold opacity-75">{targets.proteinG != null ? `of ${targets.proteinG} g` : "g"}</span>
           </Fill>
           <span className="text-[13px] font-bold text-muted">Protein</span>
         </button>
         <button
           type="button"
           onClick={addWater}
-          aria-label={`Water ${litres(vals.waterMl ?? 0)} of ${litres(targets.waterMl)} litres. Add 250 ml`}
+          aria-label={`Water ${litres(vals.waterMl ?? 0)}${targets.waterMl != null ? ` of ${litres(targets.waterMl)}` : ""} litres. Add 250 ml`}
           className={tile}
         >
           <Fill value={vals.waterMl} target={targets.waterMl} kind="C" delay={160}>
             <span key={vals.waterMl ?? 0} className="num text-[20px] animate-tick">{litres(vals.waterMl ?? 0)}</span>
-            <span className="text-[11px] font-bold opacity-75">of {litres(targets.waterMl)} L</span>
+            <span className="text-[11px] font-bold opacity-75">{targets.waterMl != null ? `of ${litres(targets.waterMl)} L` : "L"}</span>
           </Fill>
           <span className="text-[13px] font-bold text-muted">Water, tap +250</span>
         </button>
@@ -276,13 +278,17 @@ function CheckInForm({
       )}
       {field === "protein" && (
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted px-1">Grams so far. The floor is {targets.proteinG} g</span>
+          <span className="text-xs text-muted px-1">
+            Grams so far.{targets.proteinG != null && ` The floor is ${targets.proteinG} g`}
+          </span>
           <input data-autofocus value={protein} onChange={(e) => setProtein(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" pattern="[0-9]*" placeholder="0" className={FIELD_INPUT} />
         </label>
       )}
       {field === "water" && (
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted px-1">Litres so far (or type ml, e.g. 750). Target {litres(targets.waterMl)} L</span>
+          <span className="text-xs text-muted px-1">
+            Litres so far (or type ml, e.g. 750).{targets.waterMl != null && ` Target ${litres(targets.waterMl)} L`}
+          </span>
           <input data-autofocus value={water} onChange={(e) => setWater(e.target.value.replace(/[^\d.,]/g, "").slice(0, 6))} inputMode="decimal" placeholder="0.0" className={FIELD_INPUT} />
         </label>
       )}
