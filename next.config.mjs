@@ -28,6 +28,9 @@ const nextConfig = {
   // OAuth discovery for the MCP connector lives under /.well-known.
   async rewrites() {
     return [
+      // Public setup guide: a standalone page (public/docs.html) with its own
+      // global CSS, so it can't live inside the app's React tree.
+      { source: "/docs", destination: "/docs.html" },
       {
         source: "/.well-known/oauth-authorization-server/:path*",
         destination: "/api/oauth/metadata",

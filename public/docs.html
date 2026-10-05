@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="A setup guide for turning a Claude Project into a personal trainer that remembers every set. The exact setup behind Olympus.">
+<meta name="theme-color" content="#FBF6F4">
+<title>Build Your Own PT | Olympus</title>
+<link rel="icon" href="/icons/icon-192x192.png">
+<link rel="apple-touch-icon" href="/icons/icon-180x180.png">
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+</style>
+<style>
+/* Layout: Olympus "Coral". One phone-width column on warm off-white; each setup step is a big block in its session colour (A coral, B berry, C apricot, cardio ink), with white cards inside. */
+:root{
+  --coral:#C63D22; --berry:#8E3B5E; --apricot:#F2A65A; --ink:#1E1412;
+  --bg:#FBF6F4; --surface:#F3E8E4; --surface-2:#EEE2DD; --surface-3:#E9D9D3; --muted:#74625D;
+  --on-dark:#FFFFFF; --on-dark-soft:rgba(255,255,255,.78); --chip-dark:rgba(255,255,255,.16);
+  --apricot-ink:#3A2210; --apricot-soft:rgba(58,34,16,.72); --chip-apricot:rgba(58,34,16,.10);
+  --card:#FFFFFF;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif;
+  --round:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --r-block:32px; --r-card:20px; --r-chip:999px;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1); --ease-out:cubic-bezier(.22,1,.36,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:20px 64px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+a{color:inherit}
+.num{font-family:var(--round);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+
+/* Top bar */
+.top{display:flex;justify-content:space-between;align-items:flex-end;padding:8px 4px 4px}
+.top small{display:block;color:var(--muted);font-size:13px;font-weight:500}
+.top h1{font-size:34px;font-weight:800}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-weight:700;font-size:14px;color:var(--ink)}
+
+/* Blocks */
+.block{border-radius:var(--r-block);padding:24px 20px;display:flex;flex-direction:column;gap:16px;position:relative;overflow:hidden}
+.block.a{background:var(--coral);color:var(--on-dark)}
+.block.b{background:var(--berry);color:var(--on-dark)}
+.block.c{background:var(--apricot);color:var(--apricot-ink)}
+.block.d{background:var(--ink);color:var(--on-dark)}
+.block.plain{background:var(--surface);color:var(--ink)}
+.block .soft{color:var(--on-dark-soft)}
+.block.c .soft{color:var(--apricot-soft)}
+.block.plain .soft{color:var(--muted)}
+.block h2{font-family:var(--round);font-size:clamp(30px,7vw,40px);font-weight:800;line-height:1.05}
+.block .lead{font-size:16px;max-width:52ch}
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--r-chip);font-size:13px;font-weight:600;background:var(--chip-dark);width:max-content}
+.block.c .chip{background:var(--chip-apricot)}
+.block.plain .chip{background:var(--surface-3)}
+
+.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+
+/* Hero */
+.hero{min-height:0}
+.hero h2{font-size:clamp(40px,10vw,56px)}
+.hero .bubbles{position:absolute;right:-60px;top:-40px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.10);pointer-events:none}
+.hero .bubbles::after{content:"";position:absolute;left:-50px;top:120px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--chip-dark);border-radius:var(--r-card);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stat .num{font-size:30px;font-weight:800;line-height:1}
+.stat span:last-child{font-size:12.5px;font-weight:500}
+.btn{appearance:none;border:0;cursor:pointer;font:600 16px/1 var(--font);border-radius:var(--r-chip);padding:14px 22px;min-height:44px;display:inline-flex;align-items:center;gap:8px;transition:transform .12s var(--ease-out);text-decoration:none;width:max-content}
+.btn:active{transform:scale(.96)}
+.btn.white{background:#fff;color:var(--coral)}
+.btn.ink{background:var(--ink);color:#fff}
+.btn.ghost{background:var(--chip-dark);color:inherit}
+.btn:focus-visible,.tick:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.block.a .btn:focus-visible,.block.b .btn:focus-visible,.block.d .btn:focus-visible,.block.a .tick:focus-visible,.block.b .tick:focus-visible,.block.d .tick:focus-visible{outline-color:#fff}
+
+/* Overview list (like the Today card's exercise list) */
+.parts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;background:var(--card);border-radius:var(--r-card);overflow:hidden}
+.parts li{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--surface-2)}
+.parts li:last-child{border-bottom:0}
+.dot{width:14px;height:14px;border-radius:50%}
+.parts strong{display:block;font-size:15.5px}
+.parts small{display:block;color:var(--muted);font-size:13.5px}
+.parts .when{font-family:var(--round);font-weight:700;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Step tick, like logging a set */
+.tick{appearance:none;border:2px solid currentColor;background:transparent;color:inherit;width:44px;height:44px;flex:0 0 44px;border-radius:50%;cursor:pointer;display:grid;place-items:center;transition:transform .12s var(--ease-out),background .2s}
+.tick svg{width:20px;height:20px;opacity:.35}
+.tick[aria-pressed="true"]{background:#fff;border-color:#fff}
+.block.a .tick[aria-pressed="true"] svg{color:var(--coral)}
+.block.b .tick[aria-pressed="true"] svg{color:var(--berry)}
+.block.c .tick[aria-pressed="true"]{background:var(--apricot-ink);border-color:var(--apricot-ink)}
+.block.c .tick[aria-pressed="true"] svg{color:var(--apricot)}
+.block.d .tick[aria-pressed="true"] svg{color:var(--ink)}
+.tick[aria-pressed="true"] svg{opacity:1;animation:pop .38s var(--ease-spring)}
+.tick:active{transform:scale(.92)}
+@keyframes pop{0%{transform:scale(.3)}100%{transform:scale(1)}}
+
+/* White cards inside blocks */
+.card{background:var(--card);color:var(--ink);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h3{font-size:17px;font-weight:700}
+.card .soft,.card small{color:var(--muted)}
+.card ol,.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.card li::marker{color:var(--muted);font-weight:600}
+.translucent{background:var(--chip-dark);color:inherit}
+.block.c .translucent{background:var(--chip-apricot)}
+.translucent .soft{color:inherit;opacity:.8}
+
+/* Template */
+.template{position:relative}
+.template pre{margin:0;font:400 14px/1.55 var(--font);white-space:pre-wrap;word-break:break-word;background:var(--surface);border-radius:14px;padding:16px;max-height:420px;overflow:auto;color:var(--ink)}
+.template pre b{font-weight:700}
+.template pre i{font-style:normal;color:var(--coral);font-weight:600}
+.copy-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.copy-row .btn{background:var(--coral);color:#fff}
+.copy-row span{font-size:13.5px;color:var(--muted)}
+
+/* Field list */
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.field{background:var(--chip-dark);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.field strong{font-size:15px}
+.field span{font-size:13.5px;opacity:.82}
+
+/* Set table, like the live session */
+.sets{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:14.5px}
+.sets th{text-align:left;font-size:12.5px;font-weight:600;color:var(--muted);padding:0 8px}
+.sets td{background:var(--surface);padding:10px 8px}
+.sets td:first-child{border-radius:12px 0 0 12px;font-weight:600}
+.sets td:last-child{border-radius:0 12px 12px 0;color:var(--muted)}
+.sets td.kg{font-family:var(--round);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.note{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border-radius:14px;padding:12px 14px;font-size:14.5px}
+.note .badge{flex:0 0 auto;font-weight:700;color:var(--berry)}
+
+/* Loop */
+.loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;counter-reset:s}
+.loop div{background:var(--card);border-radius:var(--r-card);padding:14px;display:flex;flex-direction:column;gap:4px;position:relative}
+.loop div::before{counter-increment:s;content:counter(s);font-family:var(--round);font-weight:800;font-size:28px;line-height:1;color:var(--seg,var(--coral))}
+.loop strong{font-size:15.5px}
+.loop span{font-size:13.5px;color:var(--muted)}
+.loop-foot{font-size:14px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.loop-foot svg{width:18px;height:18px;flex:0 0 auto}
+
+/* Sources table */
+.src{display:flex;flex-direction:column;gap:8px}
+.src-row{display:grid;grid-template-columns:110px 1fr;gap:12px;background:var(--chip-dark);border-radius:16px;padding:12px 14px;align-items:start}
+.src-row strong{font-size:15px}
+.src-row span{font-size:14px;color:var(--on-dark-soft)}
+@media (max-width:480px){.src-row{grid-template-columns:1fr;gap:2px}}
+
+/* Load modes */
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.mode{background:var(--card);border-radius:var(--r-card);padding:14px;display:flex;flex-direction:column;gap:4px}
+.mode .num{font-size:28px;font-weight:800;line-height:1.05;color:var(--coral)}
+.mode .num sub{font-size:13px;font-weight:600;color:var(--muted);vertical-align:baseline;margin-left:3px;font-family:var(--font);letter-spacing:0}
+.mode strong{font-size:14.5px}
+.mode span{font-size:13px;color:var(--muted)}
+
+/* Context menu */
+.tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:var(--r-chip);font-size:12px;font-weight:700;width:max-content}
+.t-ins{background:rgba(198,61,34,.12);color:var(--coral)}
+.t-doc{background:rgba(142,59,94,.12);color:var(--berry)}
+.t-file{background:rgba(242,166,90,.28);color:var(--apricot-ink)}
+.t-mem{background:rgba(30,20,18,.08);color:var(--ink)}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;background:var(--card);border-radius:var(--r-card);padding:14px 16px}
+.legend-txt{font-size:13.5px;color:var(--muted)}
+@media (min-width:600px){.legend{grid-template-columns:auto 1fr auto 1fr}}
+.ctx{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.ctx-item{background:var(--card);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:6px}
+.ctx-item strong{font-size:15.5px}
+.ctx-item span:last-child{font-size:14px;color:var(--muted)}
+
+/* Lessons */
+.lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
+.lesson{background:var(--card);border-radius:var(--r-card);padding:16px;display:flex;flex-direction:column;gap:6px}
+.lesson .date{font-size:12.5px;font-weight:600;color:var(--coral)}
+.lesson strong{font-size:15.5px}
+.lesson span{font-size:14px;color:var(--muted)}
+
+.foot{color:var(--muted);font-size:13.5px;text-align:center;padding-top:8px}
+.foot a{color:var(--coral);font-weight:600}
+
+/* Bottom pill nav, like the tab bar */
+.tabbar{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));align-self:center;background:var(--ink);border-radius:var(--r-chip);padding:5px;display:flex;gap:2px;box-shadow:0 8px 24px rgba(30,20,18,.25);z-index:5;max-width:100%;overflow-x:auto}
+.tabbar a{color:rgba(255,255,255,.72);text-decoration:none;font-size:13px;font-weight:600;padding:9px 13px;border-radius:var(--r-chip);white-space:nowrap;transition:background .25s var(--ease-spring),color .2s}
+.tabbar a.on{background:#fff;color:var(--ink)}
+.tabbar a:focus-visible{outline:2px solid #fff;outline-offset:1px}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <small>A setup guide, about an hour</small>
+      <h1>Build your own PT</h1>
+    </div>
+    <div class="avatar" aria-hidden="true">PT</div>
+  </header>
+
+  <!-- Hero -->
+  <section class="block a hero" id="start">
+    <div class="bubbles" aria-hidden="true"></div>
+    <span class="chip">From a working setup, Oct 2026</span>
+    <h2>A coach who<br>remembers every set</h2>
+    <p class="lead soft">Turn a Claude Project into a personal trainer that knows your history, programmes your next session, and progresses your loads by rules you set. This is the exact setup behind Olympus, minus the app.</p>
+    <div class="hero-stats">
+      <div class="stat"><span class="num">4</span><span class="soft">parts to set up</span></div>
+      <div class="stat"><span class="num">1</span><span class="soft">log, the source of truth</span></div>
+      <div class="stat"><span class="num" id="doneCount">0</span><span class="soft">of 4 steps done</span></div>
+    </div>
+    <a class="btn white" href="#coach">Let's go
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </section>
+
+  <!-- Overview -->
+  <section class="block plain" aria-labelledby="ov">
+    <div>
+      <h2 id="ov" style="font-size:26px">What you're building</h2>
+      <p class="soft" style="margin-top:6px">Four parts, each with its own colour below. The one rule that makes it work: the log decides the next session's weights, not Claude's memory of a chat.</p>
+    </div>
+    <ul class="parts">
+      <li><span class="dot" style="background:var(--coral)"></span><div><strong>Coach instructions</strong><small>Who it is, who you are, your rules</small></div><span class="when">20 min</span></li>
+      <li><span class="dot" style="background:var(--berry)"></span><div><strong>Lift log</strong><small>One markdown file, appended every session</small></div><span class="when">10 min</span></li>
+      <li><span class="dot" style="background:var(--apricot)"></span><div><strong>Files and knowledge</strong><small>Scans, blood work, docs, lessons learned</small></div><span class="when">20 min</span></li>
+      <li><span class="dot" style="background:var(--ink)"></span><div><strong>Data sources</strong><small>Watch, wearable and nutrition data</small></div><span class="when">15 min</span></li>
+    </ul>
+  </section>
+
+  <!-- Step 1: coral -->
+  <section class="block a" id="coach" aria-labelledby="s1">
+    <div class="head-row">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="chip">Step 1, coach instructions</span>
+        <h2 id="s1">Write the coach</h2>
+      </div>
+      <button class="tick" data-step="1" aria-pressed="false" aria-label="Mark step 1 done"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <p class="lead soft">In claude.ai, create a new Project and name it something like "Sam's PT". Paste the template below into its instructions and fill every bracket. Vague inputs get vague programming.</p>
+
+    <div class="fields">
+      <div class="field"><strong>Identity</strong><span>How it talks. "Direct, evidence-based" beats a paragraph.</span></div>
+      <div class="field"><strong>Athlete profile</strong><span>Experience, goal, days per week, kit, anything that limits training.</span></div>
+      <div class="field"><strong>Working weights</strong><span>What you actually lift. Say they're not one-rep maxes.</span></div>
+      <div class="field"><strong>Programming rules</strong><span>RPE targets, when to add weight, by how much, deloads.</span></div>
+    </div>
+
+    <div class="card template">
+      <h3>Project instructions template</h3>
+<pre id="tpl"><b>IDENTITY</b>
+You are a personal trainer AI built for <i>[name]</i>. Direct, knowledgeable,
+evidence-based. Talk like a coach who actually trains.
+
+<b>ATHLETE PROFILE</b>
+Training experience: <i>[x years]</i>
+Goal: <i>[e.g. gain lean muscle, lose fat]</i>
+Schedule: <i>[days a week, which ones are cardio]</i>
+Equipment: <i>[home kit and heaviest dumbbell; gym]</i>
+Limitations: <i>[injuries, conditions that affect training]</i>
+
+<b>CURRENT WORKING WEIGHTS</b>
+These are working weights, NOT one-rep maxes. Never calculate
+percentages from them. For an exercise not listed, check the lift log.
+If it isn't there, estimate, flag it as a calibration weight, and
+confirm the real weight after the first session.
+<i>[Exercise]: [kg]</i>
+<i>[Exercise]: [kg]</i>
+
+<b>LIFT LOG</b>
+Append each session in this format:
+[DATE] Session name
+Exercise | Sets x Reps | Weight | RPE | Notes
+Session notes: [energy, how it felt]
+Never delete old entries. After a few sessions, the log replaces the
+working weights above as the main reference.
+
+<b>PROGRAMMING RULES</b>
+- RPE 7 to 8 for hypertrophy, 8 to 9 for strength
+- Add weight after hitting the top of the rep range at target RPE
+  for 2 sessions in a row: upper compounds +2.5 kg, lower +5 kg,
+  accessories add reps before weight
+- Suggest a deload every 4 to 6 weeks, or when I flag fatigue
+- Week 1 of any new programme is a calibration week
+- Base each session on the most recent log entries
+
+<b>HOW TO RESPOND</b>
+- When I log a session: acknowledge it, update the log, note any
+  weight increases, flag anything to adjust
+- When I ask for the next session: a table with weights, sets,
+  reps and RPE
+- When I ask about progress: concrete numbers from the log
+- Keep it short. Tables for sessions. No waffle.
+- If you can't edit my log file, give me the updated file named
+  YYYY-MM-DD Session name so I can save it myself</pre>
+      <div class="copy-row">
+        <button class="btn" id="copyBtn" type="button">Copy template</button>
+        <span id="copyMsg" role="status">Paste it into the Project's instructions</span>
+      </div>
+    </div>
+    <p class="soft" style="font-size:14.5px">Want a personality on top, like bluntness or jokes? Put that in your Claude profile preferences instead, so it applies everywhere and the Project stays about training.</p>
+  </section>
+
+  <!-- Step 2: berry -->
+  <section class="block b" id="log" aria-labelledby="s2">
+    <div class="head-row">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="chip">Step 2, lift log</span>
+        <h2 id="s2">Start the log</h2>
+      </div>
+      <button class="tick" data-step="2" aria-pressed="false" aria-label="Mark step 2 done"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <p class="lead soft">Keep the log as one markdown file you own, outside Claude. A notes app like Obsidian works well, since it's plain text and syncs to your phone. Every session gets appended, never rewritten.</p>
+
+    <div class="card">
+      <h3>One entry, 5 Oct, Session A</h3>
+      <div class="scroll">
+        <table class="sets">
+          <thead><tr><th>Exercise</th><th>Sets</th><th>kg</th><th>RPE</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Bench press</td><td class="num">3 × 8</td><td class="kg">30</td><td class="num">8</td><td>Last set grindy</td></tr>
+            <tr><td>Lat pulldown</td><td class="num">3 × 10</td><td class="kg">36</td><td class="num">7</td><td>Easy, add weight</td></tr>
+            <tr><td>Leg press</td><td class="num">3 × 12</td><td class="kg">110</td><td class="num">8</td><td>Total, not per side</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="badge">Notes</span><span>Slept 6 hours, energy 6 out of 10. Shoulder fine.</span></div>
+    </div>
+
+    <div class="card translucent">
+      <h3>The update loop</h3>
+      <ol>
+        <li>Upload the current log to the Project, or attach it to the chat.</li>
+        <li>Send the session: raw notes, a screenshot, or "pull today's workout".</li>
+        <li>Claude parses it, flags anything odd, and returns the updated file.</li>
+        <li>Replace your copy with that file and re-upload it to the Project.</li>
+      </ol>
+      <p class="soft" style="font-size:14px">The Project's copy doesn't update itself. Skipping step 4 is how the coach ends up programming off last week.</p>
+    </div>
+  </section>
+
+  <!-- Step 3: apricot -->
+  <section class="block c" id="knowledge" aria-labelledby="s3">
+    <div class="head-row">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="chip">Step 3, files and knowledge</span>
+        <h2 id="s3">Give it context</h2>
+      </div>
+      <button class="tick" data-step="3" aria-pressed="false" aria-label="Mark step 3 done"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <p class="lead soft">Instructions say how to coach. Project knowledge is what the coach checks before it answers. A Project holds two kinds of knowledge, and it helps to know which is which.</p>
+
+    <div class="fields">
+      <div class="field translucent"><strong>Files</strong><span>Things you upload as they are: PDF reports, screenshots, photos. Reference material that doesn't change once it's in.</span></div>
+      <div class="field translucent"><strong>Docs</strong><span>Text documents you keep up to date: the lift log, your programme, your exercise library, your learnings.</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Files worth uploading</h3>
+      <div class="scroll">
+        <table class="sets">
+          <thead><tr><th>File</th><th>What the coach uses it for</th><th>Refresh</th></tr></thead>
+          <tbody>
+            <tr><td>DEXA scan</td><td>Fat mass, lean mass by limb, visceral fat. The baseline every cut or bulk is judged against.</td><td>8 to 12 weeks</td></tr>
+            <tr><td>Body comp scan</td><td>Quick checks between DEXAs. Only comparable if taken the same way: morning, fasted, same machine.</td><td>4 weeks</td></tr>
+            <tr><td>Blood tests</td><td>Thyroid, iron, vitamin D, lipids. Explains low energy before the programme gets blamed.</td><td>3 to 6 months</td></tr>
+            <tr><td>Progress photos</td><td>Front, side, back, same light. Shows what the scale misses.</td><td>4 weeks</td></tr>
+            <tr><td>Screenshots</td><td>A nutrition diary, a watch summary, a machine's weight plate. Faster than typing.</td><td>As needed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card translucent">
+      <h3>Make files easy to use</h3>
+      <ul>
+        <li>Put the date and type in the name: "2026-09-04 DEXA.pdf", not "scan_final2.pdf".</li>
+        <li>Upload reports as text PDFs where you can. A photo of a printout reads worse.</li>
+        <li>Keep old scans. The coach needs them to show a trend, so add the new one beside the old.</li>
+        <li>When you upload a new file, say so in chat: "new DEXA is in, compare it to April".</li>
+        <li>Delete files that are wrong, not files that are old. Two conflicting truths make bad advice.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Lines from a real learnings file</h3>
+      <ul>
+        <li>Iso-lateral machines: the carriage has its own weight. Log the real load per side.</li>
+        <li>Assisted pull-up: more counterweight means easier, not harder.</li>
+        <li>Zone 2 is my heart-rate band, 130 to 140 bpm, not my wearable's zone label.</li>
+        <li>Never superset chest with triceps. They tire each other out.</li>
+        <li>Don't raise any weights after a night under six hours of sleep.</li>
+      </ul>
+    </div>
+    <p class="soft" style="font-size:14.5px">Turn memory on for the Project too. It picks up your preferences between chats, but the files stay the authority.</p>
+  </section>
+
+  <!-- More context -->
+  <section class="block plain" id="more" aria-labelledby="s3b">
+    <div>
+      <span class="chip">Add as you go</span>
+      <h2 id="s3b" style="font-size:30px;margin-top:10px">More context you can add</h2>
+      <p class="soft" style="margin-top:6px">You don't need all of this on day one. Add a piece when the coach gets something wrong that it would have known. Each one is tagged with where it belongs.</p>
+    </div>
+    <div class="legend">
+      <span class="tag t-ins">Instructions</span><span class="legend-txt">rules it must always follow</span>
+      <span class="tag t-doc">Doc</span><span class="legend-txt">text you keep updating</span>
+      <span class="tag t-file">File</span><span class="legend-txt">reports and images</span>
+      <span class="tag t-mem">Memory</span><span class="legend-txt">picked up from chat</span>
+    </div>
+    <div class="ctx">
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Programme template</strong><span>Your split, the order of sessions, and how a 12-week block runs from calibration to deload.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Exercise library</strong><span>Every exercise you do, the muscle it trains, its swaps, and how it's loaded: total, per side, counterweight or time.</span></div>
+      <div class="ctx-item"><span class="tag t-ins">Instructions</span><strong>Injuries and blocked lifts</strong><span>What hurts, what to avoid, and the replacement. "No straight-bar curls, use EZ bar."</span></div>
+      <div class="ctx-item"><span class="tag t-ins">Instructions</span><strong>Health conditions</strong><span>Anything that changes recovery or energy, and the medication timing that matters for training.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Nutrition targets</strong><span>Calories, protein, water, and how you track them. Note which app settings to leave off.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Food you actually eat</strong><span>Staple meals with their macros, so meal advice fits your kitchen and your cuisine.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Supplements</strong><span>What you take, how much, and when. Stops it suggesting what you already have.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Gym equipment</strong><span>Every machine at each gym you use, plus carriage weights and quirks. One list per gym if you travel.</span></div>
+      <div class="ctx-item"><span class="tag t-doc">Doc</span><strong>Cardio zones</strong><span>Your heart-rate bands and the format you like, such as incline walk at a fixed speed.</span></div>
+      <div class="ctx-item"><span class="tag t-file">File</span><strong>Past programmes</strong><span>Old plans and logs from apps or coaches. Gives it years of history on day one.</span></div>
+      <div class="ctx-item"><span class="tag t-mem">Memory</span><strong>Schedule and travel</strong><span>Which days you train, when you travel, and what kit a hotel gym has. Say it in chat and memory keeps it.</span></div>
+      <div class="ctx-item"><span class="tag t-mem">Memory</span><strong>How you like answers</strong><span>Short tables, no hedging, a warning before any big jump. Tell it once.</span></div>
+    </div>
+    <p class="soft" style="font-size:14.5px">When a Project holds a lot, Claude searches its knowledge rather than reading everything at once. Clear titles and headings are how it finds the right page.</p>
+  </section>
+
+  <!-- Step 4: ink -->
+  <section class="block d" id="data" aria-labelledby="s4">
+    <div class="head-row">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="chip">Step 4, data sources</span>
+        <h2 id="s4">Connect your data</h2>
+      </div>
+      <button class="tick" data-step="4" aria-pressed="false" aria-label="Mark step 4 done"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <p class="lead soft">Typing every set into a chat gets old fast. Pull what you can, screenshot the rest. Where a service has a connector in Claude, add it under Settings, Connectors.</p>
+    <div class="src">
+      <div class="src-row"><strong>Garmin</strong><span>Main record for lifting and cardio sessions. When two sources disagree, it wins.</span></div>
+      <div class="src-row"><strong>Strava</strong><span>Has a Claude connector. Gives duration, heart rate and calories, but not sets and reps. The activity description from Garmin carries the lifts.</span></div>
+      <div class="src-row"><strong>Whoop</strong><span>Sleep and recovery. Its Strava copies are duplicates: spot them by "Strain" in the description.</span></div>
+      <div class="src-row"><strong>MyFitnessPal</strong><span>Protein and calories. A diary screenshot is the most reliable way in.</span></div>
+    </div>
+    <p class="soft" style="font-size:14.5px">A good pull pattern: list activities for the date, then fetch that one activity's details. Ask for both in one message.</p>
+  </section>
+
+  <!-- Weekly loop -->
+  <section class="block plain" id="loop" aria-labelledby="s5">
+    <div>
+      <span class="chip">Every gym day</span>
+      <h2 id="s5" style="font-size:30px;margin-top:10px">The loop</h2>
+    </div>
+    <div class="loop">
+      <div style="--seg:var(--coral)"><strong>Plan</strong><span>"Heading to the gym." It reads the log and your sleep, then proposes a table.</span></div>
+      <div style="--seg:var(--berry)"><strong>Approve</strong><span>Push back on anything. Nothing is final until you say yes.</span></div>
+      <div style="--seg:#C27A2E"><strong>Train</strong><span>Log weight, reps and RPE as you go, in notes or your watch.</span></div>
+      <div style="--seg:var(--ink)"><strong>Review</strong><span>Send the session. It updates the log and working weights, and flags issues.</span></div>
+    </div>
+    <p class="loop-foot"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M14 6a6 6 0 1 0 1 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14.5 2.5V6.5H10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Then the review feeds the next plan. Every 4 to 6 weeks, a deload.</p>
+  </section>
+
+  <!-- Level up -->
+  <section class="block a" id="level" aria-labelledby="s6">
+    <span class="chip">Optional, for builders</span>
+    <h2 id="s6">Level up: your own app</h2>
+    <p class="lead soft">Chat works, but copying plans in and logs out is the weak spot. Olympus fixes that with a workout app and an MCP connector, so Claude reads and writes your data directly.</p>
+
+    <div class="card translucent">
+      <h3>What the connector does</h3>
+      <ul>
+        <li>Reads your profile, recent sessions and recovery before every plan.</li>
+        <li>Pushes the approved plan straight to the app's Today screen.</li>
+        <li>Checks every plan against rules first, like blocked exercises or a weight that jumps too far.</li>
+        <li>Has no delete tools. Anything removed, you remove in the app.</li>
+      </ul>
+    </div>
+
+    <div class="modes">
+      <div class="mode"><span class="num">110<sub>kg</sub></span><strong>Total</strong><span>Barbell, the number on the bar</span></div>
+      <div class="mode"><span class="num">33.2<sub>kg a side</sub></span><strong>Per side</strong><span>Plates plus the carriage</span></div>
+      <div class="mode"><span class="num">40<sub>kg</sub></span><strong>Counterweight</strong><span>Lower is harder</span></div>
+      <div class="mode"><span class="num">35<sub>min</sub></span><strong>Time</strong><span>Cardio, not kilos</span></div>
+    </div>
+    <a class="btn white" href="https://adithyabhat.com/work/olympus" target="_blank" rel="noopener">Read the Olympus build
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11l6-6M6 5h5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </section>
+
+  <!-- Lessons -->
+  <section class="block plain" id="lessons" aria-labelledby="s7">
+    <div>
+      <span class="chip">From real sessions</span>
+      <h2 id="s7" style="font-size:30px;margin-top:10px">Mistakes to skip</h2>
+      <p class="soft" style="margin-top:6px">Each of these happened once, then became a rule.</p>
+    </div>
+    <div class="lessons">
+      <div class="lesson"><span class="date">Opening sets</span><strong>Calibration weights run light</strong><span>Hitting 15 reps on the first set means the guess was too low. Ask for exact opening loads, not general advice.</span></div>
+      <div class="lesson"><span class="date">Machines</span><strong>Read the machine, not the stack</strong><span>Carriage weights and counterweights flip the maths. Write them into your learnings file on day one.</span></div>
+      <div class="lesson"><span class="date">Supersets</span><strong>Ban pairings in writing</strong><span>If a pairing tires you out, say so in the instructions. A rule in chat is forgotten next week.</span></div>
+      <div class="lesson"><span class="date">Progression</span><strong>Cap the jumps</strong><span>A machine squat once went from 50 to 90 kg in one plan. Set a maximum increase per session.</span></div>
+      <div class="lesson"><span class="date">Nutrition</span><strong>Turn off exercise calories</strong><span>Calorie apps add back exercise by default. That quietly erases a deficit.</span></div>
+      <div class="lesson"><span class="date">Your call</span><strong>You can drop a lift</strong><span>If your form on an exercise worries you, cut it permanently and log the decision so it stays cut.</span></div>
+    </div>
+  </section>
+
+  <p class="foot">Based on the setup behind <a href="https://adithyabhat.com/work/olympus" target="_blank" rel="noopener">Olympus</a>, by Adithya NR. Not medical advice; check with a doctor if a condition affects your training.</p>
+
+  <nav class="tabbar" aria-label="Sections">
+    <a href="#coach" data-for="coach">Coach</a>
+    <a href="#log" data-for="log">Log</a>
+    <a href="#knowledge" data-for="knowledge">Files</a>
+    <a href="#more" data-for="more">Context</a>
+    <a href="#data" data-for="data">Data</a>
+    <a href="#loop" data-for="loop">Loop</a>
+  </nav>
+</div>
+
+<script>
+(function(){
+  var KEY='buildpt-steps';
+  var state={};
+  try{state=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){state={};}
+  var ticks=document.querySelectorAll('.tick');
+  var count=document.getElementById('doneCount');
+  function render(){
+    var n=0;
+    ticks.forEach(function(t){
+      var on=!!state[t.dataset.step];
+      t.setAttribute('aria-pressed',on?'true':'false');
+      if(on)n++;
+    });
+    count.textContent=n;
+  }
+  ticks.forEach(function(t){
+    t.addEventListener('click',function(){
+      state[t.dataset.step]=!state[t.dataset.step];
+      try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}
+      try{if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
+      render();
+    });
+  });
+  render();
+
+  var btn=document.getElementById('copyBtn'),msg=document.getElementById('copyMsg'),pre=document.getElementById('tpl');
+  btn.addEventListener('click',function(){
+    var text=pre.innerText;
+    function fallback(){
+      var r=document.createRange();r.selectNodeContents(pre);
+      var s=window.getSelection();s.removeAllRanges();s.addRange(r);
+      msg.textContent='Selected. Press copy on your keyboard.';
+    }
+    try{
+      navigator.clipboard.writeText(text).then(function(){
+        btn.textContent='Copied';msg.textContent='Now paste it into the Project’s instructions';
+        setTimeout(function(){btn.textContent='Copy template';},2000);
+      },fallback);
+    }catch(e){fallback();}
+  });
+
+  var links=document.querySelectorAll('.tabbar a');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){
+          links.forEach(function(l){l.classList.toggle('on',l.dataset.for===en.target.id);});
+        }
+      });
+    },{rootMargin:'-45% 0px -50% 0px'});
+    ['coach','log','knowledge','more','data','loop'].forEach(function(id){var el=document.getElementById(id);if(el)io.observe(el);});
+  }
+})();
+</script>
+
+</body>
+</html>
