@@ -276,13 +276,13 @@ function CheckInForm({
       )}
       {field === "protein" && (
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted px-1">Grams so far — floor is {targets.proteinG} g</span>
+          <span className="text-xs text-muted px-1">Grams so far. The floor is {targets.proteinG} g</span>
           <input data-autofocus value={protein} onChange={(e) => setProtein(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" pattern="[0-9]*" placeholder="0" className={FIELD_INPUT} />
         </label>
       )}
       {field === "water" && (
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted px-1">Litres so far (or type ml, e.g. 750) — target {litres(targets.waterMl)} L</span>
+          <span className="text-xs text-muted px-1">Litres so far (or type ml, e.g. 750). Target {litres(targets.waterMl)} L</span>
           <input data-autofocus value={water} onChange={(e) => setWater(e.target.value.replace(/[^\d.,]/g, "").slice(0, 6))} inputMode="decimal" placeholder="0.0" className={FIELD_INPUT} />
         </label>
       )}

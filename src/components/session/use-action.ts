@@ -31,7 +31,7 @@ export function useAction() {
         }
         return res;
       } catch {
-        const error = "Couldn't reach the server — try again.";
+        const error = "Couldn't reach the server. Try again.";
         toast.error(error);
         return { ok: false, error };
       } finally {

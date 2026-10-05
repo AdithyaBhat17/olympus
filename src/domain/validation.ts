@@ -164,7 +164,7 @@ export function validatePlan(
         code: "V6",
         level: "warning",
         exerciseId: ex.id,
-        message: `${ex.name}: ${item.restSec}s rest on a compound — this isn't a circuit. Use 180s.`,
+        message: `${ex.name}: ${item.restSec}s rest on a compound. This isn't a circuit. Use 180s.`,
       });
     }
 
@@ -174,7 +174,7 @@ export function validatePlan(
         code: "V7",
         level: "warning",
         exerciseId: ex.id,
-        message: `${ex.name} has no carriage weight set — calibrate carriage so true load is right.`,
+        message: `${ex.name} has no carriage weight set. Calibrate carriage so true load is right.`,
       });
     }
 
@@ -186,7 +186,7 @@ export function validatePlan(
         code: "V9",
         level: "warning",
         exerciseId: ex.id,
-        message: `${ex.name} has no log history — treat the first session as a calibration weight.`,
+        message: `${ex.name} has no log history. Treat the first session as a calibration weight.`,
       });
       continue;
     }
@@ -203,7 +203,7 @@ export function validatePlan(
         code: "V3",
         level: "warning",
         exerciseId: ex.id,
-        message: `${ex.name}: opening at ${formatKg(underloaded.openKg!)} kg is more than 15% off last top set (${formatKg(lastTop)} kg) — first-set underloading pattern.`,
+        message: `${ex.name}: opening at ${formatKg(underloaded.openKg!)} kg is more than 15% off last top set (${formatKg(lastTop)} kg), a first-set underloading pattern.`,
       });
     }
 
@@ -232,14 +232,14 @@ export function validatePlan(
           code: "V4",
           level: "warning",
           exerciseId: ex.id,
-          message: `${ex.name}: load increase proposed but sleep for ${plan.date} isn't logged — ask before progressing (gate is ${plan.recoveryGate.minSleepH} h).`,
+          message: `${ex.name}: load increase proposed but sleep for ${plan.date} isn't logged. Ask before progressing (gate is ${plan.recoveryGate.minSleepH} h).`,
         });
       } else if (sleepGateFails) {
         push({
           code: "V4",
           level: "warning",
           exerciseId: ex.id,
-          message: `${ex.name}: load increase proposed but sleep is under ${plan.recoveryGate!.minSleepH} h — progression on hold today.`,
+          message: `${ex.name}: load increase proposed but sleep is under ${plan.recoveryGate!.minSleepH} h, so progression is on hold today.`,
         });
       }
 

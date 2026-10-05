@@ -626,7 +626,7 @@ describe("recovery gate", () => {
     const s = summarizeRecovery([]);
     expect(s.gate).toBe("unknown");
     expect(s.progressionOnHold).toBe(false);
-    expect(gateMessage(s)).toMatch(/ask/);
+    expect(gateMessage(s)).toMatch(/ask/i);
   });
   it("is clear or hold when it is logged", () => {
     const d = (sleepMin: number) => [{ date: "d", sleepMin, proteinG: null, waterMl: null }];
@@ -650,7 +650,7 @@ describe("recovery gate", () => {
     ];
     const p = progressionStatus(EX.shoulderPress, history, { sleepUnknown: true });
     expect(p.ready).toBe(false);
-    expect(p.summary).toMatch(/ask before bumping/);
+    expect(p.summary).toMatch(/ask before bumping/i);
   });
 });
 

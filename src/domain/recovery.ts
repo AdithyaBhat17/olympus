@@ -86,7 +86,7 @@ export function holdMessage(summary: RecoverySummary): string | null {
   if (!summary.progressionOnHold) return null;
   const nth =
     summary.shortSleepStreak > 1
-      ? ` — ${ordinal(summary.shortSleepStreak)} short night`
+      ? `, ${ordinal(summary.shortSleepStreak)} short night`
       : "";
   return `Sleep under ${TARGETS.minSleepMin / 60} h${nth}. Hit last session's loads; no bumps.`;
 }
@@ -95,7 +95,7 @@ export function holdMessage(summary: RecoverySummary): string | null {
 export function gateMessage(summary: RecoverySummary): string {
   if (summary.gate === "hold") return holdMessage(summary) ?? "Progression on hold today.";
   if (summary.gate === "unknown") {
-    return "No sleep logged for today — ask how they slept before adding load.";
+    return "No sleep logged for today. Ask how they slept before adding load.";
   }
-  return "Slept enough — progression allowed where earned.";
+  return "Slept enough. Progression allowed where earned.";
 }

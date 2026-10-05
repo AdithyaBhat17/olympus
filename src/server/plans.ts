@@ -108,7 +108,7 @@ async function writeItems(planId: string, items: PlanItemInput[]) {
 
 function summarize(planId: string | null, r: { errors: Issue[]; warnings: Issue[] }, verb: string) {
   if (r.errors.length) {
-    return `Rejected — ${r.errors.length} error(s): ${r.errors.map((e) => `${e.code} ${e.message}`).join(" | ")}`;
+    return `Rejected with ${r.errors.length} error(s): ${r.errors.map((e) => `${e.code} ${e.message}`).join(" | ")}`;
   }
   return `${verb} plan ${planId}${r.warnings.length ? ` with ${r.warnings.length} warning(s): ${r.warnings.map((w) => w.code).join(", ")}` : " with no warnings"}.`;
 }

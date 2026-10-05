@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatCategory } from "@/lib/utils";
 import { EXERCISE_CATEGORIES } from "@/lib/constants";
 
 const STATUS_DOT: Record<Exercise["status"], { cls: string; label: string }> = {
@@ -172,7 +172,7 @@ export default function ExerciseSearch({
                     onClick={() => handleCreateCustom(cat)}
                     className="w-full text-left px-3 min-h-[44px] text-sm text-fg-2 hover:bg-line rounded-lg transition-colors"
                   >
-                    {cat}
+                    {formatCategory(cat)}
                   </button>
                 ))}
               </div>

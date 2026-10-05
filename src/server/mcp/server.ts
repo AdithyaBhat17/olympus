@@ -174,7 +174,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
           result =
             err instanceof DomainError
               ? fail(err.message)
-              : (console.error(`mcp tool ${name} failed`, err), fail("Internal error — nothing was written."));
+              : (console.error(`mcp tool ${name} failed`, err), fail("Internal error. Nothing was written."));
         }
         await recordToolCall({
           userId,
@@ -204,7 +204,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     async () => {
       const ctx = await getAthleteContext(userId);
       return ok(
-        `Next due: Session ${ctx.rotation.nextDue}. ${ctx.workingWeights.length} working weights, ${ctx.constraints.length} constraints, ${ctx.openCoachFlags.length} open flags.${ctx.blockedLifts.length ? ` ${ctx.blockedLifts.length} blocked lift(s) listed separately — never programme them.` : ""} Progression gate: ${ctx.progressionGate} — ${ctx.progressionGateMessage}`,
+        `Next due: Session ${ctx.rotation.nextDue}. ${ctx.workingWeights.length} working weights, ${ctx.constraints.length} constraints, ${ctx.openCoachFlags.length} open flags.${ctx.blockedLifts.length ? ` ${ctx.blockedLifts.length} blocked lift(s) listed separately. Never programme them.` : ""} Progression gate: ${ctx.progressionGate}. ${ctx.progressionGateMessage}`,
         ctx
       );
     }
@@ -254,7 +254,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       const date = a.date ?? todayInTz();
       const r = await getRecovery(userId, date, a.days);
       return ok(
-        `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate} — ${gateMessage(r.summary)}`,
+        `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate}. ${gateMessage(r.summary)}`,
         {
           date,
           today: r.today,
@@ -286,7 +286,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     async (a) => {
       const all = await listExercises(userId);
       const ex = resolveRef(all, a.exerciseId);
-      if (!ex) throw new DomainError(`Unknown exercise "${a.exerciseId}" — try search_exercises.`);
+      if (!ex) throw new DomainError(`Unknown exercise "${a.exerciseId}". Try search_exercises.`);
       const [history, range, recovery] = await Promise.all([
         exerciseHistory(userId, ex.id, a.limit),
         plannedRange(userId, ex.id),
@@ -591,7 +591,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                 "",
                 "1. Call get_athlete_context. Use rotation.nextDue unless I named a type.",
                 `2. Call get_sessions with sessionType=<that type>, limit=2 (and from=${addDays(date, -60)}).`,
-                "3. Call get_recovery. Gate 'hold': no load bumps — repeat last loads. Gate 'unknown': ask how I slept before adding any load.",
+                "3. Call get_recovery. Gate 'hold': no load bumps, repeat last loads. Gate 'unknown': ask how I slept before adding any load.",
                 "4. For each exercise, call get_exercise_history if you need the progression status.",
                 "5. Apply the rules:",
                 "   - Never programme a blocked exercise; use its substitutes. Active constraints:",
@@ -600,7 +600,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                 "   - COUNTERWEIGHT machines: lower number = harder.",
                 "   - PER_SIDE machines: openKg is true kg per side (plates + carriage).",
                 "   - Compounds rest 180 s. Alternate chest with core; triceps go last, never paired with chest press.",
-                "   - Open at last session's top set — don't plan a light first set.",
+                "   - Open at last session's top set. Don't plan a light first set.",
                 "6. Show me the plan as a table (exercise | sets × reps | open kg | RPE | rest | notes) with the coach notes.",
                 "7. WAIT for my approval. Then call push_plan with clientRef `pt-<date>-<type>`, a recoveryGate of { minSleepH: 6, onFail: \"hold_progression\" }, and report any warnings.",
               ].join("\n"),

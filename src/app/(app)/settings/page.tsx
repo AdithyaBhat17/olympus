@@ -38,7 +38,7 @@ function syncedAt(d: Date | null | undefined): string {
 }
 
 const WHOOP_FLASH: Record<string, string> = {
-  connected: "Whoop connected — last 14 nights synced.",
+  connected: "Whoop connected. The last 14 nights are synced.",
   denied: "Whoop access was declined.",
   state_mismatch: "That Whoop sign-in expired. Try again.",
   error: "Whoop sign-in failed. Check the server logs.",

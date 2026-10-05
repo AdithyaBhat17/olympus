@@ -644,7 +644,7 @@ export function sessionExport(
   if (view.progressionOnHold && view.checkIn?.sleepMin != null) {
     catches.push({
       kind: "recovery",
-      text: `Sleep ${formatSleep(view.checkIn.sleepMin)} — progression held.`,
+      text: `Sleep ${formatSleep(view.checkIn.sleepMin)}, so progression is held.`,
     });
   }
   return {
@@ -826,7 +826,7 @@ export async function logSessionFull(userId: string, p: LogSessionPayload) {
       ...(st.avgHr != null ? { avgHr: st.avgHr } : {}),
     }));
     const sets = annotateSets(d, raw, prevs.get(d.id)?.topKg ?? null, { blockedOverride: blocked });
-    if (blocked) flagged.push(`${d.name} is blocked — logged with a blocked_override flag`);
+    if (blocked) flagged.push(`${d.name} is blocked. Logged with a blocked_override flag`);
     return {
       sessionId: s.id,
       exerciseId: d.id,

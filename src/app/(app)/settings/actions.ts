@@ -16,7 +16,7 @@ async function run<T>(fn: () => Promise<T>): Promise<R<T>> {
   } catch (err) {
     // Raw messages can carry WHOOP response bodies or DB errors; log, don't return.
     console.error(err);
-    return { ok: false, error: "Something went wrong — try again." };
+    return { ok: false, error: "Something went wrong. Try again." };
   }
 }
 

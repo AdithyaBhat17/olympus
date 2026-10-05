@@ -113,7 +113,7 @@ export function sessionCatches(
       const t = top!;
       out.push({
         kind: "pr",
-        text: `${ex.name} top set ${formatKg(t.weight)} × ${t.reps}${t.rpe != null ? ` @ ${t.rpe}` : ""} — new working weight.`,
+        text: `${ex.name} top set ${formatKg(t.weight)} × ${t.reps}${t.rpe != null ? ` @ ${t.rpe}` : ""}. New working weight.`,
       });
     }
     sets.forEach((s, i) => {
@@ -125,7 +125,7 @@ export function sessionCatches(
       }
     });
     if (sets.some((s) => s.flags?.includes("blocked_override"))) {
-      out.push({ kind: "blocked", text: `${ex.name} logged despite a block — flagged for your PT.` });
+      out.push({ kind: "blocked", text: `${ex.name} logged despite a block, flagged for your PT.` });
     }
   }
   return out;

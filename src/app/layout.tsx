@@ -4,7 +4,7 @@ import "./globals.css";
 
 // System fonts only (SF Pro / SF Pro Rounded on Apple devices): nothing to download.
 export const metadata: Metadata = {
-  title: "Olympus — LiftLog",
+  title: "Olympus",
   description: "Personal training log, programmed by your PT",
   manifest: "/manifest.json",
   appleWebApp: {

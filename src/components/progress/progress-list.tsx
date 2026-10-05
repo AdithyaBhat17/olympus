@@ -75,7 +75,7 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
       )}
 
       {groups.map((g) => (
-        <section key={g.category} aria-label={g.category} className="mx-4 mt-6">
+        <section key={g.category} aria-label={formatCategory(g.category)} className="mx-4 mt-6">
           <h2 className="section-label mx-1.5 mb-2.5">{formatCategory(g.category)}</h2>
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
             {g.rows.map((r, i) => (

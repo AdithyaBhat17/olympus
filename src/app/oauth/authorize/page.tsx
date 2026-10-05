@@ -102,7 +102,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         <ul className="card flex flex-col gap-3 text-sm leading-snug">
           <li className="flex gap-3"><span className="text-info font-display text-lg font-bold w-4">R</span>Read sessions, working weights, check-ins, constraints and coach flags</li>
           <li className="flex gap-3"><span className="text-accent font-display text-lg font-bold w-4">W</span>Push plans to Today, log sessions, set working weights, add coach flags and check-ins</li>
-          <li className="flex gap-3"><span className="text-danger-soft font-display text-lg font-bold w-4">×</span>Never delete anything — deletes stay in the app</li>
+          <li className="flex gap-3"><span className="text-danger-soft font-display text-lg font-bold w-4">×</span>Never delete anything. Deletes stay in the app</li>
         </ul>
         <div className="flex flex-col gap-2">
           <form action={decideAction.bind(null, params, true)}>

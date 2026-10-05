@@ -286,7 +286,7 @@ function CarriageEditor({ ex }: { ex: LibraryExercise }) {
       className="flex flex-col gap-2 pt-1"
     >
       <label htmlFor={inputId} className="text-[13px] text-muted">
-        Carriage per side (kg) — saved per machine, added to the plates you log.
+        Carriage per side (kg). Saved per machine and added to the plates you log.
       </label>
       <div className="flex gap-2">
         <input
@@ -369,7 +369,7 @@ function CreateExercise({ initialName, onDone }: { initialName: string; onDone: 
         <select id={catId} value={category} onChange={(e) => setCategory(e.target.value)} className="select-base">
           {EXERCISE_CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {formatCategory(c)}
             </option>
           ))}
         </select>

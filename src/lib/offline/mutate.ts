@@ -24,7 +24,7 @@ export async function mutate<T>(
   } else if (res.status === "ok") {
     handlers.onOk?.(res.data);
   } else {
-    toast("Saved on this phone — syncs when you're back online", { id: "offline-queued" });
+    toast("Saved on this phone. It syncs when you're back online", { id: "offline-queued" });
   }
   return res;
 }

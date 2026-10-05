@@ -286,7 +286,7 @@ export default function SessionForm({
             value={sessionName}
             onChange={(e) => setSessionName(e.target.value)}
             list="session-names"
-            placeholder="Session name (e.g. Upper A — Push)"
+            placeholder="Session name (e.g. Upper A, Push)"
             aria-label="Session name"
             className="input-base"
           />

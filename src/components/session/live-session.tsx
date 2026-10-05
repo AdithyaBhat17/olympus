@@ -300,11 +300,11 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         toast.error(res.error);
         return;
       }
-      toast.success(overrideReason ? "Swapped — flagged for your PT" : "Exercise swapped");
+      toast.success(overrideReason ? "Swapped and flagged for your PT" : "Exercise swapped");
       router.refresh();
     } catch {
       rollback();
-      toast.error("Swapping needs a connection — try again in a moment.");
+      toast.error("Swapping needs a connection. Try again in a moment.");
     }
   };
 

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { formatLoad } from "@/domain/load";
 import type { LoadMode } from "@/domain/types";
 import type { ExerciseSearchHit } from "@/server/exercises";
-import { cn } from "@/lib/utils";
+import { cn, formatCategory } from "@/lib/utils";
 import { Sheet } from "./sheet";
 import { CloseIcon, SearchIcon } from "./icons";
 
@@ -98,7 +98,7 @@ function SwapBody({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search — showing ${replacing.category}`}
+            placeholder={`Search, showing ${formatCategory(replacing.category)}`}
             autoComplete="off"
             className="grow min-w-0 border-none bg-transparent text-fg text-base outline-none placeholder:text-faint"
           />
@@ -128,7 +128,7 @@ function SwapBody({
         </h2>
         {safe.length === 0 && (
           <p className="text-sm text-muted py-2">
-            {words.length ? "Nothing safe matches that search." : "No safe alternatives in this category — try searching."}
+            {words.length ? "Nothing safe matches that search." : "No safe alternatives in this category. Try searching."}
           </p>
         )}
         {safe.map((c) => {
@@ -136,7 +136,7 @@ function SwapBody({
           const sub = already
             ? "Already in today's session"
             : c.lastKg != null
-              ? `${c.category}, last ${formatLoad(c.loadMode as LoadMode, c.lastKg)}${c.loadMode === "TOTAL" ? " kg" : ""}`
+              ? `${formatCategory(c.category)}, last ${formatLoad(c.loadMode as LoadMode, c.lastKg)}${c.loadMode === "TOTAL" ? " kg" : ""}`
               : "No log yet, calibration weight";
           return (
             <button
@@ -237,7 +237,7 @@ function SwapBody({
               overrideMode ? "border-danger-line text-danger-text" : "border-line-strong text-muted"
             )}
           >
-            {overrideMode ? "Pick the blocked exercise above — or tap to cancel" : "Log it anyway — I'll take the flag"}
+            {overrideMode ? "Pick the blocked exercise above, or tap to cancel" : "Log it anyway, I'll take the flag"}
           </button>
         </section>
       )}

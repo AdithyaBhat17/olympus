@@ -69,7 +69,7 @@ export function progressionStatus(
       increment,
       ready: false,
       label: `0 of ${SESSIONS_TO_PROGRESS}`,
-      summary: `No ${ex.name} history yet — log a calibration session.`,
+      summary: `No ${ex.name} history yet. Log a calibration session.`,
     };
   }
 
@@ -93,9 +93,9 @@ export function progressionStatus(
 
   let summary: string;
   if (opts.sleepUnknown && !opts.sleepGateFails && hits >= SESSIONS_TO_PROGRESS) {
-    summary = `Earned ${formatKg(nextKg)} kg, but today's sleep isn't logged — ask before bumping.`;
+    summary = `Earned ${formatKg(nextKg)} kg, but today's sleep isn't logged. Ask before bumping.`;
   } else if (opts.sleepGateFails && hits >= SESSIONS_TO_PROGRESS) {
-    summary = `Ready for ${formatKg(nextKg)} kg but held — sleep under the gate today.`;
+    summary = `Ready for ${formatKg(nextKg)} kg but held. Sleep is under the gate today.`;
   } else if (ready) {
     summary = `Top of range at RPE ${targetRpe} in ${hits} of ${SESSIONS_TO_PROGRESS} sessions. Goes to ${formatKg(nextKg)} kg.`;
   } else {

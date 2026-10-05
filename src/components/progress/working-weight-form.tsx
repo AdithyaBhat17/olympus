@@ -37,7 +37,7 @@ export default function WorkingWeightForm({
       return;
     }
     if (!reason.trim()) {
-      setError(force ? "Forcing a jump needs a reason." : "Add a short reason — it goes in the audit log.");
+      setError(force ? "Forcing a jump needs a reason." : "Add a short reason. It goes in the audit log.");
       return;
     }
     setError(null);

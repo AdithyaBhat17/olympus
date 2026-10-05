@@ -90,7 +90,7 @@ export function HealthTokenControls({ hasToken, endpoint }: { hasToken: boolean;
       <CopyField label="Endpoint (POST)" value={endpoint} />
       {token && (
         <div className="flex flex-col gap-2 p-3 rounded-[16px] bg-accent-bg ring-1 ring-inset ring-accent-line">
-          <CopyField label="Token — shown once. Paste it into the Shortcut's Authorization header as: Bearer <token>" value={token} />
+          <CopyField label="Token, shown once. Paste it into the Shortcut's Authorization header as: Bearer <token>" value={token} />
         </div>
       )}
       <div className="flex gap-2">
