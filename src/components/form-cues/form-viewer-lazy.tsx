@@ -18,7 +18,7 @@ const FormViewerLazy = dynamic(() => import("./form-viewer"), {
           <span className="h-7 w-52 rounded-lg bg-surface-2" />
         </span>
       </div>
-      <div className="mt-3.5 rounded-[28px] bg-surface shadow-[inset_0_0_0_1px_#232327] aspect-[366/392]" />
+      <div className="mt-3.5 rounded-[28px] bg-surface aspect-[366/392]" />
     </div>
   ),
 });

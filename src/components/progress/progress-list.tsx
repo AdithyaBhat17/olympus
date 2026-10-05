@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatDdMm } from "@/lib/dates";
-import { cn } from "@/lib/utils";
+import { cn, formatCategory } from "@/lib/utils";
 
 export interface ProgressRow {
   id: string;
@@ -54,7 +54,7 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
   return (
     <div className="flex flex-col">
       <div className="px-4 pt-4 pb-1">
-        <label className="flex items-center gap-2.5 h-12 px-3.5 rounded-full bg-surface transition-shadow focus-within:ring-[2.5px] focus-within:ring-inset focus-within:ring-accent">
+        <label className="search-field">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-muted shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-3.5-3.5" />
@@ -76,7 +76,7 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
 
       {groups.map((g) => (
         <section key={g.category} aria-label={g.category} className="mx-4 mt-6">
-          <h2 className="section-label mx-1.5 mb-2.5">{g.category.replace(/ — /g, ", ")}</h2>
+          <h2 className="section-label mx-1.5 mb-2.5">{formatCategory(g.category)}</h2>
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
             {g.rows.map((r, i) => (
               <li key={r.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
@@ -112,7 +112,7 @@ function TrendMark({ trend, label }: { trend: ProgressRow["trend"]; label: strin
       title={label}
       className={cn(
         "w-7 h-7 rounded-full inline-flex items-center justify-center num text-[15px] shrink-0",
-        trend === "up" ? "bg-apricot text-apricot-ink" : trend === "down" ? "bg-bg text-danger-text" : "text-faint"
+        trend === "up" ? "tag-apricot" : trend === "down" ? "bg-bg text-danger-text" : "text-faint"
       )}
     >
       <span aria-hidden="true">{trend === "up" ? "↑" : trend === "down" ? "↓" : "–"}</span>

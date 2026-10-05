@@ -106,7 +106,7 @@ export function FlagsList({ flags }: { flags: FlagItem[] }) {
                   <span aria-hidden className="num text-[22px] text-accent w-[26px] shrink-0">
                     {st ? "" : String(n).padStart(2, "0")}
                   </span>
-                  <span className="flex-1 text-sm leading-[1.4] text-[#3F302C] py-2">{f.text}</span>
+                  <span className="flex-1 text-sm leading-[1.4] text-fg-2 py-2">{f.text}</span>
                   <button
                     type="button"
                     disabled={!!st}

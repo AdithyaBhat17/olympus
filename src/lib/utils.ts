@@ -25,7 +25,12 @@ export function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-/** Colour block for a session type: A coral, B berry, C apricot, anything else ink. */
+/** "Lower Body — Quad Dominant" as display copy: "Lower Body, Quad Dominant". */
+export function formatCategory(category: string): string {
+  return category.replace(/ — /g, ", ");
+}
+
+/** Colour block for a session type: A coral, B berry, C apricot, anything else (cardio, other) ink. */
 export function kindClass(sessionType: string | null | undefined): string {
   switch (sessionType) {
     case "A":

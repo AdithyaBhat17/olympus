@@ -35,7 +35,7 @@ function SignIn() {
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl: safeCallback(params.get("callbackUrl")) })}
-      className="w-full h-[60px] rounded-full bg-white text-fg font-extrabold text-[19px] flex items-center justify-center gap-3 shadow-[0_12px_28px_rgba(0,0,0,.2)]"
+      className="btn-on-k w-full text-fg"
     >
       <GoogleIcon />
       {isConnect ? "Sign in to connect Claude" : "Continue with Google"}
@@ -45,7 +45,7 @@ function SignIn() {
 
 export default function LoginPage() {
   return (
-    <main className="kind-a relative overflow-hidden min-h-dvh flex flex-col justify-between bg-k text-k-on px-6 pt-[max(96px,calc(env(safe-area-inset-top)+64px))] pb-[max(34px,calc(env(safe-area-inset-bottom)+16px))]">
+    <main className="kind-accent relative overflow-hidden min-h-dvh flex flex-col justify-between bg-k text-k-on px-6 pt-[max(96px,calc(env(safe-area-inset-top)+64px))] pb-[max(34px,calc(env(safe-area-inset-bottom)+16px))]">
       <PlateStack className="-right-24 top-14" size={300} />
       <div className="relative flex flex-col gap-5">
         <h1 className="m-0 text-[clamp(64px,22vw,96px)] font-extrabold leading-[0.92] tracking-[-1.5px]">
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <SignIn />
         </Suspense>
         <div className="flex items-center gap-3 px-4 py-3.5 rounded-3xl bg-white/15">
-          <span className="w-9 h-9 shrink-0 rounded-full bg-white/20 flex items-center justify-center">
+          <span className="on-k w-9 h-9 shrink-0 rounded-full flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 15V3M7 8l5-5 5 5" />
               <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />

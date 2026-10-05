@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, kindClass } from "@/lib/utils";
 
 /** A/B/C rotation, X = cardio, O = other / manual. */
 export type SessionKind = "A" | "B" | "C" | "X" | "O";
@@ -26,14 +26,8 @@ export interface HistoryDay {
   future: boolean;
 }
 
-/** Session colours, matching the Today card and the lifting screen. */
-const CELL: Record<SessionKind, string> = {
-  A: "bg-[#C63D22] text-white",
-  B: "bg-[#8E3B5E] text-white",
-  C: "bg-[#F2A65A] text-[#3D1F05]",
-  X: "bg-fg text-bg",
-  O: "bg-fg text-bg",
-};
+/** Session colour block for a kind: same palette as Today and the lifting screen. */
+const cell = (kind: SessionKind) => cn(kindClass(kind), "bg-k text-k-on");
 
 const FILTERS: Array<{ id: SessionKind | null; label: string }> = [
   { id: null, label: "All" },
@@ -44,22 +38,15 @@ const FILTERS: Array<{ id: SessionKind | null; label: string }> = [
 ];
 
 function KindTile({ kind }: { kind: SessionKind }) {
-  const base = "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0";
-  if (kind === "X" || kind === "O") {
-    return (
-      <span className={cn(base, CELL[kind])} aria-hidden>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+  return (
+    <span aria-hidden className={cn(cell(kind), "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 num text-[20px]")}>
+      {kind === "X" || kind === "O" ? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {kind === "X" ? <path d="M3 12h4l3-8 4 16 3-8h4" /> : <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />}
         </svg>
-      </span>
-    );
-  }
-  return (
-    <span
-      aria-hidden
-      className={cn(base, "num text-[20px]", CELL[kind])}
-    >
-      {kind}
+      ) : (
+        kind
+      )}
     </span>
   );
 }
@@ -112,12 +99,12 @@ export default function HistoryList({
           <span className="flex gap-2.5 text-[13px] font-semibold text-muted">
             {(["A", "B", "C"] as const).map((k) => (
               <span key={k} className="flex items-center gap-[5px]">
-                <span className={cn("w-2.5 h-2.5 rounded-full", CELL[k])} />
+                <span className={cn("w-2.5 h-2.5 rounded-full", cell(k))} />
                 {k}
               </span>
             ))}
             <span className="flex items-center gap-[5px]">
-              <span className="w-2.5 h-2.5 rounded-full bg-fg" />
+              <span className={cn("w-2.5 h-2.5 rounded-full", cell("X"))} />
               Cardio
             </span>
           </span>
@@ -137,7 +124,7 @@ export default function HistoryList({
                 aria-label={`${d.date}${d.kind ? `: ${d.kind === "X" ? "cardio" : d.kind === "O" ? "session" : `Session ${d.kind}`}` : ""}${d.today ? ", today" : ""}`}
                 className={cn(
                   "aspect-square rounded-full flex items-center justify-center num text-[15px] animate-pop-in transition-colors duration-200",
-                  on ? cn(CELL[d.kind!], "font-extrabold") : "text-muted font-semibold",
+                  on ? cn(cell(d.kind!), "font-extrabold") : "text-muted font-semibold",
                   d.future && "opacity-40",
                   d.today && !on && "text-accent ring-[3px] ring-inset ring-accent"
                 )}
@@ -209,10 +196,7 @@ export default function HistoryList({
                     </span>
                   ) : s.kind !== "X" ? (
                     <span
-                      className={cn(
-                        "h-7 px-2.5 rounded-full inline-flex items-center text-[13px] font-extrabold",
-                        s.sent ? "bg-bg text-muted" : "bg-apricot text-apricot-ink"
-                      )}
+                      className={cn("tag font-extrabold", s.sent ? "bg-bg text-muted" : "tag-apricot")}
                     >
                       {s.sent ? "Sent" : "Not sent"}
                     </span>
@@ -222,12 +206,12 @@ export default function HistoryList({
                     height="16"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#9C8A84"
+                    stroke="currentColor"
                     strokeWidth="2.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden="true"
-                    className="transition-transform duration-200 group-hover:translate-x-[3px] group-active:translate-x-[3px]"
+                    className="text-faint transition-transform duration-200 group-hover:translate-x-[3px] group-active:translate-x-[3px]"
                   >
                     <path d="M9 6l6 6-6 6" />
                   </svg>

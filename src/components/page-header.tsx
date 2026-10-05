@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Large-title page header: Geist Mono eyebrow, then the title in Archivo 44px.
+ * Large-title page header: muted eyebrow line, then the large title.
  * `action` sits bottom-right (avatar, + button…).
  */
 export function PageHeader({

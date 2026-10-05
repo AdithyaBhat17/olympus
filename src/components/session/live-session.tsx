@@ -347,7 +347,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     <div className={cn(kindClass(view.sessionType), "min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+40px)]")}>
       <div className="bg-k text-k-on">
       <header className="page-top px-4 grid grid-cols-[44px_1fr_auto] items-center gap-2">
-        <Link href="/today" prefetch aria-label="Back to Today" className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+        <Link href="/today" prefetch aria-label="Back to Today" className="btn-round on-k">
           <ChevronDownIcon size={20} strokeWidth={2.4} />
         </Link>
         <div className="flex flex-col items-center gap-0.5 min-w-0">
@@ -359,7 +359,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
             </span>
           </span>
         </div>
-        <Link href={`/session/${view.id}/finish`} prefetch className="h-11 px-[18px] rounded-full bg-white/20 flex items-center text-[17px] font-bold">
+        <Link href={`/session/${view.id}/finish`} prefetch className="btn-pill on-k">
           Finish
         </Link>
       </header>
@@ -431,7 +431,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
               : "This plan has no items. Discard it and start from Today."}
           </p>
           {items.length > 0 && (
-            <Link href={`/session/${view.id}/finish`} prefetch className="mt-2 h-[60px] px-8 rounded-full bg-white text-k-text font-extrabold text-[19px] flex items-center">
+            <Link href={`/session/${view.id}/finish`} prefetch className="btn-on-k mt-2">
               Finish workout
             </Link>
           )}

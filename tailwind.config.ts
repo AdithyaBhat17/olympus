@@ -1,5 +1,4 @@
 import type { Config } from "tailwindcss";
-import plugin from "tailwindcss/plugin";
 
 /**
  * Olympus "Coral" tokens — light, colour-blocked, Apple-native type.
@@ -10,6 +9,9 @@ import plugin from "tailwindcss/plugin";
  *   info (berry)   = "from your PT" or "progress / up".
  *   k-*            = the current session type's colour block (.kind-a/b/c/cardio).
  */
+// Colours live as "r g b" channels in globals.css so opacity modifiers keep working.
+const c = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -19,82 +21,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#FBF6F4",
-        "bg-deep": "#F6EEEA",
-        "bg-nav": "rgba(30,20,18,.72)",
-        surface: "#F3E8E4",
-        "surface-2": "#EEE2DD",
-        "surface-3": "#E9D9D3",
-        "surface-sunk": "#F0E6E2",
-        sheet: "#FBF6F4",
-        key: "#E9D9D3",
-        "key-down": "#DCC8C0",
-        line: "#E9D9D3",
-        "line-soft": "#EEE2DD",
-        "line-strong": "#DCC8C0",
-        fg: "#1E1412",
-        "fg-2": "#3F302C",
-        muted: "#74625D",
-        faint: "#9C8A84",
-        sleep: "#5B4BC4",
-        apricot: { DEFAULT: "#F2A65A", ink: "#3D1F05" },
-        berry: "#8E3B5E",
-        // Session-type colour block, set by .kind-* on an ancestor (see globals.css).
-        k: {
-          DEFAULT: "rgb(var(--k) / <alpha-value>)",
-          on: "rgb(var(--k-on) / <alpha-value>)",
-          text: "rgb(var(--k-text) / <alpha-value>)",
-          1: "rgb(var(--k1) / <alpha-value>)",
-          2: "rgb(var(--k2) / <alpha-value>)",
-          3: "rgb(var(--k3) / <alpha-value>)",
-        },
-        cardio: "#DCC8C0",
+        // Every colour comes from the palette in globals.css (:root), as "r g b" channels.
+        bg: c("bg"),
+        surface: c("surface"),
+        "surface-2": c("surface-2"),
+        "surface-3": c("surface-3"),
+        "surface-sunk": c("surface-2"),
+        sheet: c("bg"),
+        key: c("surface-3"),
+        "key-down": c("line-strong"),
+        line: c("surface-3"),
+        "line-soft": c("surface-2"),
+        "line-strong": c("line-strong"),
+        fg: c("fg"),
+        "fg-2": c("fg-2"),
+        muted: c("muted"),
+        faint: c("faint"),
+        apricot: { DEFAULT: c("apricot"), ink: c("apricot-ink") },
+        // Session-type colour block, set by .kind-* on an ancestor.
+        k: { DEFAULT: c("k"), on: c("k-on"), text: c("k-text"), 1: c("k1"), 2: c("k2"), 3: c("k3") },
         accent: {
-          DEFAULT: "#C63D22",
-          hover: "#B0341C",
-          ink: "#FFFFFF",
-          bg: "rgba(198,61,34,.12)",
-          line: "rgba(198,61,34,.35)",
-          soft: "#8F2914",
-          ring: "rgba(198,61,34,.35)",
+          DEFAULT: c("coral"),
+          ink: c("white"),
+          bg: "rgb(var(--coral) / .12)",
+          line: "rgb(var(--coral) / .35)",
+          soft: c("coral-deep"),
         },
-        info: {
-          DEFAULT: "#8E3B5E",
-          ink: "#FBF6F4",
-          bg: "rgba(142,59,94,.1)",
-          line: "rgba(142,59,94,.35)",
-          text: "#6E2A47",
-        },
+        // "From your PT" / progress: berry.
+        info: { DEFAULT: c("berry"), bg: "rgb(var(--berry) / .1)" },
         danger: {
-          DEFAULT: "#B3261E",
-          soft: "#C9473F",
-          text: "#8C1D18",
-          bg: "rgba(179,38,30,.1)",
-          line: "rgba(179,38,30,.35)",
-          dot: "#F4D9D6",
+          DEFAULT: c("danger"),
+          soft: c("danger"),
+          text: c("danger-ink"),
+          bg: "rgb(var(--danger) / .1)",
+          line: "rgb(var(--danger) / .35)",
+          dot: "rgb(var(--danger) / .15)",
         },
       },
       fontFamily: {
         sans: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "system-ui", "sans-serif"],
         display: ["ui-rounded", '"SF Pro Rounded"', "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
-        // No monospace anywhere: "mono" is the same system face with tabular figures.
-        mono: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "system-ui", "sans-serif"],
       },
       fontWeight: {
         cta: "650",
       },
-      borderRadius: {
-        "4xl": "32px",
-        hero: "28px",
-        card: "24px",
-        row: "14px",
-        cta: "18px",
-      },
-      height: {
-        cta: "58px",
-      },
       transitionTimingFunction: {
-        press: "cubic-bezier(.3,.7,.4,1.5)",
         sheet: "cubic-bezier(.32,.72,0,1)",
         arrive: "cubic-bezier(.2,.8,.2,1)",
         spring: "cubic-bezier(.3,.7,.4,1.3)",
@@ -106,27 +77,20 @@ const config: Config = {
         "scale-in": "scale-in 0.2s cubic-bezier(.2,.8,.2,1) both",
         rise: "rise 0.42s cubic-bezier(.2,.8,.2,1) both",
         "live-dot": "pulse-ember 1.6s ease-out infinite",
-        "live-dot-ice": "pulse-ice 1.6s ease-out infinite",
-        sheen: "sheen 3.2s cubic-bezier(.4,0,.2,1) infinite",
-        nudge: "nudge .6s ease-in-out infinite",
         pop: "pop .38s cubic-bezier(.3,.7,.4,1.5)",
         burst: "burst .5s ease-out forwards",
         pill: "pill-up .34s cubic-bezier(.2,.9,.25,1.2) both",
         blink: "blink 1s step-end infinite",
         tick: "tick .16s cubic-bezier(.2,.8,.2,1)",
-        stamp: "stamp .55s cubic-bezier(.3,.7,.4,1.3) .15s both",
-        spark: "spark 1.1s cubic-bezier(.2,.8,.2,1) .2s both",
-        "day-pop": "day-pop .3s cubic-bezier(.3,.7,.4,1.4) both",
         draw: "draw 1.1s cubic-bezier(.4,0,.2,1) both",
         "fade-late": "fade-in .8s .5s both",
         ping: "ping-r 1.6s ease-out 1.1s infinite",
         "word-up": "word-up .7s cubic-bezier(.2,.8,.2,1) both",
-        bar: "bar .9s cubic-bezier(.7,0,.2,1) .25s both",
-        bob: "bob 3.2s ease-in-out infinite",
-        wave: "wave 4s linear infinite",
-        breathe: "breathe 1.8s ease-in-out infinite",
+        // Ambient motion plays a few times, then settles: no idle battery drain.
+        bob: "bob 3.2s ease-in-out 3",
+        wave: "wave 4s linear 3",
         "plate-in": "plate-in .4s cubic-bezier(.3,.7,.4,1.3) both",
-        fall: "fall linear infinite",
+        fall: "fall 4.5s cubic-bezier(.3,.1,.6,1) both",
         "pop-in": "pop-in .45s cubic-bezier(.3,.7,.4,1.4) both",
       },
       keyframes: {
@@ -150,18 +114,6 @@ const config: Config = {
           "0%": { boxShadow: "0 0 0 0 rgba(198,61,34,.6)" },
           "100%": { boxShadow: "0 0 0 7px rgba(198,61,34,0)" },
         },
-        "pulse-ice": {
-          "0%": { boxShadow: "0 0 0 0 rgba(142,59,94,.55)" },
-          "100%": { boxShadow: "0 0 0 7px rgba(142,59,94,0)" },
-        },
-        sheen: {
-          "0%": { transform: "translateX(-120%)" },
-          "60%, 100%": { transform: "translateX(260%)" },
-        },
-        nudge: {
-          "0%, 100%": { transform: "translateX(0)" },
-          "50%": { transform: "translateX(4px)" },
-        },
         pop: {
           "0%": { transform: "scale(.6)" },
           "55%": { transform: "scale(1.18)" },
@@ -183,20 +135,6 @@ const config: Config = {
           "0%": { transform: "translateY(6px)", opacity: ".3" },
           "100%": { transform: "none", opacity: "1" },
         },
-        stamp: {
-          "0%": { transform: "scale(1.6) rotate(-8deg)", opacity: "0" },
-          "60%": { transform: "scale(.94) rotate(0)", opacity: "1" },
-          "100%": { transform: "scale(1)" },
-        },
-        spark: {
-          "0%": { opacity: "0", transform: "translate(0,0) scale(.4)" },
-          "20%": { opacity: "1" },
-          "100%": { opacity: "0", transform: "translate(var(--dx),var(--dy)) scale(1)" },
-        },
-        "day-pop": {
-          from: { opacity: "0", transform: "scale(.5)" },
-          to: { opacity: "1", transform: "none" },
-        },
         draw: {
           from: { strokeDashoffset: "var(--len, 900)" },
           to: { strokeDashoffset: "0" },
@@ -209,26 +147,19 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(40px)" },
           to: { opacity: "1", transform: "none" },
         },
-        bar: {
-          "0%": { transform: "scaleX(0)" },
-          "100%": { transform: "scaleX(1)" },
-        },
         bob: {
           "0%,100%": { transform: "translateY(0) rotate(-8deg)" },
           "50%": { transform: "translateY(-6px) rotate(-6deg)" },
         },
         wave: { to: { transform: "translateX(-50%)" } },
-        breathe: {
-          "0%,100%": { boxShadow: "inset 0 0 0 3px rgb(var(--k)), 0 0 0 0 rgb(var(--k) / .45)" },
-          "50%": { boxShadow: "inset 0 0 0 3px rgb(var(--k)), 0 0 0 7px rgb(var(--k) / 0)" },
-        },
+        // Ends at the plate's own shade (--o), so no wrapper element is needed for it.
         "plate-in": {
           from: { opacity: "0", transform: "translateX(18px)" },
-          to: { opacity: "1", transform: "none" },
+          to: { opacity: "var(--o, 1)", transform: "none" },
         },
         fall: {
           "0%": { transform: "translate(0,-60px) rotate(0)" },
-          "100%": { transform: "translate(var(--dx),110vh) rotate(540deg)" },
+          "100%": { transform: "translate(var(--dx),900px) rotate(540deg)" },
         },
         "pop-in": {
           "0%": { opacity: "0", transform: "scale(.4)" },
@@ -238,15 +169,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [
-    plugin(({ addUtilities }) => {
-      addUtilities({
-        ".stretch-62": { "font-stretch": "62%" },
-        ".stretch-72": { "font-stretch": "72%" },
-        ".stretch-80": { "font-stretch": "80%" },
-        ".stretch-100": { "font-stretch": "100%" },
-      });
-    }),
-  ],
+  plugins: [],
 };
 export default config;

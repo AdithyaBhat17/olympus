@@ -22,7 +22,7 @@ export default function SessionLoading() {
         <span className="mt-5 block h-8 w-56 rounded-2xl bg-white/25 animate-pulse" />
         <span className="mt-3 block h-20 w-40 rounded-3xl bg-white/25 animate-pulse" />
       </div>
-      <div className="-mt-9 flex-1 rounded-t-[40px] bg-bg px-4 pt-6 flex flex-col gap-2">
+      <div className="sheet-over flex-1 px-4 pt-6 flex flex-col gap-2">
         {[0, 1, 2, 3].map((i) => (
           <span key={i} className="h-14 rounded-[26px] bg-surface animate-pulse" />
         ))}

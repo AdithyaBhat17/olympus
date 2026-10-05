@@ -58,7 +58,7 @@ function LiveCta({ href, startedAt, opening }: { href: string; startedAt: number
     <Link
       href={href}
       prefetch
-      className="relative w-full h-[60px] rounded-full bg-white text-k-text font-extrabold text-[19px] flex items-center justify-center gap-2.5 shadow-[0_8px_20px_rgba(0,0,0,.18)]"
+      className="btn-on-k w-full"
     >
       <span className="w-2.5 h-2.5 rounded-full bg-k animate-live-dot" />
       {opening ? "Opening your session" : `Back to it${elapsed ? `, ${elapsed} in` : ""}`}
@@ -104,7 +104,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
       <div className="relative flex justify-between items-center gap-3">
         {onPlan ? (
           data.fromPtAt ? (
-            <span className="inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full bg-white/20 text-[13px] font-bold">
+            <span className="on-k inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full text-[13px] font-bold">
               <span className="w-2 h-2 rounded-full bg-white animate-live-dot" />
               From your PT, {data.fromPtAt}
               {data.dayLabel && <span className="opacity-70">, {data.dayLabel}</span>}
@@ -116,7 +116,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
           <button
             type="button"
             onClick={() => setPick(data.plannedType)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-white/20 text-[13px] font-bold"
+            className="on-k inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[13px] font-bold"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 14L4 9l5-5" />
@@ -146,7 +146,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
                   onClick={() => setPick(type)}
                   className={cn(
                     "relative w-11 h-11 rounded-full num text-[18px] flex items-center justify-center disabled:opacity-40 transition-colors",
-                    on ? "bg-white text-k-text" : "bg-white/20",
+                    on ? "bg-white text-k-text" : "on-k",
                     !on && isLast && "opacity-70",
                     !on && isPlan && "ring-2 ring-inset ring-white/70"
                   )}
@@ -225,7 +225,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
                 </span>
               )}
               {it.up ? (
-                <span className="text-[13px] font-extrabold bg-apricot text-apricot-ink px-2 h-6 inline-flex items-center rounded-full">{it.up}</span>
+                <span className="tag tag-apricot">{it.up}</span>
               ) : (
                 <span className="w-[38px]" aria-hidden />
               )}
@@ -250,7 +250,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
         <button
           type="button"
           onClick={start}
-          className="relative w-fit h-[60px] px-8 rounded-full bg-white text-k-text font-extrabold text-[19px] flex items-center gap-2.5 shadow-[0_8px_20px_rgba(0,0,0,.18)]"
+          className="btn-on-k w-fit"
         >
           <PlayIcon />
           Let&apos;s go
@@ -258,7 +258,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
       )}
 
       {!data.live && !sel.lastDone && !(onPlan && data.planId) && (
-        <Link href="/log" className="relative h-11 w-fit px-4 rounded-full bg-white/20 text-[15px] font-bold flex items-center -mt-2">
+        <Link href="/log" className="btn-pill on-k relative w-fit -mt-2">
           Log a past session manually
         </Link>
       )}

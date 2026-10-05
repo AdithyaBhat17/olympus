@@ -9,6 +9,7 @@ import {
   holdMessage,
   matchesPattern,
   nextSessionType,
+  plateBreakdown,
   platesFor,
   progressionStatus,
   renderSessionMarkdown,
@@ -178,6 +179,22 @@ describe("true load", () => {
   });
   it("leaves total-load exercises alone", () => {
     expect(trueKg(EX.deadlift, 85)).toBe(85);
+  });
+});
+
+describe("plate breakdown", () => {
+  it("splits a barbell load per side after the 20 kg bar", () => {
+    expect(plateBreakdown(EX.deadlift, 110)).toEqual({ plates: [25, 20], leftover: 0 });
+    expect(plateBreakdown(EX.deadlift, 82.5)).toEqual({ plates: [25, 5, 1.25], leftover: 0 });
+  });
+  it("reports what standard plates can't make", () => {
+    expect(plateBreakdown(EX.deadlift, 111)).toEqual({ plates: [25, 20], leftover: 1 });
+  });
+  it("loads per-side machines net of the carriage", () => {
+    expect(plateBreakdown(EX.isoIncline, 21.1)).toEqual({ plates: [15, 2.5], leftover: 0 });
+  });
+  it("skips lifts that aren't plate-loaded", () => {
+    expect(plateBreakdown({ ...EX.deadlift, name: "Lat Pulldown", equipment: "cable" }, 50)).toBeNull();
   });
 });
 

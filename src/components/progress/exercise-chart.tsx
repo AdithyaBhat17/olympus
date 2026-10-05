@@ -107,7 +107,7 @@ export default function ExerciseChart({
   return (
     <section
       aria-label="Top set over time"
-      className="arrive arrive-1 kind-a mx-4 mt-4 pt-5 px-4 pb-4 rounded-[36px] bg-k text-k-on"
+      className="arrive arrive-1 kind-accent mx-4 mt-4 pt-5 px-4 pb-4 rounded-[36px] bg-k text-k-on"
     >
       <figure id={`${baseId}-panel`} className="m-0">
         <svg key={range} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label={summary}>
@@ -152,12 +152,12 @@ export default function ExerciseChart({
                 cy={last[1]}
                 r={5}
                 fill="none"
-                stroke="#F2A65A"
+                stroke="rgb(var(--apricot))"
                 strokeWidth={2}
                 className="animate-ping"
                 style={{ transformBox: "fill-box", transformOrigin: "center" }}
               />
-              <circle cx={last[0]} cy={last[1]} r={7} fill="#F2A65A" stroke="currentColor" strokeWidth={3} className="animate-pop-in [animation-delay:1s]" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
+              <circle cx={last[0]} cy={last[1]} r={7} fill="rgb(var(--apricot))" stroke="currentColor" strokeWidth={3} className="animate-pop-in [animation-delay:1s]" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
             </>
           )}
           {first && end && first !== end && (
@@ -194,7 +194,7 @@ export default function ExerciseChart({
           </table>
         </figcaption>
       </figure>
-      <div role="radiogroup" aria-label="Range" className="flex gap-2 mt-3">
+      <div role="radiogroup" aria-label="Range" className="seg mt-3">
         {RANGES.map((r) => (
           <button
             key={r.key}
@@ -203,10 +203,7 @@ export default function ExerciseChart({
             aria-checked={range === r.key}
             aria-controls={`${baseId}-panel`}
             onClick={() => setRange(r.key)}
-            className={cn(
-              "flex-1 h-11 rounded-full text-[15px] font-extrabold transition-colors",
-              range === r.key ? "bg-white text-k-text" : "bg-white/20"
-            )}
+            className={cn("seg-btn transition-colors", range === r.key ? "bg-white text-k-text" : "on-k")}
           >
             {r.label}
           </button>

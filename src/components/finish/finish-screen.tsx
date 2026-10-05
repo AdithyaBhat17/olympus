@@ -52,10 +52,10 @@ const CATCH: Record<SessionCatch["kind"], { mark: React.ReactNode; tile: string;
         <path d="M12 19V5M6 11l6-6 6 6" />
       </svg>
     ),
-    tile: "bg-[rgba(142,59,94,.12)] text-info",
+    tile: "bg-info-bg text-info",
     label: "Progress",
   },
-  underload: { mark: "!", tile: "bg-[rgba(198,61,34,.14)] text-accent num text-[17px] font-black", label: "Underloaded" },
+  underload: { mark: "!", tile: "bg-accent-bg text-accent num text-[17px] font-black", label: "Underloaded" },
   blocked: { mark: "×", tile: "bg-danger-bg text-danger num text-[18px]", label: "Blocked" },
   recovery: { mark: "×", tile: "bg-danger-bg text-danger num text-[18px]", label: "Recovery" },
 };
@@ -198,17 +198,19 @@ export default function FinishScreen({
   }
 
   const time = elapsed != null ? formatDuration(elapsed) : null;
-  const prs = catches.filter((c) => c.kind === "pr").length;
+  const hasPr = catches.some((c) => c.kind === "pr");
+  // Already sent and not live: the screen is a receipt, not a celebration.
+  const done = sent && !live;
 
   return (
     <div className={cn(kindClass(sessionType), "flex flex-col pb-[calc(env(safe-area-inset-bottom)+180px)]")}>
       <div className="relative overflow-hidden bg-k text-k-on pb-12">
-        {!sent && <Confetti />}
+        {!done && <Confetti />}
         <header className="relative page-top px-4 flex justify-between items-center">
           <Link
             href={live ? `/session/${sessionId}` : "/history"}
             aria-label={live ? "Back to session" : "Back to log"}
-            className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center"
+            className="btn-round on-k"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M15 6l-6 6 6 6" />
@@ -220,7 +222,7 @@ export default function FinishScreen({
 
         <div className="relative px-6 pt-6 flex flex-col gap-1.5">
           <h1 className="m-0 text-[56px] font-extrabold leading-[58px] tracking-[-1px] animate-pop-in">
-            {live || !sent ? (prs > 0 ? "New PR!" : "Crushed it.") : "Sent."}
+            {done ? "Sent." : hasPr ? "New PR!" : "Crushed it."}
           </h1>
           <p className="arrive arrive-1 m-0 text-[17px] opacity-90">
             {label}. {summaryLine(catches)}
@@ -248,7 +250,7 @@ export default function FinishScreen({
         </section>
       </div>
 
-      <div className="-mt-8 relative rounded-t-[40px] bg-bg pt-2">
+      <div className="sheet-over pt-2">
       <section aria-labelledby="c-h" className="arrive arrive-3 mx-3 mt-[22px]">
         <h2 id="c-h" className="section-label mx-2 mb-2.5">
           What your PT will see
@@ -329,19 +331,14 @@ export default function FinishScreen({
 
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] bg-[linear-gradient(180deg,rgba(251,246,244,0),#FBF6F4_30%)]">
+      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] bg-gradient-to-b from-bg/0 via-bg to-bg">
         <div className="max-w-lg mx-auto flex flex-col gap-2">
-          {sent && !live ? (
+          {done ? (
             <Link href="/today" className="btn-chalk">
               Back to Today
             </Link>
           ) : (
-            <button
-              type="button"
-              onClick={() => void complete("sendToPT")}
-              disabled={leaving}
-              className="relative w-full h-[60px] rounded-full bg-k text-k-on font-extrabold text-[19px] flex items-center justify-center gap-2.5 disabled:opacity-50"
-            >
+            <button type="button" onClick={() => void complete("sendToPT")} disabled={leaving} className="btn-k">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
               </svg>

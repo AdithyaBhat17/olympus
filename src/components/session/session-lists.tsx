@@ -34,7 +34,7 @@ export function CompletedList({
               aria-label={`${it.exercise.name}, done: ${text}${pr ? ", top set PR" : ""}. Open`}
               className={row}
             >
-              <span className="w-6 h-6 rounded-full bg-[rgba(198,61,34,.14)] text-accent flex items-center justify-center shrink-0">
+              <span className="w-6 h-6 rounded-full bg-accent-bg text-accent flex items-center justify-center shrink-0">
                 <CheckIcon size={13} />
               </span>
               <span className="flex-1 text-muted truncate">{it.exercise.name}</span>

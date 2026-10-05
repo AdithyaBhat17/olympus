@@ -22,7 +22,7 @@ export default function FormViewer({
 }: {
   cue: FormCueId;
   title: string;
-  /** "FORM, 3D, 100 KG, STRAPS" */
+  /** "3D form, 100 kg, straps" */
   eyebrow: string;
 }) {
   const { make, copy } = FORM_DEFS[cue];
@@ -94,14 +94,14 @@ export default function FormViewer({
           </svg>
         </BackLink>
         <div className="flex flex-col gap-[3px] min-w-0">
-          <span className="text-[11px] text-accent truncate">{eyebrow}</span>
+          <span className="eyebrow truncate">{eyebrow}</span>
           <h1 className="m-0 num text-[32px] leading-[0.95] truncate">{title}</h1>
         </div>
       </header>
 
       <div
         ref={stageRef}
-        className="relative mx-3 mt-3.5 rounded-[28px] overflow-hidden shadow-[inset_0_0_0_1px_#232327] bg-[radial-gradient(ellipse_70%_55%_at_50%_38%,rgba(255,106,43,.13),rgba(255,106,43,0)_70%),#141416]"
+        className="relative mx-3 mt-3.5 rounded-[28px] overflow-hidden bg-[radial-gradient(ellipse_70%_55%_at_50%_38%,rgba(198,61,34,.13),rgba(198,61,34,0)_70%),#F3E8E4]"
         style={{ height: size?.H ?? BASE_H }}
       >
         {size && (
@@ -134,7 +134,7 @@ export default function FormViewer({
             />
           </>
         )}
-        <div className="absolute left-3 top-3 flex items-center gap-2 h-[30px] pl-2.5 pr-3 rounded-full bg-[rgba(10,10,11,.66)] text-xs font-semibold pointer-events-none" aria-live="polite">
+        <div className="absolute left-3 top-3 flex items-center gap-2 h-[30px] pl-2.5 pr-3 rounded-full bg-bg/70 text-xs font-semibold pointer-events-none" aria-live="polite">
           <span className="w-[7px] h-[7px] rounded-full bg-accent animate-live-dot" />
           {ui.phaseText || def?.phases[0].n}
         </div>
@@ -143,7 +143,7 @@ export default function FormViewer({
           <span className="num text-[34px] text-info">{ui.read}</span>
         </div>
         {def && (
-          <div role="group" aria-label="Camera angle" className="absolute left-2.5 bottom-2.5 flex gap-0.5 p-[3px] rounded-[14px] bg-[rgba(10,10,11,.66)]">
+          <div role="group" aria-label="Camera angle" className="absolute left-2.5 bottom-2.5 flex gap-0.5 p-[3px] rounded-[14px] bg-bg/70">
             {def.views.map((v, i) => (
               <button
                 key={v.n}
@@ -171,7 +171,7 @@ export default function FormViewer({
         )}
       </div>
 
-      <div className="flex items-center gap-3 mx-3 mt-2.5 py-1.5 pl-1.5 pr-2 rounded-3xl bg-surface shadow-[inset_0_0_0_1px_#232327]">
+      <div className="flex items-center gap-3 mx-3 mt-2.5 py-1.5 pl-1.5 pr-2 rounded-3xl bg-surface">
         <button
           type="button"
           onClick={togglePlay}
@@ -223,7 +223,7 @@ export default function FormViewer({
               aria-current={ui.phase === i ? "step" : undefined}
               className={cn(
                 "flex-1 min-w-0 h-[34px] rounded-xl px-1.5 text-xs font-semibold flex items-center justify-center truncate transition-colors duration-200",
-                ui.phase === i ? "bg-accent text-accent-ink" : "bg-surface text-muted shadow-[inset_0_0_0_1px_#232327]"
+                ui.phase === i ? "bg-accent text-accent-ink" : "bg-surface text-muted"
               )}
             >
               {p.n}
@@ -232,26 +232,26 @@ export default function FormViewer({
         </ol>
       )}
 
-      <section aria-label="Coaching cues" className="mx-3 mt-3 p-4 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327] grid grid-cols-2 gap-3.5">
+      <section aria-label="Coaching cues" className="mx-4 mt-3 p-5 rounded-[28px] bg-surface grid grid-cols-2 gap-3.5">
         <div className="flex flex-col gap-2.5">
-          <span className="text-[11px] text-accent">DO</span>
+          <span className="text-[15px] font-extrabold text-accent">Do</span>
           {copy.do.map((c) => (
-            <span key={c} className="text-[13px] leading-[1.4] text-[#E4E2DC]">
+            <span key={c} className="text-[13px] leading-[1.4] text-fg-2">
               {c}
             </span>
           ))}
         </div>
         <div className="flex flex-col gap-2.5">
-          <span className="text-[11px] text-danger-soft">AVOID</span>
+          <span className="text-[15px] font-extrabold text-danger">Avoid</span>
           {copy.avoid.map((c) => (
-            <span key={c} className="text-[13px] leading-[1.4] text-[#E4E2DC]">
+            <span key={c} className="text-[13px] leading-[1.4] text-fg-2">
               {c}
             </span>
           ))}
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-5 pb-[calc(env(safe-area-inset-bottom)+16px)] bg-[linear-gradient(180deg,rgba(10,10,11,0),#0A0A0B_35%)]">
+      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-5 pb-[calc(env(safe-area-inset-bottom)+16px)] bg-gradient-to-b from-bg/0 via-bg to-bg">
         <div className="max-w-lg mx-auto">
           <BackLink className="btn-primary">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

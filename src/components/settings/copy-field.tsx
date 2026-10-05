@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Value in Geist Mono with a Copy button that morphs to an ice "✓ Copied" for 1.6 s. */
+/** Value in monospace with a Copy button that morphs to an ice "✓ Copied" for 1.6 s. */
 export function CopyField({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | null>(null);
@@ -39,7 +39,7 @@ export function CopyField({ label, value, mono = true }: { label: string; value:
           aria-label={copied ? `${label} copied` : `Copy ${label}`}
           className={cn(
             "h-11 px-3 rounded-[10px] text-[13px] font-semibold flex items-center gap-1.5 shrink-0 transition-colors duration-200",
-            copied ? "bg-[rgba(142,59,94,.14)] text-info" : "bg-surface-3 text-fg"
+            copied ? "bg-info-bg text-info" : "bg-surface-3 text-fg"
           )}
         >
           {copied && (

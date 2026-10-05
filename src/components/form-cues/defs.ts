@@ -367,7 +367,7 @@ export const FORM_DEFS: Record<FormCueId, { make: (E: FormEngine) => FormDef; co
   deadlift: {
     make: deadlift,
     copy: {
-      tag: "STRAPS",
+      tag: "straps",
       aria: "3D animation of a conventional deadlift: brace, push the floor with the bar travelling straight up over mid-foot, lock out, then hinge back down",
       do: ["Big breath, brace hard before every rep", "Bar over mid-foot, brushing the shins", "Push the floor away, hips and shoulders rise together"],
       avoid: ["Hitching the bar up the thighs on the last rep", "Rounding the lower back off the floor"],
@@ -376,7 +376,7 @@ export const FORM_DEFS: Record<FormCueId, { make: (E: FormEngine) => FormDef; co
   "lat-pulldown": {
     make: latPulldown,
     copy: {
-      tag: "WIDE GRIP",
+      tag: "wide grip",
       aria: "3D animation of a seated wide-grip lat pulldown: elbows drive down and back toward the hips, the bar touches the upper chest, a one-second squeeze, then a two-second controlled return",
       do: ["Chest tall, slight lean back — keep it fixed", "Drive elbows to hips, bar to upper chest", "Pause 1 s, then 2 s back up"],
       avoid: ["Swinging the torso to move the weight", "Shrugging — keep the shoulders down"],
@@ -385,7 +385,7 @@ export const FORM_DEFS: Record<FormCueId, { make: (E: FormEngine) => FormDef; co
   squat: {
     make: squat,
     copy: {
-      tag: "DEPTH STOP",
+      tag: "depth stop",
       aria: "3D animation of a guided machine squat: two seconds down until the carriage touches the depth stop, knees tracking over the second and third toe, then one second up",
       do: ["Feet mid-platform, toes out about 15°", "Knees follow the 2nd–3rd toe line", "Touch the stop, drive through the whole foot"],
       avoid: ["Riding past the depth stop", "Knees caving inward on the way up"],
@@ -394,7 +394,7 @@ export const FORM_DEFS: Record<FormCueId, { make: (E: FormEngine) => FormDef; co
   pushdown: {
     make: pushdown,
     copy: {
-      tag: "CABLE",
+      tag: "cable",
       aria: "3D animation of a rope triceps pushdown: the upper arm stays pinned to the side while the forearm extends, the rope splits at the bottom, then a three-second return",
       do: ["Elbows pinned to your ribs", "Split the rope apart at the bottom", "Count 3 s on the way back up"],
       avoid: ["Elbows drifting forward", "Leaning over the stack to push with bodyweight"],

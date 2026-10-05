@@ -16,7 +16,7 @@ export function UnderloadNudge({ nudge, nextSetLabel, currentKg, onAccept, onKee
   return (
     <div
       role="status"
-      className="mt-0.5 mb-1 px-3.5 py-3 rounded-[16px] bg-accent-bg shadow-[inset_0_0_0_1px_rgba(198,61,34,.35)] flex gap-2.5 items-start animate-slide-up"
+      className="mt-0.5 mb-1 px-3.5 py-3 rounded-[16px] bg-accent-bg ring-1 ring-inset ring-accent-line flex gap-2.5 items-start animate-slide-up"
     >
       <ArrowUpIcon className="shrink-0 mt-0.5 text-accent" />
       <div className="flex flex-col gap-2 grow">

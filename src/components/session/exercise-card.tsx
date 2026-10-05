@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { formatKg, isHarder, progressDelta } from "@/domain/load";
+import { formatKg, isHarder, plateBreakdown, progressDelta } from "@/domain/load";
 import type { LiveItemView } from "@/server/sessions";
 import { WarnIcon, InfoIcon } from "./icons";
 import { OptionsMenu, type MenuEntry } from "./options-menu";
 import { openKg, plannedMinutes, targetLabel, targetRpe } from "./format";
-import { Plates, platesFor } from "./plates";
+import { Plates } from "./plates";
 
 interface ExerciseCardProps {
   item: LiveItemView;
@@ -35,7 +35,7 @@ function Tile({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-const btn = "h-12 rounded-full bg-surface text-fg text-[15px] font-bold disabled:opacity-40";
+
 
 export function ExerciseCard({
   item,
@@ -69,7 +69,7 @@ export function ExerciseCard({
 
   const cueLines = [...item.coachFlags, ...item.cues];
 
-  const plates = mode === "TOTAL" || mode === "PER_SIDE" ? platesFor(exercise, open) : null;
+  const plates = open != null ? plateBreakdown(exercise, open) : null;
 
   return (
     <section aria-label="Current exercise" className="flex flex-col">
@@ -97,13 +97,13 @@ export function ExerciseCard({
             </span>
           </span>
           {delta != null && delta > 0 && (
-            <span className="mb-2 h-7 px-2.5 rounded-full bg-apricot text-apricot-ink text-[15px] font-extrabold inline-flex items-center animate-pop-in [animation-delay:300ms]">
+            <span className="mb-2 tag tag-apricot text-[15px] animate-pop-in [animation-delay:300ms]">
               +{formatKg(delta)}
             </span>
           )}
         </div>
 
-        {plates && <Plates plates={plates.plates} leftover={plates.leftover} />}
+        {plates && <Plates {...plates} />}
 
         <div className="grid grid-cols-2 gap-2">
           <Tile label="Target">{target ?? `${item.sets.length} sets`}</Tile>
@@ -155,23 +155,23 @@ export function ExerciseCard({
         )}
       </div>
 
-      <div className="-mt-9 relative rounded-t-[40px] bg-bg px-4 pt-6 flex flex-col gap-4">
+      <div className="sheet-over px-4 pt-6 flex flex-col gap-4">
         {children}
 
         {item.done && next && (
-          <button type="button" onClick={onNext} className="h-[60px] rounded-full bg-k text-k-on font-extrabold text-[19px]">
+          <button type="button" onClick={onNext} className="btn-k">
             Next: {next.name}
           </button>
         )}
 
         <div className="grid grid-cols-3 gap-2">
-          <button type="button" onClick={onAddSet} className={btn}>
+          <button type="button" onClick={onAddSet} className="btn-secondary">
             Add set
           </button>
-          <button type="button" onClick={onSwap ?? undefined} disabled={!onSwap} className={btn}>
+          <button type="button" onClick={onSwap ?? undefined} disabled={!onSwap} className="btn-secondary">
             Swap
           </button>
-          <button type="button" onClick={onNote} className={btn}>
+          <button type="button" onClick={onNote} className="btn-secondary">
             Note
           </button>
         </div>

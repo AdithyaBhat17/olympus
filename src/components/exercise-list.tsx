@@ -4,7 +4,7 @@ import { useId, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatCategory } from "@/lib/utils";
 import { EXERCISE_CATEGORIES } from "@/lib/constants";
 import { createCustomExercise } from "@/lib/actions";
 import { setCarriageAction } from "@/lib/liftlog-actions";
@@ -55,18 +55,18 @@ function groupOf(category: string): Exclude<Filter, "all" | "blocked"> {
 }
 
 /** Small pills: equipment, compound, load-mode rules. */
-function tagsFor(ex: LibraryExercise): Array<{ text: string; ice?: boolean }> {
-  const tags: Array<{ text: string; ice?: boolean }> = [];
+function tagsFor(ex: LibraryExercise): Array<{ text: string; info?: boolean }> {
+  const tags: Array<{ text: string; info?: boolean }> = [];
   if (ex.equipment) {
     const e = ex.equipment.replace(/_/g, " ").toLowerCase();
     tags.push({ text: e.charAt(0).toUpperCase() + e.slice(1) });
   }
   if (ex.isCompound) tags.push({ text: "Compound" });
-  if (ex.loadMode === "COUNTERWEIGHT") tags.push({ text: "Counterweight, lower is harder", ice: true });
+  if (ex.loadMode === "COUNTERWEIGHT") tags.push({ text: "Counterweight, lower is harder", info: true });
   if (ex.loadMode === "PER_SIDE")
     tags.push({
       text: `Per side${ex.carriageKgPerSide != null ? `, +${formatKg(ex.carriageKgPerSide)}` : ""}`,
-      ice: true,
+      info: true,
     });
   if (ex.loadMode === "TIME") tags.push({ text: "Timed" });
   if (ex.status === "SUB") tags.push({ text: "Substitute" });
@@ -106,9 +106,9 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
       <div className="arrive arrive-1 px-3 pt-4">
         <label
           htmlFor={searchId}
-          className="flex items-center gap-2.5 h-12 px-3.5 rounded-full bg-surface transition-shadow duration-200 focus-within:ring-[2.5px] focus-within:ring-inset focus-within:ring-accent"
+          className="search-field"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74625D" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-4-4" />
           </svg>
@@ -161,7 +161,7 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
       {grouped.map(({ category, exercises: exs }, gi) => (
         <section key={category} aria-labelledby={`lib-${gi}`} className="arrive arrive-3 mx-3 mt-5">
           <h2 id={`lib-${gi}`} className="section-label mx-2 mb-2.5">
-            {category.replace(/ — /g, ", ")}
+            {formatCategory(category)}
           </h2>
           <ul className="card-group m-0 p-0 list-none">
             {exs.map((ex) => (
@@ -207,7 +207,7 @@ function ExerciseRow({ ex }: { ex: LibraryExercise }) {
           {tags.length > 0 && (
             <span className="flex flex-wrap gap-1">
               {tags.map((t) => (
-                <span key={t.text} className={cn("tag", t.ice && "tag-ice")}>
+                <span key={t.text} className={cn("tag", t.info && "tag-info")}>
                   {t.text}
                 </span>
               ))}

@@ -15,7 +15,7 @@ import {
   topSet,
   type SetLogEntry,
 } from "@/domain";
-import { cn } from "@/lib/utils";
+import { cn, formatCategory } from "@/lib/utils";
 import { BackIcon } from "@/components/page-header";
 import ExerciseChart, { type ChartPoint } from "@/components/progress/exercise-chart";
 import WorkingWeightForm from "@/components/progress/working-weight-form";
@@ -116,7 +116,7 @@ export default async function ExerciseProgressPage({
     ex.loadMode === "PER_SIDE" ? "kg/side" : ex.loadMode === "COUNTERWEIGHT" ? "kg cw" : ex.loadMode === "TIME" ? "min" : "kg";
   const e1rm = newestTop ? estimatedOneRepMax(ex.loadMode, newestTop.weight, newestTop.reps) : null;
 
-  const eyebrow = [row.category.replace(/ — /g, ", "), sessionLabel(history[0]?.sessionType)]
+  const eyebrow = [formatCategory(row.category), sessionLabel(history[0]?.sessionType)]
     .filter(Boolean)
     .join(", ");
   const formCue = isFormCueId(row.formCueId) ? row.formCueId : null;
@@ -152,7 +152,7 @@ export default async function ExerciseProgressPage({
               className={cn(
                 "w-fit text-[15px] font-extrabold",
                 deltaLine.tone === "up"
-                  ? "h-7 px-2.5 rounded-full inline-flex items-center bg-apricot text-apricot-ink"
+                  ? "tag tag-apricot text-[15px]"
                   : deltaLine.tone === "down"
                     ? "text-danger-text"
                     : "text-muted"
@@ -175,7 +175,7 @@ export default async function ExerciseProgressPage({
       {points.some((p) => p.top != null) ? (
         <ExerciseChart points={points} today={todayInTz()} loadMode={ex.loadMode} />
       ) : (
-        <section className="kind-a mx-4 mt-4 px-6 py-8 rounded-[36px] bg-k text-k-on flex flex-col gap-1">
+        <section className="kind-accent mx-4 mt-4 px-6 py-8 rounded-[36px] bg-k text-k-on flex flex-col gap-1">
           <span className="text-[28px] font-extrabold">Nothing to chart yet</span>
           <span className="text-[17px] opacity-90">Log {row.name} once and the chart starts here.</span>
         </section>
@@ -261,7 +261,7 @@ export default async function ExerciseProgressPage({
                       .join(", ")}
                   </span>
                   {pr ? (
-                    <span className="h-7 px-2.5 rounded-full inline-flex items-center bg-apricot text-apricot-ink text-[13px] font-extrabold">Record</span>
+                    <span className="tag tag-apricot">Record</span>
                   ) : under ? (
                     <span className="num text-[17px] text-accent">
                       !<span className="sr-only"> Underloaded</span>
@@ -277,7 +277,7 @@ export default async function ExerciseProgressPage({
       {formCue && (
         <Link
           href={`/form/${formCue}?ex=${row.id}`}
-          className="press-soft mx-4 mt-3 h-16 px-4 rounded-[26px] bg-berry text-white flex items-center gap-3"
+          className="press-soft mx-4 mt-3 h-16 px-4 rounded-[26px] bg-info text-white flex items-center gap-3"
         >
           <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

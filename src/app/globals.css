@@ -6,7 +6,7 @@
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
-    background: #FBF6F4;
+    background: rgb(var(--bg));
   }
 
   body {
@@ -53,18 +53,14 @@
     transform: none !important;
   }
 
-  /* Rounded system face for display type and numerals. */
-  .font-display {
-    font-variant-numeric: tabular-nums;
-  }
 
   :focus-visible {
-    outline: 2px solid #8E3B5E;
+    outline: 2.5px solid rgb(var(--coral));
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(198,61,34, 0.35);
+    background: rgb(var(--apricot) / 0.4);
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -96,17 +92,17 @@
 @layer components {
   /* Meta line above a title: "Monday 5 October, day 47". Sentence case, never mono. */
   .eyebrow {
-    @apply text-[15px] font-semibold text-muted normal-case tracking-normal;
+    @apply text-[15px] font-semibold text-muted;
   }
 
   /* Section heading: big and friendly, like the Coral canvas. */
   .section-label {
-    @apply text-[22px] leading-7 font-extrabold text-fg normal-case tracking-normal;
+    @apply text-[22px] leading-7 font-extrabold text-fg;
   }
 
   /* Tile label inside cards: "Target", "Open at". */
   .tile-label {
-    @apply text-[13px] font-semibold text-muted normal-case tracking-normal;
+    @apply text-[13px] font-semibold text-muted;
   }
 
   /* Rounded numerals: heavy and tabular. */
@@ -129,13 +125,13 @@
 
   .input-base {
     @apply w-full h-12 bg-surface-2 text-fg rounded-[14px] px-4
-    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#C63D22]
+    focus:outline-none focus:ring-[2.5px] focus:ring-inset focus:ring-accent
     placeholder:text-faint transition-shadow text-[16px];
   }
 
   .select-base {
     @apply w-full h-12 bg-surface-2 text-fg rounded-[14px] px-4
-    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#C63D22]
+    focus:outline-none focus:ring-[2.5px] focus:ring-inset focus:ring-accent
     transition-shadow text-[16px] appearance-none cursor-pointer
     bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%238E8C87%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.646%206.646a.5.5%200%200%201%20.708%200L8%209.293l2.646-2.647a.5.5%200%200%201%20.708.708l-3%203a.5.5%200%200%201-.708%200l-3-3a.5.5%200%200%201%200-.708z%22%2F%3E%3C%2Fsvg%3E')]
     bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
@@ -143,7 +139,7 @@
 
   /* Primary CTA: coral capsule, 60px, heavy 19px. */
   .btn-primary {
-    @apply relative overflow-hidden w-full h-[60px] rounded-full bg-accent text-accent-ink font-extrabold text-[19px] shadow-[0_12px_28px_rgba(198,61,34,.3)]
+    @apply relative overflow-hidden w-full h-[60px] rounded-full bg-accent text-accent-ink font-extrabold text-[19px] shadow-[0_12px_28px_rgb(var(--coral)/.3)]
     flex items-center justify-center gap-2.5
     disabled:opacity-50 disabled:pointer-events-none;
   }
@@ -183,10 +179,51 @@
 
   /* Small pill: "Cable", "Per side, +3.6". */
   .tag {
-    @apply text-[13px] font-bold px-2.5 h-7 inline-flex items-center rounded-full bg-surface-3 text-fg-2 whitespace-nowrap normal-case tracking-normal;
+    @apply text-[13px] font-bold px-2.5 h-7 inline-flex items-center rounded-full bg-surface-3 text-fg-2 whitespace-nowrap;
   }
-  .tag-ice {
+  .tag-info {
     @apply bg-info-bg text-info;
+  }
+  .tag-apricot {
+    @apply bg-apricot text-apricot-ink font-extrabold;
+  }
+
+  /* Controls sitting on a session colour block (.kind-*). */
+  .on-k {
+    @apply bg-white/20 text-current;
+  }
+  /* White capsule CTA on a colour block. */
+  .btn-on-k {
+    @apply relative h-[60px] px-8 rounded-full bg-white text-k-text font-extrabold text-[19px]
+    flex items-center justify-center gap-2.5 shadow-[0_8px_20px_rgba(0,0,0,.18)]
+    disabled:opacity-50;
+  }
+  /* Capsule CTA in the session colour, on light. */
+  .btn-k {
+    @apply relative w-full h-[60px] rounded-full bg-k text-k-on font-extrabold text-[19px]
+    flex items-center justify-center gap-2.5 disabled:opacity-50;
+  }
+  /* Light sheet that overlaps the bottom of a colour block. */
+  .sheet-over {
+    @apply relative -mt-9 rounded-t-[40px] bg-bg;
+  }
+  .search-field {
+    @apply flex items-center gap-2.5 h-12 px-3.5 rounded-full bg-surface transition-shadow
+    focus-within:ring-[2.5px] focus-within:ring-inset focus-within:ring-accent;
+  }
+  /* Active set: a static ring plus a pulse that only animates transform/opacity. */
+  .breathe {
+    @apply relative;
+    box-shadow: inset 0 0 0 3px rgb(var(--k));
+  }
+  .breathe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 3px rgb(var(--k) / 0.45);
+    animation: breathe-ring 1.8s ease-out infinite;
+    pointer-events: none;
   }
 
   /* Small "straps" style chip. */
@@ -207,12 +244,12 @@
 
   /* Frosted light glass for floating controls over content. */
   .glass {
-    background: rgba(251, 246, 244, 0.82);
+    background: rgb(var(--bg) / 0.82);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
     backdrop-filter: blur(24px) saturate(160%);
     box-shadow:
       inset 0 0 0 0.5px rgba(255, 255, 255, 0.9),
-      0 12px 32px rgba(30, 20, 18, 0.14);
+      0 12px 32px rgb(var(--fg) / 0.14);
   }
 
   .scroller {
@@ -258,45 +295,72 @@
   }
 }
 
-/* Session-type colour blocks (Coral). Outside @layer so classes built at runtime
-   (kind-${type}) are always emitted. --k-on on --k, and --k-text on light, pass 4.5:1. */
-.kind-a {
-  --k: 198 61 34;
-  --k-on: 255 255 255;
-  --k-text: 198 61 34;
+/* The Coral palette, defined once as "r g b" channels. tailwind.config.ts, the
+   session-type blocks below and any inline SVG/canvas colours all read these. */
+:root {
+  --bg: 251 246 244;
+  --surface: 243 232 228;
+  --surface-2: 238 226 221;
+  --surface-3: 233 217 211;
+  --line-strong: 220 200 192;
+  --fg: 30 20 18;
+  --fg-2: 63 48 44;
+  --muted: 116 98 93;
+  --faint: 156 138 132;
+  --coral: 198 61 34;
+  --coral-deep: 143 41 20;
+  --berry: 142 59 94;
+  --apricot: 242 166 90;
+  --apricot-ink: 61 31 5;
+  --danger: 179 38 30;
+  --danger-ink: 140 29 24;
+  --white: 255 255 255;
+}
+
+/* Session-type colour blocks: A coral, B berry, C apricot, cardio ink. .kind-accent is
+   the brand block (login, progress). --k-on on --k, and --k-text on light, pass 4.5:1. */
+.kind-a,
+.kind-accent {
+  --k: var(--coral);
+  --k-on: var(--white);
+  --k-text: var(--coral);
   --k1: 210 78 51;
   --k2: 220 100 72;
   --k3: 230 125 98;
 }
 .kind-b {
-  --k: 142 59 94;
-  --k-on: 255 255 255;
-  --k-text: 142 59 94;
+  --k: var(--berry);
+  --k-on: var(--white);
+  --k-text: var(--berry);
   --k1: 156 75 109;
   --k2: 171 92 125;
   --k3: 186 112 143;
 }
 .kind-c {
-  --k: 242 166 90;
-  --k-on: 61 31 5;
+  --k: var(--apricot);
+  --k-on: var(--apricot-ink);
   --k-text: 154 79 12;
   --k1: 244 177 112;
   --k2: 246 189 134;
   --k3: 248 201 156;
 }
 .kind-cardio {
-  --k: 30 20 18;
-  --k-on: 255 255 255;
-  --k-text: 30 20 18;
+  --k: var(--fg);
+  --k-on: var(--white);
+  --k-text: var(--fg);
   --k1: 51 37 31;
   --k2: 74 55 48;
   --k3: 97 74 65;
 }
 
-/* Recovery rings draw in from empty on first paint. */
-@keyframes ring-in {
+@keyframes breathe-ring {
   from {
-    stroke-dashoffset: var(--full);
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.35);
+    opacity: 0;
   }
 }
 
@@ -316,7 +380,7 @@ html[data-sheet] main {
   height: 6px;
   margin: 0;
   border-radius: 3px;
-  background: linear-gradient(#C63D22, #C63D22) 0 0 / 0% 100% no-repeat, #E9D9D3;
+  background: linear-gradient(rgb(var(--coral)), rgb(var(--coral))) 0 0 / 0% 100% no-repeat, rgb(var(--surface-3));
   outline: none;
 }
 .scrub::-webkit-slider-thumb {
@@ -327,7 +391,7 @@ html[data-sheet] main {
   border-radius: 12px;
   background: #ffffff;
   border: 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 10px rgb(var(--fg) / 0.3);
 }
 .scrub::-moz-range-thumb {
   width: 24px;

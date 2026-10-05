@@ -321,7 +321,7 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
                     }
                     className={cn(
                       "w-12 h-12 mx-auto rounded-full flex items-center justify-center disabled:opacity-100",
-                      done ? "bg-k text-k-on" : active ? "bg-bg text-k-text animate-breathe" : "text-faint ring-2 ring-inset ring-surface-3"
+                      done ? "bg-k text-k-on" : active ? "bg-bg text-k-text breathe" : "text-faint ring-2 ring-inset ring-surface-3"
                     )}
                   >
                     <CheckIcon size={22} strokeWidth={2.8} className={done ? "animate-pop" : undefined} />

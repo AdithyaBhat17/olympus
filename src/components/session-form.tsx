@@ -310,7 +310,7 @@ export default function SessionForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="log-week" className="eyebrow text-xs mb-1 block">
+            <label htmlFor="log-week" className="tile-label mb-1 block">
               Week
             </label>
             <select
@@ -327,7 +327,7 @@ export default function SessionForm({
             </select>
           </div>
           <div>
-            <label htmlFor="log-block" className="eyebrow text-xs mb-1 block">
+            <label htmlFor="log-block" className="tile-label mb-1 block">
               Block
             </label>
             <select

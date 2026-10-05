@@ -134,7 +134,7 @@ export default function WorkingWeightForm({
           )}
 
           {guard ? (
-            <div role="alert" className="rounded-[16px] bg-accent-bg shadow-[inset_0_0_0_1px_rgba(198,61,34,.35)] p-3 flex flex-col gap-3">
+            <div role="alert" className="rounded-[16px] bg-accent-bg ring-1 ring-inset ring-accent-line p-3 flex flex-col gap-3">
               <p className="m-0 text-sm leading-[1.45] text-fg-2">{guard}</p>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" className="btn-ghost" onClick={() => setGuard(null)}>

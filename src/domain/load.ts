@@ -30,6 +30,43 @@ export function platesFor(
   return roundKg(targetTrueKg);
 }
 
+const PLATE_SIZES = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
+export const BAR_KG = 20;
+
+/** Barbell by kit, or by name when the kit isn't recorded ("Barbell Back Squat", "Deadlift"). */
+export function isBarbell(ex: { name: string; equipment?: string | null }): boolean {
+  return ex.equipment === "barbell" || /\bbarbell\b|deadlift/i.test(ex.name);
+}
+
+/**
+ * Plates to load on one side for a true target, largest first, or null when the
+ * lift isn't plate-loaded. `leftover` is the true kg standard plates can't make.
+ */
+export function plateBreakdown(
+  ex: Pick<DomainExercise, "loadMode" | "carriageKgPerSide" | "name"> & { equipment?: string | null },
+  targetTrueKg: number
+): { plates: number[]; leftover: number } | null {
+  let side: number;
+  let sides: number;
+  if (ex.loadMode === "PER_SIDE" && ex.carriageKgPerSide != null) {
+    side = platesFor(ex, targetTrueKg);
+    sides = 1;
+  } else if (ex.loadMode === "TOTAL" && isBarbell(ex)) {
+    side = (targetTrueKg - BAR_KG) / 2;
+    sides = 2;
+  } else {
+    return null;
+  }
+  const plates: number[] = [];
+  for (const p of PLATE_SIZES) {
+    while (side + 1e-9 >= p) {
+      side -= p;
+      plates.push(p);
+    }
+  }
+  return { plates, leftover: roundKg(Math.max(0, side * sides)) };
+}
+
 /** Lower counterweight = harder. Everything else: higher = harder. */
 export function isHarder(mode: LoadMode, a: number, b: number): boolean {
   return mode === "COUNTERWEIGHT" ? a < b : a > b;

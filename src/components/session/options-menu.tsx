@@ -46,7 +46,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-11 h-11 flex items-center justify-center rounded-full bg-white/20 text-current"
+        className="btn-round on-k"
       >
         <DotsIcon />
       </button>

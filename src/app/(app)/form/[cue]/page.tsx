@@ -48,7 +48,7 @@ export default async function FormCuePage({
   const region = needle ? constraints.find((k) => k.region.toLowerCase().includes(needle))?.region.split(" · ")[0] : null;
 
   const eyebrow = [
-    "FORM, 3D",
+    "3D form",
     ex && current ? loadText(ex.loadMode, current.kg) : null,
     region,
     FORM_DEFS[cue].copy.tag,

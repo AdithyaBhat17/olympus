@@ -116,13 +116,14 @@ export function RestPill({ sessionId, rest, nextLabel, onAdd, onSkip }: RestPill
         style={{ ...bottom, background: "rgba(243,232,228,.82)" }}
       >
         <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true" className="shrink-0">
-          <circle cx="26" cy="26" r={R} fill="none" stroke="#E9D9D3" strokeWidth="5" />
+          <circle cx="26" cy="26" r={R} fill="none" stroke="currentColor" strokeWidth="5" className="text-surface-3" />
           <circle
             cx="26"
             cy="26"
             r={R}
             fill="none"
-            stroke={getSet || finished ? "#8E3B5E" : "#C63D22"}
+            stroke="currentColor"
+            className={getSet || finished ? "text-info" : "text-accent"}
             strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={C}

@@ -1404,7 +1404,7 @@ export class FormEngine {
   private drawLabel(ctx: CanvasRenderingContext2D, l: Label) {
     const p = this.P(l.p);
     ctx.save();
-    ctx.font = '600 11px "Geist Mono", ui-monospace, monospace';
+    ctx.font = '600 11px -apple-system, "SF Pro Text", system-ui, ui-monospace, monospace';
     const w = ctx.measureText(l.text).width + 14;
     const h = 20;
     const x = Math.max(4, Math.min(this.W - w - 4, p[0] + (l.dx == null ? 14 : l.dx)));

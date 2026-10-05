@@ -22,7 +22,7 @@ export default function FormIndexPage() {
         {FORM_CUE_IDS.filter(isFormCueId).map((id) => (
           <li key={id} className="border-b border-line last:border-b-0">
             <Link href={`/form/${id}`} className="press-soft flex items-center gap-3 px-4 py-3.5">
-              <span className="w-10 h-10 shrink-0 rounded-xl bg-[rgba(142,59,94,.12)] text-info flex items-center justify-center">
+              <span className="w-10 h-10 shrink-0 rounded-xl bg-info-bg text-info flex items-center justify-center">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" />
                 </svg>

@@ -6,7 +6,7 @@ import { formatSleep } from "@/domain/recovery";
 import { TARGETS } from "@/domain/targets";
 import { mutate } from "@/lib/offline/mutate";
 import { hapticTick } from "@/lib/haptics";
-import { cn } from "@/lib/utils";
+import { cn, kindClass } from "@/lib/utils";
 import { Sheet } from "@/components/session/sheet";
 import { WarnIcon } from "@/components/session/icons";
 
@@ -40,38 +40,46 @@ function litres(ml: number): string {
   return String(Math.round(ml / 10) / 100);
 }
 
-/** Bubble that fills from the bottom with a moving wave, like a glass of water. */
+/** Bubble that fills from the bottom with a moving wave, like a glass of water. `kind` picks the colour. */
 function Fill({
   value,
   target,
-  fill,
-  ink,
+  kind,
+  danger = false,
   delay = 0,
   children,
 }: {
   value: number | null;
   target: number;
-  fill: string;
-  ink: string;
+  kind: "A" | "B" | "C";
+  danger?: boolean;
   delay?: number;
   children: React.ReactNode;
 }) {
   const frac = value == null ? 0 : Math.min(1, value / target);
+  const color = danger ? "text-danger" : "text-k";
   return (
-    <span className="relative w-[84px] h-[84px] rounded-full overflow-hidden bg-surface-3 ring-[5px] ring-inset ring-bg animate-pop-in" style={{ animationDelay: `${delay}ms` }}>
-      <span
-        aria-hidden="true"
-        className={cn("absolute inset-x-0 bottom-0 transition-[height] duration-700 ease-arrive", frac === 0 && "invisible")}
-        style={{ height: `${Math.round(frac * 100)}%` }}
-      >
-        <span className="absolute -top-1.5 left-0 h-3.5 w-[200%] animate-wave">
-          <svg viewBox="0 0 192 14" preserveAspectRatio="none" className="block h-3.5 w-full">
-            <path d="M0 7 Q12 0 24 7 T48 7 T72 7 T96 7 T120 7 T144 7 T168 7 T192 7 V14 H0Z" fill={fill} />
-          </svg>
+    <span
+      className={cn(kindClass(kind), "relative w-[84px] h-[84px] rounded-full overflow-hidden bg-surface-3 ring-[5px] ring-inset ring-bg animate-pop-in")}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      {frac > 0 && (
+        <span
+          aria-hidden="true"
+          className={cn("absolute inset-0 transition-transform duration-700 ease-arrive", color)}
+          style={{ transform: `translateY(${Math.round((1 - frac) * 100)}%)` }}
+        >
+          {frac < 1 && (
+            <span className="absolute -top-1.5 left-0 h-3.5 w-[200%] animate-wave">
+              <svg viewBox="0 0 192 14" preserveAspectRatio="none" className="block h-3.5 w-full fill-current">
+                <path d="M0 7 Q12 0 24 7 T48 7 T72 7 T96 7 T120 7 T144 7 T168 7 T192 7 V14 H0Z" />
+              </svg>
+            </span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 top-2 bg-current" />
         </span>
-        <span className="absolute inset-x-0 bottom-0 top-2" style={{ background: fill }} />
-      </span>
-      <span className="absolute inset-0 flex flex-col items-center justify-center" style={{ color: frac > 0.55 ? ink : undefined }}>
+      )}
+      <span className={cn("absolute inset-0 flex flex-col items-center justify-center", frac > 0.55 && (danger ? "text-white" : "text-k-on"))}>
         {children}
       </span>
     </span>
@@ -127,7 +135,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Sleep ${formatSleep(vals.sleepMin)} of ${targets.sleepMin / 60} h. Edit`}
           className={tile}
         >
-          <Fill value={vals.sleepMin} target={targets.sleepMin} fill={short ? "#B3261E" : "#8E3B5E"} ink="#FFFFFF">
+          <Fill value={vals.sleepMin} target={targets.sleepMin} kind="B" danger={short}>
             <span className="num text-[20px]">{vals.sleepMin == null ? "—" : formatSleep(vals.sleepMin).replace(/\s|m$/g, "")}</span>
           </Fill>
           <span className={cn("text-[13px] font-bold", short ? "text-danger-text" : "text-muted")}>{short ? "Short sleep" : "Sleep"}</span>
@@ -138,7 +146,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Protein ${vals.proteinG ?? 0} of ${targets.proteinG} grams. Edit`}
           className={tile}
         >
-          <Fill value={vals.proteinG} target={targets.proteinG} fill="#C63D22" ink="#FFFFFF" delay={80}>
+          <Fill value={vals.proteinG} target={targets.proteinG} kind="A" delay={80}>
             <span className="num text-[20px]">{vals.proteinG ?? "—"}</span>
             <span className="text-[11px] font-bold opacity-75">of {targets.proteinG} g</span>
           </Fill>
@@ -150,7 +158,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Water ${litres(vals.waterMl ?? 0)} of ${litres(targets.waterMl)} litres. Add 250 ml`}
           className={tile}
         >
-          <Fill value={vals.waterMl} target={targets.waterMl} fill="#F2A65A" ink="#3D1F05" delay={160}>
+          <Fill value={vals.waterMl} target={targets.waterMl} kind="C" delay={160}>
             <span key={vals.waterMl ?? 0} className="num text-[20px] animate-tick">{litres(vals.waterMl ?? 0)}</span>
             <span className="text-[11px] font-bold opacity-75">of {litres(targets.waterMl)} L</span>
           </Fill>

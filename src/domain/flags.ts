@@ -1,4 +1,4 @@
-import { formatKg, isHarder, topSet } from "./load";
+import { formatKg, isBarbell, isHarder, topSet } from "./load";
 import { isUnderloaded } from "./validation";
 import type { DomainExercise, SetFlag, SetLogEntry } from "./types";
 
@@ -15,7 +15,7 @@ export const TOO_EASY_RPE = 6.5;
 export function rampExempt(
   ex: Pick<DomainExercise, "isCompound" | "name"> & { equipment?: string | null }
 ): boolean {
-  return ex.isCompound && (ex.equipment === "barbell" || /\bbarbell\b|deadlift/i.test(ex.name));
+  return ex.isCompound && isBarbell(ex);
 }
 
 /**

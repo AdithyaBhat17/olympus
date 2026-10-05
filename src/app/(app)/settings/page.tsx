@@ -104,7 +104,7 @@ export default async function SettingsPage({
         </h2>
         <div className="p-4 rounded-[20px] bg-surface flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <span className={`${ico} bg-[rgba(142,59,94,.12)] text-info`}>
+            <span className={`${ico} bg-info-bg text-info`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 12h4l2-5 4 10 2-5h4" />
               </svg>
