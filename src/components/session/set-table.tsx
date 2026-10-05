@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatKg } from "@/domain/load";
 import type { UnderloadNudge as Nudge } from "@/domain/progression";
 import type { LiveItemView, LiveSetView, LogSetResult } from "@/server/sessions";
@@ -10,6 +10,7 @@ import { CheckIcon } from "./icons";
 import { RpeStrip } from "./rpe-pad";
 import { UnderloadNudge } from "./underload-nudge";
 import { LoadSheet } from "./load-sheet";
+import { MAX_REPS, RepsSheet } from "./reps-sheet";
 
 export interface LogInput {
   weight: number;
@@ -34,7 +35,6 @@ interface SetTableProps {
   onActiveKg?: (kg: number | null) => void;
 }
 
-const MAX_REPS = 15;
 const GRID = "grid grid-cols-[38px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_52px] gap-1.5 items-center";
 const CELL =
   "h-12 rounded-2xl flex items-center justify-center num text-[24px] min-w-0";
@@ -57,6 +57,9 @@ export function SetTable({ item, onLog, onUndoLast, onActiveKg }: SetTableProps)
 
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const [sheetIndex, setSheetIndex] = useState<number | null>(null);
+  const [repsIndex, setRepsIndex] = useState<number | null>(null);
+  const pressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
   const [nudge, setNudge] = useState<{ index: number; nudge: Nudge; weight: number; platesKg: number | null } | null>(null);
   const [just, setJust] = useState<number | null>(null);
 
@@ -145,7 +148,39 @@ export function SetTable({ item, onLog, onUndoLast, onActiveKg }: SetTableProps)
     void onLog(i, { weight: v.kg, platesKg: v.platesKg, reps: v.reps, rpe: null }, "new").then((r) => handleResult(i, r));
   };
 
+  const setReps = (i: number, reps: number) => {
+    const s = sets[i];
+    if (s.logged) {
+      void onLog(
+        i,
+        { weight: s.logged.weight, platesKg: s.logged.platesKg ?? null, reps, rpe: s.logged.rpe ?? null },
+        "edit"
+      ).then((r) => handleResult(i, r));
+    } else {
+      patchDraft(i, { reps });
+    }
+  };
+
+  const startPress = (i: number) => {
+    longPressed.current = false;
+    if (timed) return;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      hapticTick();
+      setRepsIndex(i);
+    }, 450);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current != null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+
   const bumpReps = (i: number) => {
+    if (longPressed.current) {
+      longPressed.current = false;
+      return;
+    }
     const s = sets[i];
     if (timed) {
       setSheetIndex(i);
@@ -305,10 +340,15 @@ export function SetTable({ item, onLog, onUndoLast, onActiveKg }: SetTableProps)
                   <button
                     type="button"
                     onClick={() => bumpReps(i)}
+                    onPointerDown={() => startPress(i)}
+                    onPointerUp={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onPointerCancel={cancelPress}
+                    onContextMenu={(e) => e.preventDefault()}
                     aria-label={
                       timed
                         ? `Block ${label}: ${v.reps ?? "no"} minutes. Change`
-                        : `Set ${label}: ${v.reps ?? "no"} reps. Tap to add one`
+                        : `Set ${label}: ${v.reps ?? "no"} reps. Tap to add one, hold to edit`
                     }
                     className={cn(CELL, "w-full", active && "bg-bg", done ? "text-muted" : "text-fg")}
                   >
@@ -370,6 +410,20 @@ export function SetTable({ item, onLog, onUndoLast, onActiveKg }: SetTableProps)
           setLabel={labels[rpeFor]}
           value={rpeSet.logged.rpe}
           onPick={(v) => pickRpe(rpeFor, v)}
+        />
+      )}
+
+      {repsIndex != null && sets[repsIndex] && (
+        <RepsSheet
+          open
+          onClose={() => setRepsIndex(null)}
+          setLabel={labels[repsIndex]}
+          exerciseName={exercise.name}
+          initial={values[repsIndex]?.reps ?? null}
+          onSubmit={(reps) => {
+            setReps(repsIndex, reps);
+            setRepsIndex(null);
+          }}
         />
       )}
 
