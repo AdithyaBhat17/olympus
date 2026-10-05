@@ -227,9 +227,9 @@ export default async function SettingsPage({
                 <li>Repeat for Type = Water (unit mL).</li>
                 <li>
                   Add <span className="text-fg-2">Get Contents of URL</span>: the endpoint above, Method POST, Header{" "}
-                  <span className="font-mono">Authorization</span> = <span className="font-mono">Bearer &lt;token&gt;</span>,
-                  Request Body JSON with <span className="font-mono">proteinG</span> and{" "}
-                  <span className="font-mono">waterMl</span> set to the two sums.
+                  <span className="text-fg-2">Authorization</span> = <span className="text-fg-2">Bearer &lt;token&gt;</span>,
+                  Request Body JSON with <span className="text-fg-2">proteinG</span> and{" "}
+                  <span className="text-fg-2">waterMl</span> set to the two sums.
                 </li>
                 <li>
                   Automation › Personal › <span className="text-fg-2">App: MyFitnessPal is closed</span> (and/or a time of

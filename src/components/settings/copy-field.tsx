@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Value in monospace with a Copy button that morphs to an ice "✓ Copied" for 1.6 s. */
-export function CopyField({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
+/** Selectable value with a Copy button that morphs to "✓ Copied" for 1.6 s. */
+export function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | null>(null);
   useEffect(() => () => {
@@ -15,15 +15,12 @@ export function CopyField({ label, value, mono = true }: { label: string; value:
     <div className="flex flex-col gap-1.5">
       <span className="text-xs text-muted px-1">{label}</span>
       <div className="flex items-center gap-2 min-h-12 rounded-[14px] bg-surface-sunk pl-3.5 pr-1.5 py-1.5">
-        <code
-          className={cn(
-            "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-fg-2 select-all",
-            mono && "font-mono"
-          )}
+        <span
+          className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium text-fg-2 select-all"
           title={value}
         >
           {value}
-        </code>
+        </span>
         <button
           type="button"
           onClick={async () => {
