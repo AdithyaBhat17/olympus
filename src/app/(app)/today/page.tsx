@@ -20,7 +20,7 @@ import {
   type NextSessionItem,
 } from "@/components/today/next-session-card";
 
-export const metadata = { title: "Today · Olympus" };
+export const metadata = { title: "Today" };
 
 const PREVIEW_COUNT = 4;
 /** Average time under the bar per set, on top of the planned rest. */
@@ -101,9 +101,9 @@ export default async function TodayPage() {
         estMin > 0 ? `~${estMin} min` : null,
       ]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
     } else if (last) {
-      sub = `${last.title} · last done ${formatDayShort(last.date)}`;
+      sub = `${last.title}, last done ${formatDayShort(last.date)}`;
     } else {
       sub = "Not done yet";
     }
@@ -134,13 +134,13 @@ export default async function TodayPage() {
   return (
     <div>
       <PageHeader
-        eyebrow={`${formatDayShort(today)}${day ? ` · Day ${day}` : ""}`}
+        eyebrow={`${formatDayShort(today)}${day ? `, Day ${day}` : ""}`}
         title="Today"
         action={
           <Link
             href="/settings"
             aria-label="Settings"
-            className="w-11 h-11 rounded-full bg-surface-2 shadow-[inset_0_0_0_1px_#2A2A2E] font-semibold flex items-center justify-center shrink-0"
+            className="w-11 h-11 rounded-full bg-surface-2 font-semibold flex items-center justify-center shrink-0"
           >
             {initial}
           </Link>

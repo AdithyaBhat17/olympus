@@ -102,11 +102,11 @@ export function FlagsList({ flags }: { flags: FlagItem[] }) {
               aria-hidden={st ? true : undefined}
             >
               <div className="overflow-hidden">
-                <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4 rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327]">
+                <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4 rounded-[18px] bg-surface">
                   <span aria-hidden className="num text-[22px] text-accent w-[26px] shrink-0">
                     {st ? "" : String(n).padStart(2, "0")}
                   </span>
-                  <span className="flex-1 text-sm leading-[1.4] text-[#E4E2DC] py-2">{f.text}</span>
+                  <span className="flex-1 text-sm leading-[1.4] text-[#3F302C] py-2">{f.text}</span>
                   <button
                     type="button"
                     disabled={!!st}

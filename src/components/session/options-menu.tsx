@@ -46,7 +46,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-11 h-11 flex items-center justify-center rounded-full bg-surface-2 text-fg-2"
+        className="w-11 h-11 flex items-center justify-center rounded-full bg-white/20 text-current"
       >
         <DotsIcon />
       </button>
@@ -54,7 +54,7 @@ export function OptionsMenu({ entries, label = "Exercise options" }: { entries: 
         <div
           role="menu"
           aria-label={label}
-          className="absolute right-0 top-12 z-40 w-56 py-1.5 rounded-[18px] bg-surface-2 shadow-[inset_0_0_0_1px_#2A2A2E,0_16px_40px_rgba(0,0,0,.6)] animate-scale-in origin-top-right"
+          className="absolute right-0 top-12 z-40 w-56 py-1.5 rounded-[22px] bg-white text-fg shadow-[0_16px_40px_rgba(30,20,18,.18)] animate-scale-in origin-top-right"
         >
           {entries.map((e) =>
             "href" in e ? (

@@ -86,7 +86,7 @@ function SwapBody({
             <CloseIcon size={22} />
           </button>
           <div className="flex flex-col min-w-0">
-            <span className="text-[13px] text-muted truncate">Replacing · {replacing.name}</span>
+            <span className="text-[13px] text-muted truncate">Replacing, {replacing.name}</span>
             <h1 className="m-0 num text-[30px]">Swap exercise</h1>
           </div>
         </div>
@@ -124,7 +124,7 @@ function SwapBody({
 
       <section aria-labelledby="swap-safe" className="px-4 pt-2 flex flex-col gap-2">
         <h2 id="swap-safe" className="eyebrow mb-0.5">
-          Safe for you · {words.length ? "matches" : "same muscle"}
+          Safe for you, {words.length ? "matches" : "same muscle"}
         </h2>
         {safe.length === 0 && (
           <p className="text-sm text-muted py-2">
@@ -136,8 +136,8 @@ function SwapBody({
           const sub = already
             ? "Already in today's session"
             : c.lastKg != null
-              ? `${c.category} · last ${formatLoad(c.loadMode as LoadMode, c.lastKg)}${c.loadMode === "TOTAL" ? " kg" : ""}`
-              : "No log yet · calibration weight";
+              ? `${c.category}, last ${formatLoad(c.loadMode as LoadMode, c.lastKg)}${c.loadMode === "TOTAL" ? " kg" : ""}`
+              : "No log yet, calibration weight";
           return (
             <button
               key={c.id}
@@ -175,7 +175,7 @@ function SwapBody({
       {blocked.length > 0 && (
         <section aria-labelledby="swap-blocked" className="px-4 pt-6 flex flex-col gap-2">
           <h2 id="swap-blocked" className="eyebrow mb-0.5">
-            Blocked · won&apos;t be programmed
+            Blocked, won&apos;t be programmed
           </h2>
           {blocked.map((c) => {
             const subs = c.substitutes.filter((s) => s.id !== replacing.exerciseId && !byId.get(s.id)?.blocked);

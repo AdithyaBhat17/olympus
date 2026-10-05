@@ -4,7 +4,7 @@ import { workingWeights } from "@/server/history";
 import { PageHeader } from "@/components/page-header";
 import ExerciseList, { type LibraryExercise } from "@/components/exercise-list";
 
-export const metadata = { title: "Library · Olympus" };
+export const metadata = { title: "Library" };
 
 export default async function ExercisesPage() {
   const email = await requireUserEmail();
@@ -36,7 +36,7 @@ export default async function ExercisesPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader eyebrow={`${items.length} exercises · ${blocked} blocked`} title="Library" />
+      <PageHeader eyebrow={`${items.length} exercises, ${blocked} blocked`} title="Library" />
       <ExerciseList exercises={items} />
     </div>
   );

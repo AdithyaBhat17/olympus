@@ -6,11 +6,12 @@
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
-    background: #0a0a0b;
+    background: #FBF6F4;
   }
 
   body {
-    @apply bg-bg text-fg text-[15px];
+    @apply bg-bg text-fg text-[17px];
+    letter-spacing: -0.41px;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -52,18 +53,18 @@
     transform: none !important;
   }
 
-  /* Archivo always runs condensed; .num and stretch-* utilities narrow it further. */
+  /* Rounded system face for display type and numerals. */
   .font-display {
-    font-stretch: 80%;
+    font-variant-numeric: tabular-nums;
   }
 
   :focus-visible {
-    outline: 2px solid #8cc8ff;
+    outline: 2px solid #8E3B5E;
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(255, 106, 43, 0.35);
+    background: rgba(198,61,34, 0.35);
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -93,77 +94,75 @@
 }
 
 @layer components {
-  /* Geist Mono meta line: "SAT 3 OCT · DAY 47". */
+  /* Meta line above a title: "Monday 5 October, day 47". Sentence case, never mono. */
   .eyebrow {
-    @apply font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-muted;
+    @apply text-[15px] font-semibold text-muted normal-case tracking-normal;
   }
 
-  /* Section heading: 13px semibold tracked caps. */
+  /* Section heading: big and friendly, like the Coral canvas. */
   .section-label {
-    @apply text-[13px] font-semibold uppercase tracking-[0.06em] text-muted;
+    @apply text-[22px] leading-7 font-extrabold text-fg normal-case tracking-normal;
   }
 
-  /* Tile label inside cards: "TARGET", "OPEN AT". */
+  /* Tile label inside cards: "Target", "Open at". */
   .tile-label {
-    @apply text-[11px] uppercase tracking-[0.06em] text-muted;
+    @apply text-[13px] font-semibold text-muted normal-case tracking-normal;
   }
 
-  /* Archivo numerals: 800, condensed, tabular. */
+  /* Rounded numerals: heavy and tabular. */
   .num {
     @apply font-display font-extrabold leading-none tabular-nums;
-    font-stretch: 72%;
   }
 
-  /* Large page title: Archivo 44px. */
+  /* Large page title: 40px heavy. */
   .page-title {
-    @apply m-0 font-display font-extrabold text-[44px] leading-[0.95] tracking-[-0.01em];
-    font-stretch: 80%;
+    @apply m-0 text-[40px] font-extrabold leading-[1.05] tracking-[-0.5px];
   }
 
   .card {
-    @apply bg-surface rounded-[20px] p-4 shadow-[inset_0_0_0_1px_#232327];
+    @apply bg-surface rounded-[28px] p-4;
   }
 
   .card-group {
-    @apply flex flex-col rounded-[20px] bg-surface shadow-[inset_0_0_0_1px_#232327] overflow-hidden;
+    @apply flex flex-col rounded-[28px] bg-surface overflow-hidden;
   }
 
   .input-base {
     @apply w-full h-12 bg-surface-2 text-fg rounded-[14px] px-4
-    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#FF6A2B]
+    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#C63D22]
     placeholder:text-faint transition-shadow text-[16px];
   }
 
   .select-base {
     @apply w-full h-12 bg-surface-2 text-fg rounded-[14px] px-4
-    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#FF6A2B]
+    focus:outline-none focus:shadow-[inset_0_0_0_1.5px_#C63D22]
     transition-shadow text-[16px] appearance-none cursor-pointer
     bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%238E8C87%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M4.646%206.646a.5.5%200%200%201%20.708%200L8%209.293l2.646-2.647a.5.5%200%200%201%20.708.708l-3%203a.5.5%200%200%201-.708%200l-3-3a.5.5%200%200%201%200-.708z%22%2F%3E%3C%2Fsvg%3E')]
     bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10;
   }
 
-  /* Primary CTA: ember, 58px, radius 18, Geist 650 17px. */
+  /* Primary CTA: coral capsule, 60px, heavy 19px. */
   .btn-primary {
-    @apply relative overflow-hidden w-full h-[58px] rounded-[18px] bg-accent text-accent-ink font-cta text-[17px]
+    @apply relative overflow-hidden w-full h-[60px] rounded-full bg-accent text-accent-ink font-extrabold text-[19px] shadow-[0_12px_28px_rgba(198,61,34,.3)]
     flex items-center justify-center gap-2.5
     disabled:opacity-50 disabled:pointer-events-none;
   }
 
-  /* Chalk CTA (sign in, Skip). */
+  /* Ink CTA (sign in, Skip). */
   .btn-chalk {
-    @apply w-full h-[58px] rounded-[18px] bg-fg text-bg font-cta text-[17px]
+    @apply w-full h-[58px] rounded-full bg-fg text-bg font-bold text-[17px]
     flex items-center justify-center gap-3
     disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply w-full h-12 rounded-[16px] bg-surface shadow-[inset_0_0_0_1px_#232327] text-fg text-[15px] font-medium
+    @apply w-full h-12 rounded-full bg-surface text-fg text-[15px] font-bold
     flex items-center justify-center gap-2
     disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-ghost {
-    @apply h-11 rounded-[14px] bg-surface-2 text-fg-2 text-sm font-medium
+    @apply h-11 rounded-full bg-surface-2 text-fg-2 text-[15px] font-semibold
     flex items-center justify-center gap-2 disabled:opacity-50;
   }
 
@@ -172,19 +171,19 @@
     @apply w-11 h-11 rounded-full bg-surface-2 text-fg flex items-center justify-center shrink-0;
   }
   .btn-pill {
-    @apply h-11 px-4 rounded-full bg-surface-2 text-fg flex items-center gap-1 text-[15px] font-medium shrink-0;
+    @apply h-11 px-4 rounded-full bg-surface-2 text-fg flex items-center gap-1 text-[17px] font-bold shrink-0;
   }
 
   .chip {
-    @apply h-[34px] px-3.5 rounded-full bg-surface-2 text-fg-2 text-[13px] font-semibold whitespace-nowrap shrink-0;
+    @apply h-10 px-[18px] rounded-full bg-surface text-fg text-[15px] font-extrabold whitespace-nowrap shrink-0;
   }
   .chip-on {
     @apply bg-fg text-bg;
   }
 
-  /* Geist Mono tag pill: "CABLE", "PER SIDE · +3.6". */
+  /* Small pill: "Cable", "Per side, +3.6". */
   .tag {
-    @apply font-mono text-[10px] font-semibold tracking-[0.04em] px-1.5 py-[3px] rounded-md bg-surface-3 text-fg-2 whitespace-nowrap;
+    @apply text-[13px] font-bold px-2.5 h-7 inline-flex items-center rounded-full bg-surface-3 text-fg-2 whitespace-nowrap normal-case tracking-normal;
   }
   .tag-ice {
     @apply bg-info-bg text-info;
@@ -192,28 +191,28 @@
 
   /* Small "straps" style chip. */
   .chip-outline {
-    @apply text-[11px] font-semibold rounded-[5px] px-[5px] py-px border whitespace-nowrap;
+    @apply text-[12px] font-bold rounded-full px-2 py-0.5 border whitespace-nowrap;
   }
 
   /* Segmented control. */
   .seg {
-    @apply flex gap-1 p-[3px] rounded-[12px] bg-surface-sunk;
+    @apply flex gap-2;
   }
   .seg-btn {
-    @apply flex-1 h-9 rounded-[10px] text-muted font-semibold text-[13px];
+    @apply flex-1 h-11 rounded-full bg-surface text-fg font-extrabold text-[15px];
   }
   .seg-on {
-    @apply bg-key-down text-fg shadow-[0_2px_8px_rgba(0,0,0,.35)];
+    @apply bg-fg text-bg;
   }
 
-  /* Floating glass: only the tab bar and the rest pill use blur. */
+  /* Frosted light glass for floating controls over content. */
   .glass {
-    background: rgba(28, 28, 31, 0.72);
+    background: rgba(251, 246, 244, 0.82);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
     backdrop-filter: blur(24px) saturate(160%);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-      0 12px 32px rgba(0, 0, 0, 0.5);
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.9),
+      0 12px 32px rgba(30, 20, 18, 0.14);
   }
 
   .scroller {
@@ -259,6 +258,41 @@
   }
 }
 
+/* Session-type colour blocks (Coral). Outside @layer so classes built at runtime
+   (kind-${type}) are always emitted. --k-on on --k, and --k-text on light, pass 4.5:1. */
+.kind-a {
+  --k: 198 61 34;
+  --k-on: 255 255 255;
+  --k-text: 198 61 34;
+  --k1: 210 78 51;
+  --k2: 220 100 72;
+  --k3: 230 125 98;
+}
+.kind-b {
+  --k: 142 59 94;
+  --k-on: 255 255 255;
+  --k-text: 142 59 94;
+  --k1: 156 75 109;
+  --k2: 171 92 125;
+  --k3: 186 112 143;
+}
+.kind-c {
+  --k: 242 166 90;
+  --k-on: 61 31 5;
+  --k-text: 154 79 12;
+  --k1: 244 177 112;
+  --k2: 246 189 134;
+  --k3: 248 201 156;
+}
+.kind-cardio {
+  --k: 30 20 18;
+  --k-on: 255 255 255;
+  --k-text: 30 20 18;
+  --k1: 51 37 31;
+  --k2: 74 55 48;
+  --k3: 97 74 65;
+}
+
 /* Recovery rings draw in from empty on first paint. */
 @keyframes ring-in {
   from {
@@ -282,7 +316,7 @@ html[data-sheet] main {
   height: 6px;
   margin: 0;
   border-radius: 3px;
-  background: linear-gradient(#ff6a2b, #ff6a2b) 0 0 / 0% 100% no-repeat, #26262a;
+  background: linear-gradient(#C63D22, #C63D22) 0 0 / 0% 100% no-repeat, #E9D9D3;
   outline: none;
 }
 .scrub::-webkit-slider-thumb {
@@ -291,7 +325,7 @@ html[data-sheet] main {
   width: 24px;
   height: 24px;
   border-radius: 12px;
-  background: #f5f3ee;
+  background: #ffffff;
   border: 0;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
 }
@@ -299,6 +333,6 @@ html[data-sheet] main {
   width: 24px;
   height: 24px;
   border-radius: 12px;
-  background: #f5f3ee;
+  background: #ffffff;
   border: 0;
 }

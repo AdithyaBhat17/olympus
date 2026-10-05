@@ -24,3 +24,17 @@ export function formatDateShort(dateStr: string): string {
 export function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
+
+/** Colour block for a session type: A coral, B berry, C apricot, anything else ink. */
+export function kindClass(sessionType: string | null | undefined): string {
+  switch (sessionType) {
+    case "A":
+      return "kind-a";
+    case "B":
+      return "kind-b";
+    case "C":
+      return "kind-c";
+    default:
+      return "kind-cardio";
+  }
+}

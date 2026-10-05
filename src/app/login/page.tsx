@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { PlateStack } from "@/components/ui/plate-stack";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
@@ -34,7 +35,7 @@ function SignIn() {
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl: safeCallback(params.get("callbackUrl")) })}
-      className="btn-chalk"
+      className="w-full h-[60px] rounded-full bg-white text-fg font-extrabold text-[19px] flex items-center justify-center gap-3 shadow-[0_12px_28px_rgba(0,0,0,.2)]"
     >
       <GoogleIcon />
       {isConnect ? "Sign in to connect Claude" : "Continue with Google"}
@@ -44,19 +45,15 @@ function SignIn() {
 
 export default function LoginPage() {
   return (
-    <main className="relative overflow-hidden min-h-dvh flex flex-col justify-between bg-bg px-5 pt-[max(96px,calc(env(safe-area-inset-top)+64px))] pb-[max(34px,calc(env(safe-area-inset-bottom)+16px))]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-[120px] bottom-[180px] w-[520px] h-[520px] rounded-full bg-[radial-gradient(circle,rgba(255,106,43,.2),rgba(255,106,43,0)_65%)]"
-      />
+    <main className="kind-a relative overflow-hidden min-h-dvh flex flex-col justify-between bg-k text-k-on px-6 pt-[max(96px,calc(env(safe-area-inset-top)+64px))] pb-[max(34px,calc(env(safe-area-inset-bottom)+16px))]">
+      <PlateStack className="-right-24 top-14" size={300} />
       <div className="relative flex flex-col gap-5">
-        <span aria-hidden className="w-14 h-1.5 rounded-[3px] bg-accent origin-left animate-bar" />
-        <h1 className="m-0 font-display font-black stretch-62 text-[clamp(72px,26vw,104px)] leading-[0.84] tracking-[-0.01em] uppercase">
+        <h1 className="m-0 text-[clamp(64px,22vw,96px)] font-extrabold leading-[0.92] tracking-[-1.5px]">
           <span className="block animate-word-up">Train.</span>
           <span className="block animate-word-up [animation-delay:80ms]">Log.</span>
-          <span className="block animate-word-up [animation-delay:160ms] text-accent">Lift.</span>
+          <span className="block animate-word-up [animation-delay:160ms] text-apricot">Lift.</span>
         </h1>
-        <p className="m-0 max-w-[300px] text-[17px] leading-[1.45] text-fg-2 animate-rise [animation-delay:400ms]">
+        <p className="m-0 max-w-[300px] text-[19px] font-semibold leading-[1.4] opacity-90 animate-rise [animation-delay:400ms]">
           Your PT programs it through Claude. You lift. Olympus keeps the score.
         </p>
       </div>
@@ -64,15 +61,15 @@ export default function LoginPage() {
         <Suspense fallback={<div className="h-[58px]" />}>
           <SignIn />
         </Suspense>
-        <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-surface shadow-[inset_0_0_0_1px_#232327]">
-          <span className="w-9 h-9 shrink-0 rounded-[10px] bg-surface-3 text-info flex items-center justify-center">
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-3xl bg-white/15">
+          <span className="w-9 h-9 shrink-0 rounded-full bg-white/20 flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 15V3M7 8l5-5 5 5" />
               <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
             </svg>
           </span>
-          <span className="text-[13px] leading-[1.4] text-fg-2">
-            On iPhone: tap <b className="text-fg font-semibold">Share</b> → <b className="text-fg font-semibold">Add to Home Screen</b> for
+          <span className="text-[15px] leading-5">
+            On iPhone: tap <b className="font-extrabold">Share</b>, then <b className="font-extrabold">Add to Home Screen</b> for
             full-screen, offline lifting.
           </span>
         </div>

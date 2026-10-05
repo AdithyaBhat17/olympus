@@ -10,7 +10,7 @@ export default function SignOutButton({ className }: { className?: string }) {
       type="button"
       onClick={() => signOut({ callbackUrl: "/login" })}
       className={cn(
-        "h-[52px] w-full rounded-2xl bg-surface shadow-[inset_0_0_0_1px_#232327] text-danger-soft text-[15px] font-semibold flex items-center justify-center gap-2",
+        "h-[52px] w-full rounded-2xl bg-surface text-danger-soft text-[15px] font-semibold flex items-center justify-center gap-2",
         className
       )}
     >

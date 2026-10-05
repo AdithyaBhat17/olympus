@@ -113,16 +113,16 @@ export function RestPill({ sessionId, rest, nextLabel, onAdd, onSkip }: RestPill
         role="timer"
         aria-label={`Rest timer, ${shortClock(remaining)} left`}
         className={cn(pos, "h-[76px] rounded-[38px] flex items-center gap-3 pl-3 pr-2.5 animate-pill")}
-        style={{ ...bottom, background: "rgba(20,20,22,.82)" }}
+        style={{ ...bottom, background: "rgba(243,232,228,.82)" }}
       >
         <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true" className="shrink-0">
-          <circle cx="26" cy="26" r={R} fill="none" stroke="#26262A" strokeWidth="5" />
+          <circle cx="26" cy="26" r={R} fill="none" stroke="#E9D9D3" strokeWidth="5" />
           <circle
             cx="26"
             cy="26"
             r={R}
             fill="none"
-            stroke={getSet || finished ? "#8CC8FF" : "#FF6A2B"}
+            stroke={getSet || finished ? "#8E3B5E" : "#C63D22"}
             strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={C}
@@ -132,11 +132,11 @@ export function RestPill({ sessionId, rest, nextLabel, onAdd, onSkip }: RestPill
           />
         </svg>
         <div className="flex-1 flex flex-col gap-px min-w-0" aria-live="polite">
-          <span className={cn("text-xs truncate", getSet || finished ? "text-info" : "text-muted")}>
+          <span className={cn("text-[13px] font-semibold truncate", getSet || finished ? "text-info" : "text-muted")}>
             {finished
-              ? "Rest done — go"
+              ? "Rest is up. Go!"
               : getSet
-                ? `Get set — next up: ${nextLabel ?? "next set"}`
+                ? `Get set. Next up: ${nextLabel ?? "next set"}`
                 : rest.label}
           </span>
           <span className="num text-[30px]">{shortClock(remaining)}</span>
@@ -145,14 +145,14 @@ export function RestPill({ sessionId, rest, nextLabel, onAdd, onSkip }: RestPill
           type="button"
           onClick={() => onAdd(30)}
           aria-label="Add 30 seconds"
-          className="h-[52px] min-w-14 rounded-[26px] bg-surface-3 text-fg font-semibold text-[15px]"
+          className="h-[52px] min-w-14 rounded-full bg-surface text-fg font-bold text-[15px]"
         >
           +30
         </button>
         <button
           type="button"
           onClick={onSkip}
-          className="h-[52px] min-w-16 rounded-[26px] bg-fg text-bg font-semibold text-[15px]"
+          className="h-[52px] min-w-16 rounded-full bg-fg text-bg font-bold text-[15px]"
         >
           Skip
         </button>
@@ -162,7 +162,7 @@ export function RestPill({ sessionId, rest, nextLabel, onAdd, onSkip }: RestPill
         role="timer"
         aria-label="Rest timer idle"
         className={cn(pos, "h-14 rounded-[28px] flex items-center justify-center gap-2 text-muted text-[13px]")}
-        style={{ ...bottom, background: "rgba(20,20,22,.7)" }}
+        style={{ ...bottom, background: "rgba(243,232,228,.7)" }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
           <circle cx="12" cy="13" r="8" />

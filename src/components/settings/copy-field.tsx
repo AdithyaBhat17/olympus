@@ -39,7 +39,7 @@ export function CopyField({ label, value, mono = true }: { label: string; value:
           aria-label={copied ? `${label} copied` : `Copy ${label}`}
           className={cn(
             "h-11 px-3 rounded-[10px] text-[13px] font-semibold flex items-center gap-1.5 shrink-0 transition-colors duration-200",
-            copied ? "bg-[rgba(140,200,255,.14)] text-info" : "bg-surface-3 text-fg"
+            copied ? "bg-[rgba(142,59,94,.14)] text-info" : "bg-surface-3 text-fg"
           )}
         >
           {copied && (

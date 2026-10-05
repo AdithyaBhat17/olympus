@@ -33,9 +33,9 @@ interface SetTableProps {
 }
 
 const MAX_REPS = 15;
-const GRID = "grid grid-cols-[34px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_52px] gap-1.5 items-center";
+const GRID = "grid grid-cols-[38px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_52px] gap-1.5 items-center";
 const CELL =
-  "h-12 rounded-xl flex items-center justify-center num text-[24px] min-w-0";
+  "h-12 rounded-2xl flex items-center justify-center num text-[24px] min-w-0";
 
 /** "W1" for warm-ups, then 1, 2, 3 for working sets. */
 export function setLabels(sets: LiveSetView[]): string[] {
@@ -50,7 +50,7 @@ export function setLabels(sets: LiveSetView[]): string[] {
 export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
   const { exercise, sets } = item;
   const timed = exercise.loadMode === "TIME";
-  const unit = timed ? "—" : exercise.loadMode === "COUNTERWEIGHT" ? "CW" : exercise.loadMode === "PER_SIDE" ? "KG/SIDE" : "KG";
+  const unit = timed ? "—" : exercise.loadMode === "COUNTERWEIGHT" ? "Counter" : exercise.loadMode === "PER_SIDE" ? "kg a side" : "kg";
   const labels = setLabels(sets);
 
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
@@ -241,14 +241,14 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
   return (
     <div className="flex flex-col gap-1">
       {exercise.loadMode === "COUNTERWEIGHT" && (
-        <p className="m-0 px-1 pb-1 text-xs text-info">Counterweight — lower = harder.</p>
+        <p className="m-0 px-1 pb-1 text-[13px] font-semibold text-info">Counterweight: lower is harder.</p>
       )}
       <div role="table" aria-label="Sets" className="flex flex-col gap-1">
-        <div role="row" className={cn(GRID, "px-1 text-[11px] tracking-[0.06em] text-faint text-center")}>
-          <span role="columnheader">SET</span>
-          <span role="columnheader">LAST</span>
+        <div role="row" className={cn(GRID, "px-1 text-[13px] font-semibold text-muted text-center")}>
+          <span role="columnheader">Set</span>
+          <span role="columnheader">Last</span>
           <span role="columnheader">{unit}</span>
-          <span role="columnheader">{timed ? "MIN" : "REPS"}</span>
+          <span role="columnheader">{timed ? "Min" : "Reps"}</span>
           <span role="columnheader">
             <span className="sr-only">Done</span>
           </span>
@@ -266,15 +266,15 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
                 role="row"
                 className={cn(
                   GRID,
-                  "p-1 rounded-2xl transition-colors duration-200",
-                  active && "bg-surface-2 shadow-[inset_0_0_0_1.5px_#FF6A2B]",
+                  "p-1 rounded-[26px] transition-colors duration-200",
+                  active && "bg-surface",
                   !active && !done && "opacity-60"
                 )}
               >
-                <span role="cell" className={cn("num text-center text-[16px]", active ? "text-accent" : "text-muted")}>
+                <span role="cell" className={cn("num text-center text-[17px]", active ? "text-k-text" : "text-muted")}>
                   {label}
                 </span>
-                <span role="cell" className="text-center font-mono text-[13px] text-faint truncate">
+                <span role="cell" className="num text-center text-[15px] text-muted truncate">
                   {last}
                 </span>
                 <span role="cell" className="min-w-0">
@@ -320,8 +320,8 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
                         : `Log set ${label}: ${v.kg != null ? formatKg(v.kg) : "—"} × ${v.reps ?? "—"}`
                     }
                     className={cn(
-                      "w-[52px] h-12 rounded-[14px] flex items-center justify-center disabled:opacity-100",
-                      done ? "bg-[rgba(255,106,43,.14)] text-accent" : active ? "bg-accent text-accent-ink" : "bg-surface-3 text-faint"
+                      "w-12 h-12 mx-auto rounded-full flex items-center justify-center disabled:opacity-100",
+                      done ? "bg-k text-k-on" : active ? "bg-bg text-k-text animate-breathe" : "text-faint ring-2 ring-inset ring-surface-3"
                     )}
                   >
                     <CheckIcon size={22} strokeWidth={2.8} className={done ? "animate-pop" : undefined} />
@@ -329,7 +329,7 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
                   {just === i && (
                     <span
                       aria-hidden
-                      className="pointer-events-none absolute inset-0 rounded-[14px] shadow-[0_0_0_2px_#FF6A2B] animate-burst"
+                      className="pointer-events-none absolute inset-0 mx-auto w-12 rounded-full shadow-[0_0_0_3px_rgb(var(--k))] animate-burst"
                     />
                   )}
                 </span>

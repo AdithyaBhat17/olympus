@@ -22,7 +22,7 @@ export default function FormViewer({
 }: {
   cue: FormCueId;
   title: string;
-  /** "FORM · 3D · 100 KG · STRAPS" */
+  /** "FORM, 3D, 100 KG, STRAPS" */
   eyebrow: string;
 }) {
   const { make, copy } = FORM_DEFS[cue];
@@ -94,7 +94,7 @@ export default function FormViewer({
           </svg>
         </BackLink>
         <div className="flex flex-col gap-[3px] min-w-0">
-          <span className="font-mono text-[11px] tracking-[0.08em] text-accent truncate">{eyebrow}</span>
+          <span className="text-[11px] text-accent truncate">{eyebrow}</span>
           <h1 className="m-0 num text-[32px] leading-[0.95] truncate">{title}</h1>
         </div>
       </header>
@@ -139,7 +139,7 @@ export default function FormViewer({
           {ui.phaseText || def?.phases[0].n}
         </div>
         <div className="absolute right-3.5 top-2.5 flex flex-col items-end pointer-events-none">
-          <span className="font-mono text-[10px] tracking-[0.08em] text-muted">{def?.readLabel}</span>
+          <span className="text-[10px] text-muted">{def?.readLabel}</span>
           <span className="num text-[34px] text-info">{ui.read}</span>
         </div>
         {def && (
@@ -234,7 +234,7 @@ export default function FormViewer({
 
       <section aria-label="Coaching cues" className="mx-3 mt-3 p-4 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327] grid grid-cols-2 gap-3.5">
         <div className="flex flex-col gap-2.5">
-          <span className="font-mono text-[11px] tracking-[0.08em] text-accent">DO</span>
+          <span className="text-[11px] text-accent">DO</span>
           {copy.do.map((c) => (
             <span key={c} className="text-[13px] leading-[1.4] text-[#E4E2DC]">
               {c}
@@ -242,7 +242,7 @@ export default function FormViewer({
           ))}
         </div>
         <div className="flex flex-col gap-2.5">
-          <span className="font-mono text-[11px] tracking-[0.08em] text-danger-soft">AVOID</span>
+          <span className="text-[11px] text-danger-soft">AVOID</span>
           {copy.avoid.map((c) => (
             <span key={c} className="text-[13px] leading-[1.4] text-[#E4E2DC]">
               {c}

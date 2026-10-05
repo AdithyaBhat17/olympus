@@ -34,12 +34,12 @@ export function CompletedList({
               aria-label={`${it.exercise.name}, done: ${text}${pr ? ", top set PR" : ""}. Open`}
               className={row}
             >
-              <span className="w-6 h-6 rounded-full bg-[rgba(255,106,43,.14)] text-accent flex items-center justify-center shrink-0">
+              <span className="w-6 h-6 rounded-full bg-[rgba(198,61,34,.14)] text-accent flex items-center justify-center shrink-0">
                 <CheckIcon size={13} />
               </span>
               <span className="flex-1 text-muted truncate">{it.exercise.name}</span>
               {pr && <span className="num text-[15px] text-info">PR ↑</span>}
-              <span className={cn("font-mono text-[13px] whitespace-nowrap", pr ? "text-fg-2" : "text-faint")}>{text}</span>
+              <span className={cn("text-[13px] whitespace-nowrap", pr ? "text-fg-2" : "text-faint")}>{text}</span>
             </button>
           );
         })}

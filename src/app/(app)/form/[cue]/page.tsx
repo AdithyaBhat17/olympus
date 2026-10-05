@@ -15,7 +15,7 @@ function loadText(mode: LoadMode, kg: number): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ cue: string }> }) {
   const { cue } = await params;
-  return { title: isFormCueId(cue) ? `${FORM_CUE_TITLES[cue].title} form · Olympus` : "Form cues" };
+  return { title: isFormCueId(cue) ? `${FORM_CUE_TITLES[cue].title} form` : "Form cues" };
 }
 
 export default async function FormCuePage({
@@ -43,18 +43,18 @@ export default async function FormCuePage({
     null;
   const current = ex ? ww.get(ex.id) ?? null : null;
 
-  // Constraint region the cue protects, e.g. "RIGHT KNEE" on the squat.
+  // Constraint region the cue protects, e.g. "Right knee" on the squat.
   const needle = cue === "squat" ? "knee" : cue === "pushdown" ? "wrist" : null;
   const region = needle ? constraints.find((k) => k.region.toLowerCase().includes(needle))?.region.split(" · ")[0] : null;
 
   const eyebrow = [
-    "FORM · 3D",
+    "FORM, 3D",
     ex && current ? loadText(ex.loadMode, current.kg) : null,
-    region?.toUpperCase(),
+    region,
     FORM_DEFS[cue].copy.tag,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
 
   return <FormViewer cue={cue} title={ex?.name ?? FORM_CUE_TITLES[cue].title} eyebrow={eyebrow} />;
 }

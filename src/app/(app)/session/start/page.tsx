@@ -5,7 +5,7 @@ import { requireUserEmail } from "@/lib/auth";
 import { DomainError, startSession } from "@/server/sessions";
 import { planFromLastSession } from "@/server/plans";
 
-export const metadata = { title: "Starting… · Olympus" };
+export const metadata = { title: "Starting…" };
 
 const uuid = z.string().uuid();
 const type = z.string().min(1).max(20);
@@ -40,9 +40,9 @@ export default async function StartSessionPage({
     const message = err instanceof DomainError ? err.message : "That session link isn't valid.";
     return (
       <div className="page-top px-3 flex flex-col gap-4">
-        <section className="mt-6 p-5 rounded-[28px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-4">
+        <section className="mt-6 p-5 rounded-[28px] bg-surface flex flex-col gap-4">
           <span className="eyebrow text-danger-text">Couldn&apos;t start</span>
-          <h1 className="num text-[36px] stretch-72">{message}</h1>
+          <h1 className="num text-[36px]">{message}</h1>
           <Link href="/today" className="btn-chalk">
             Back to Today
           </Link>

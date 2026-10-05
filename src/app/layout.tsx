@@ -1,36 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-// Self-hosted through next/font: no layout shift (size-adjusted fallbacks), no
-// third-party request on cold open.
-const archivo = Archivo({
-  subsets: ["latin"],
-  axes: ["wdth"],
-  variable: "--font-archivo",
-  display: "swap",
-});
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
-  display: "swap",
-});
-
+// System fonts only (SF Pro / SF Pro Rounded on Apple devices): nothing to download.
 export const metadata: Metadata = {
   title: "Olympus — LiftLog",
   description: "Personal training log, programmed by your PT",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "Olympus",
   },
   icons: {
@@ -45,8 +24,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#0A0A0B",
-  colorScheme: "dark",
+  themeColor: "#FBF6F4",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -55,21 +34,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${archivo.variable} ${geist.variable} ${geistMono.variable}`}>
+    <html lang="en">
       <body className="font-sans antialiased">
         {children}
         <Toaster
-          theme="dark"
+          theme="light"
           position="top-center"
           offset="max(12px, env(safe-area-inset-top))"
           toastOptions={{
             style: {
-              background: "#1C1C1F",
+              background: "#1E1412",
               border: "0",
-              boxShadow: "inset 0 0 0 1px #2A2A2E, 0 12px 32px rgba(0,0,0,.5)",
-              color: "#F5F3EE",
-              borderRadius: "16px",
-              fontFamily: "var(--font-geist), system-ui, sans-serif",
+              boxShadow: "0 12px 32px rgba(30,20,18,.25)",
+              color: "#FFFFFF",
+              borderRadius: "22px",
+              fontSize: "15px",
+              fontWeight: 600,
             },
           }}
         />

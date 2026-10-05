@@ -40,8 +40,8 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
   if (rows.length === 0) {
     return (
       <div className="mx-4 mt-6 card flex flex-col gap-2">
-        <p className="font-semibold">Nothing logged yet</p>
-        <p className="text-sm text-muted leading-[1.45]">
+        <p className="text-[22px] font-extrabold">Nothing logged yet</p>
+        <p className="text-[15px] text-muted leading-5">
           Finish a session and each lift shows up here with its working weight and trend.
         </p>
         <Link href="/today" className="btn-secondary mt-2">
@@ -53,8 +53,8 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
 
   return (
     <div className="flex flex-col">
-      <div className="px-3 pt-4 pb-1">
-        <label className="flex items-center gap-2.5 h-12 px-3.5 rounded-2xl bg-surface-2 transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_#FF6A2B]">
+      <div className="px-4 pt-4 pb-1">
+        <label className="flex items-center gap-2.5 h-12 px-3.5 rounded-full bg-surface transition-shadow focus-within:ring-[2.5px] focus-within:ring-inset focus-within:ring-accent">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-muted shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-3.5-3.5" />
@@ -75,22 +75,22 @@ export default function ProgressList({ rows }: { rows: ProgressRow[] }) {
       )}
 
       {groups.map((g) => (
-        <section key={g.category} aria-label={g.category} className="mx-3 mt-5">
-          <h2 className="section-label mx-2 mb-2.5">{g.category.replace(/ — /g, " · ")}</h2>
-          <ul className="card-group m-0 p-0 list-none">
-            {g.rows.map((r) => (
-              <li key={r.id} className="border-b border-line last:border-0">
+        <section key={g.category} aria-label={g.category} className="mx-4 mt-6">
+          <h2 className="section-label mx-1.5 mb-2.5">{g.category.replace(/ — /g, ", ")}</h2>
+          <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
+            {g.rows.map((r, i) => (
+              <li key={r.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
                 <Link
                   href={`/progress/${r.id}`}
-                  className="press-soft group flex items-center gap-3 min-h-[60px] py-2.5 px-4"
+                  className="press-soft group flex items-center gap-3 min-h-[64px] py-2.5 pl-[18px] pr-3.5 rounded-[22px] bg-surface"
                 >
                   <div className="flex-1 min-w-0 flex flex-col">
-                    <span className="truncate font-semibold">{r.name}</span>
-                    <span className="font-mono text-[11px] text-muted">LAST {formatDdMm(r.lastDate)}</span>
+                    <span className="truncate font-bold">{r.name}</span>
+                    <span className="text-[15px] text-muted">Last {formatDdMm(r.lastDate)}</span>
                   </div>
                   <span className="num text-[22px]">
                     {r.load}
-                    {r.unit && <span className="text-sm text-muted font-medium"> {r.unit}</span>}
+                    {r.unit && <span className="text-[13px] text-muted font-bold"> {r.unit}</span>}
                   </span>
                   <TrendMark trend={r.trend} label={r.trendLabel} />
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-faint shrink-0 transition-transform duration-200 group-hover:translate-x-[3px]">
@@ -111,8 +111,8 @@ function TrendMark({ trend, label }: { trend: ProgressRow["trend"]; label: strin
     <span
       title={label}
       className={cn(
-        "w-5 text-center num text-lg shrink-0",
-        trend === "up" ? "text-info" : trend === "down" ? "text-danger-text" : "text-faint"
+        "w-7 h-7 rounded-full inline-flex items-center justify-center num text-[15px] shrink-0",
+        trend === "up" ? "bg-apricot text-apricot-ink" : trend === "down" ? "bg-bg text-danger-text" : "text-faint"
       )}
     >
       <span aria-hidden="true">{trend === "up" ? "↑" : trend === "down" ? "↓" : "–"}</span>

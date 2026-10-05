@@ -69,7 +69,7 @@ export default async function ExerciseProgressPage({
   const current = ww.get(ex.id) ?? null;
   const workingKg = current?.kg ?? status.workingKg;
 
-  // Delta: oldest vs newest logged session, "↑ 10 kg · 12 wk".
+  // Delta: oldest vs newest logged session, "↑ 10 kg, 12 wk".
   let deltaLine: { text: string; tone: "up" | "down" | "flat" } | null = null;
   const newestTop = fullHistory[0] ? topSet(ex.loadMode, fullHistory[0].sets) : null;
   if (fullHistory.length >= 2) {
@@ -86,10 +86,10 @@ export default async function ExerciseProgressPage({
       );
       deltaLine =
         d > 0
-          ? { text: `↑ ${formatKg(d)} kg · ${wk} wk`, tone: "up" }
+          ? { text: `↑ ${formatKg(d)} kg, ${wk} wk`, tone: "up" }
           : d < 0
-            ? { text: `↓ ${formatKg(-d)} kg · ${wk} wk`, tone: "down" }
-            : { text: `Holding · ${wk} wk`, tone: "flat" };
+            ? { text: `↓ ${formatKg(-d)} kg, ${wk} wk`, tone: "down" }
+            : { text: `Holding, ${wk} wk`, tone: "flat" };
     }
   }
 
@@ -109,26 +109,26 @@ export default async function ExerciseProgressPage({
   });
 
   const incrementLabel = ex.isCompound
-    ? `${ex.bodyRegion === "lower" ? "Lower compound" : ex.bodyRegion === "upper" ? "Upper compound" : "Compound"} · +${formatKg(status.increment)} kg`
-    : "Accessory · reps first";
+    ? `${ex.bodyRegion === "lower" ? "Lower compound" : ex.bodyRegion === "upper" ? "Upper compound" : "Compound"}, +${formatKg(status.increment)} kg`
+    : "Accessory, reps first";
 
   const unit =
     ex.loadMode === "PER_SIDE" ? "kg/side" : ex.loadMode === "COUNTERWEIGHT" ? "kg cw" : ex.loadMode === "TIME" ? "min" : "kg";
   const e1rm = newestTop ? estimatedOneRepMax(ex.loadMode, newestTop.weight, newestTop.reps) : null;
 
-  const eyebrow = [row.category.replace(/ — /g, " · "), sessionLabel(history[0]?.sessionType)]
+  const eyebrow = [row.category.replace(/ — /g, ", "), sessionLabel(history[0]?.sessionType)]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
   const formCue = isFormCueId(row.formCueId) ? row.formCueId : null;
   const [before, after] = status.summary.includes(status.label)
     ? status.summary.split(status.label, 2)
     : [status.summary, null];
 
-  const tile = "p-3 rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-0.5 min-w-0";
+  const tile = "px-4 py-3.5 rounded-[26px] bg-surface flex flex-col gap-0.5 min-w-0";
 
   return (
     <div className="flex flex-col">
-      <header className="page-top px-3 flex justify-between items-center">
+      <header className="page-top px-4 flex justify-between items-center">
         <Link href="/progress" aria-label="Back to Progress" className="btn-pill pl-2">
           <BackIcon />
           Progress
@@ -138,20 +138,24 @@ export default async function ExerciseProgressPage({
 
       <div className="arrive px-5 pt-5 flex flex-col gap-1.5">
         <span className="eyebrow">{eyebrow}</span>
-        <h1 className="m-0 num text-[44px] leading-[0.92]">{row.name}</h1>
+        <h1 className="m-0 text-[40px] font-extrabold leading-[44px] tracking-[-0.5px]">{row.name}</h1>
       </div>
 
       <div className="arrive arrive-1 flex items-end gap-3 px-5 pt-[18px]">
         <span className="num text-[72px] leading-[0.85] whitespace-nowrap">
           {workingKg != null ? formatKg(workingKg) : "—"}
-          <span className="text-[22px] text-muted"> {unit}</span>
+          <span className="font-sans text-[22px] font-bold text-muted"> {unit}</span>
         </span>
         <span className="flex flex-col gap-0.5 pb-1.5 min-w-0">
           {deltaLine && (
             <span
               className={cn(
-                "font-mono text-[13px] font-semibold",
-                deltaLine.tone === "up" ? "text-info" : deltaLine.tone === "down" ? "text-danger-text" : "text-muted"
+                "w-fit text-[15px] font-extrabold",
+                deltaLine.tone === "up"
+                  ? "h-7 px-2.5 rounded-full inline-flex items-center bg-apricot text-apricot-ink"
+                  : deltaLine.tone === "down"
+                    ? "text-danger-text"
+                    : "text-muted"
               )}
             >
               {deltaLine.text}
@@ -159,7 +163,7 @@ export default async function ExerciseProgressPage({
           )}
           {newestTop && (
             <span className="text-[13px] text-muted">
-              Top set · {formatKg(newestTop.weight)} × {newestTop.reps}
+              Top set, {formatKg(newestTop.weight)} × {newestTop.reps}
             </span>
           )}
           {current?.source === "override" && (
@@ -171,13 +175,13 @@ export default async function ExerciseProgressPage({
       {points.some((p) => p.top != null) ? (
         <ExerciseChart points={points} today={todayInTz()} loadMode={ex.loadMode} />
       ) : (
-        <section className="card mx-3 mt-4 flex flex-col gap-1">
-          <span className="font-semibold">No sessions logged yet</span>
-          <span className="text-sm text-muted">Log {row.name} once and the chart starts here.</span>
+        <section className="kind-a mx-4 mt-4 px-6 py-8 rounded-[36px] bg-k text-k-on flex flex-col gap-1">
+          <span className="text-[28px] font-extrabold">Nothing to chart yet</span>
+          <span className="text-[17px] opacity-90">Log {row.name} once and the chart starts here.</span>
         </section>
       )}
 
-      <div className="arrive arrive-2 grid grid-cols-3 gap-1.5 mx-3 mt-2">
+      <div className="arrive arrive-2 grid grid-cols-3 gap-2 mx-4 mt-3">
         <div className={tile}>
           <span className="tile-label">Est. 1RM</span>
           <span className="num text-[24px]">{e1rm != null ? formatKg(Math.round(e1rm)) : "—"}</span>
@@ -197,7 +201,7 @@ export default async function ExerciseProgressPage({
 
       <section
         aria-labelledby="bump-title"
-        className="arrive arrive-3 mx-3 mt-2 p-4 rounded-[20px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3"
+        className="arrive arrive-3 mx-4 mt-3 p-5 rounded-[28px] bg-surface flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id="bump-title" className="section-label m-0">
@@ -216,10 +220,14 @@ export default async function ExerciseProgressPage({
           aria-valuetext={`${status.label} sessions`}
         >
           {Array.from({ length: status.needed }, (_, i) => (
-            <div key={i} className={cn("h-1.5 rounded-sm", i < status.hits ? "bg-info" : "bg-key")} />
+            <div
+              key={i}
+              className={cn("h-3 rounded-full animate-pop-in", i < status.hits ? "bg-apricot" : "bg-surface-3")}
+              style={{ animationDelay: `${200 + i * 80}ms` }}
+            />
           ))}
         </div>
-        <p className="m-0 text-sm leading-[1.45] text-fg-2">
+        <p className="m-0 text-[15px] leading-5 text-fg-2">
           {before}
           {after != null && (
             <>
@@ -232,26 +240,30 @@ export default async function ExerciseProgressPage({
       </section>
 
       {history.length > 0 && (
-        <section aria-labelledby="rs-h" className="mx-3 mt-[22px]">
-          <h2 id="rs-h" className="section-label mx-2 mb-2.5">
+        <section aria-labelledby="rs-h" className="mx-4 mt-6">
+          <h2 id="rs-h" className="section-label mx-1.5 mb-2.5">
             Recent sessions
           </h2>
-          <ul className="card-group m-0 p-0 list-none">
+          <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
             {history.map((h, i) => {
               const under = h.sets.some((s) => s.flags?.includes("underloaded"));
               const pr = h.sets.some((s) => s.flags?.includes("top_set_pr")) || i === bestIdx;
               return (
-                <li key={h.sessionId} className="flex items-center gap-3 px-4 py-3.5 border-b border-line last:border-b-0">
-                  <span className="w-[76px] shrink-0 text-[13px] text-muted">{formatDayShort(h.date)}</span>
-                  <span className="flex-1 min-w-0 font-mono text-[13px] text-fg-2">
+                <li
+                  key={h.sessionId}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-[22px] bg-surface animate-rise"
+                  style={{ animationDelay: `${300 + Math.min(i, 8) * 45}ms` }}
+                >
+                  <span className="w-[86px] shrink-0 text-[15px] font-semibold text-muted">{formatDayShort(h.date)}</span>
+                  <span className="flex-1 min-w-0 num text-[15px] text-fg-2">
                     {working(h.sets)
                       .map((s) => `${formatKg(s.weight)}×${s.reps}`)
-                      .join(" · ")}
+                      .join(", ")}
                   </span>
                   {pr ? (
-                    <span className="num text-[16px] text-info">PR</span>
+                    <span className="h-7 px-2.5 rounded-full inline-flex items-center bg-apricot text-apricot-ink text-[13px] font-extrabold">Record</span>
                   ) : under ? (
-                    <span className="num text-[16px] text-accent">
+                    <span className="num text-[17px] text-accent">
                       !<span className="sr-only"> Underloaded</span>
                     </span>
                   ) : null}
@@ -265,14 +277,14 @@ export default async function ExerciseProgressPage({
       {formCue && (
         <Link
           href={`/form/${formCue}?ex=${row.id}`}
-          className="press-soft mx-3 mt-3 h-14 px-4 rounded-[18px] bg-[rgba(140,200,255,.08)] text-info-text flex items-center gap-3"
+          className="press-soft mx-4 mt-3 h-16 px-4 rounded-[26px] bg-berry text-white flex items-center gap-3"
         >
-          <span className="w-8 h-8 rounded-[10px] bg-[rgba(140,200,255,.14)] text-info flex items-center justify-center">
+          <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" />
             </svg>
           </span>
-          <span className="flex-1 font-semibold">Form cues</span>
+          <span className="flex-1 font-extrabold">Form cues</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M9 6l6 6-6 6" />
           </svg>

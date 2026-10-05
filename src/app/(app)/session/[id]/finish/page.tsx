@@ -41,7 +41,7 @@ export default async function FinishPage({
   if (protein != null && protein < TARGETS.proteinG) {
     catches.push({
       kind: "recovery",
-      text: `Protein ${protein}/${TARGETS.proteinG} g — still ${TARGETS.proteinG - protein} g short of the floor.`,
+      text: `Protein ${protein} of ${TARGETS.proteinG} g, still ${TARGETS.proteinG - protein} g short of the floor.`,
     });
   }
 
@@ -62,8 +62,9 @@ export default async function FinishPage({
       sessionId={view.id}
       status={view.status}
       sentAt={view.sentAt}
-      eyebrow={`${formatDayShort(view.date)} · ${label}`}
+      eyebrow={`${formatDayShort(view.date)}, ${label}`}
       label={label}
+      sessionType={view.sessionType}
       startedAt={view.startedAt}
       durationSec={durationSec}
       workingSets={working.length}

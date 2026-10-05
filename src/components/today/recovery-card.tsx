@@ -34,35 +34,47 @@ const SOURCE_LABEL: Record<Source, string> = {
 };
 
 const WATER_STEP = 250;
-const R = 27;
-const C = 2 * Math.PI * R; // 169.6
 
 /** 1750 → "1.75", 2000 → "2" */
 function litres(ml: number): string {
   return String(Math.round(ml / 10) / 100);
 }
 
-function Ring({ value, target, color, delay = 0 }: { value: number | null; target: number; color: string; delay?: number }) {
+/** Bubble that fills from the bottom with a moving wave, like a glass of water. */
+function Fill({
+  value,
+  target,
+  fill,
+  ink,
+  delay = 0,
+  children,
+}: {
+  value: number | null;
+  target: number;
+  fill: string;
+  ink: string;
+  delay?: number;
+  children: React.ReactNode;
+}) {
   const frac = value == null ? 0 : Math.min(1, value / target);
-  const offset = C * (1 - frac);
   return (
-    <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r={R} fill="none" stroke="#26262A" strokeWidth="7" />
-      <circle
-        cx="32"
-        cy="32"
-        r={R}
-        fill="none"
-        stroke={color}
-        strokeWidth="7"
-        strokeLinecap="round"
-        strokeDasharray={C}
-        strokeDashoffset={offset}
-        transform="rotate(-90 32 32)"
-        className="animate-[ring-in_.9s_cubic-bezier(.2,.8,.2,1)_both] transition-[stroke-dashoffset] duration-[350ms] ease-arrive"
-        style={{ ["--full" as string]: C, animationDelay: `${delay}ms` }}
-      />
-    </svg>
+    <span className="relative w-[84px] h-[84px] rounded-full overflow-hidden bg-surface-3 ring-[5px] ring-inset ring-bg animate-pop-in" style={{ animationDelay: `${delay}ms` }}>
+      <span
+        aria-hidden="true"
+        className={cn("absolute inset-x-0 bottom-0 transition-[height] duration-700 ease-arrive", frac === 0 && "invisible")}
+        style={{ height: `${Math.round(frac * 100)}%` }}
+      >
+        <span className="absolute -top-1.5 left-0 h-3.5 w-[200%] animate-wave">
+          <svg viewBox="0 0 192 14" preserveAspectRatio="none" className="block h-3.5 w-full">
+            <path d="M0 7 Q12 0 24 7 T48 7 T72 7 T96 7 T120 7 T144 7 T168 7 T192 7 V14 H0Z" fill={fill} />
+          </svg>
+        </span>
+        <span className="absolute inset-x-0 bottom-0 top-2" style={{ background: fill }} />
+      </span>
+      <span className="absolute inset-0 flex flex-col items-center justify-center" style={{ color: frac > 0.55 ? ink : undefined }}>
+        {children}
+      </span>
+    </span>
   );
 }
 
@@ -92,20 +104,20 @@ export function RecoveryCard(props: RecoveryCardProps) {
   const short = vals.sleepMin != null && vals.sleepMin < TARGETS.minSleepMin;
   const srcLine = Array.from(
     new Set(Object.values(sources).filter((s): s is Source => !!s && s !== "manual").map((s) => SOURCE_LABEL[s]))
-  ).join(" · ");
+  ).join(", ");
 
-  const tile = "rounded-[18px] bg-surface-2 pt-3.5 pb-3 px-2 flex flex-col items-center gap-2 min-w-0";
+  const tile = "flex flex-col items-center gap-2 min-w-0 py-1";
 
   return (
     <section
       aria-labelledby="rec-h"
-      className="arrive arrive-2 mx-3 mt-3 pt-[18px] pb-4 px-4 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3.5"
+      className="arrive arrive-2 mx-4 mt-3 pt-[18px] pb-4 px-4 rounded-[32px] bg-surface flex flex-col gap-3.5"
     >
       <div className="flex justify-between items-center">
         <h2 id="rec-h" className="section-label m-0">
           Recovery
         </h2>
-        <span className="text-xs text-muted">{srcLine || "Tap to log"}</span>
+        <span className="text-[13px] text-muted">{srcLine || "Tap to log"}</span>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -115,9 +127,10 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Sleep ${formatSleep(vals.sleepMin)} of ${targets.sleepMin / 60} h. Edit`}
           className={tile}
         >
-          <Ring value={vals.sleepMin} target={targets.sleepMin} color={short ? "#FF7A6B" : "#B7A6FF"} />
-          <span className="num text-[20px]">{vals.sleepMin == null ? "—" : formatSleep(vals.sleepMin).replace(/\s|m$/g, "")}</span>
-          <span className={cn("text-xs", short ? "text-danger-text" : "text-muted")}>{short ? "Short sleep" : "Sleep"}</span>
+          <Fill value={vals.sleepMin} target={targets.sleepMin} fill={short ? "#B3261E" : "#8E3B5E"} ink="#FFFFFF">
+            <span className="num text-[20px]">{vals.sleepMin == null ? "—" : formatSleep(vals.sleepMin).replace(/\s|m$/g, "")}</span>
+          </Fill>
+          <span className={cn("text-[13px] font-bold", short ? "text-danger-text" : "text-muted")}>{short ? "Short sleep" : "Sleep"}</span>
         </button>
         <button
           type="button"
@@ -125,12 +138,11 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Protein ${vals.proteinG ?? 0} of ${targets.proteinG} grams. Edit`}
           className={tile}
         >
-          <Ring value={vals.proteinG} target={targets.proteinG} color="#FF6A2B" delay={80} />
-          <span className="num text-[20px]">
-            {vals.proteinG ?? "—"}
-            <span className="text-[13px] text-muted">/{targets.proteinG}g</span>
-          </span>
-          <span className="text-xs text-muted">Protein</span>
+          <Fill value={vals.proteinG} target={targets.proteinG} fill="#C63D22" ink="#FFFFFF" delay={80}>
+            <span className="num text-[20px]">{vals.proteinG ?? "—"}</span>
+            <span className="text-[11px] font-bold opacity-75">of {targets.proteinG} g</span>
+          </Fill>
+          <span className="text-[13px] font-bold text-muted">Protein</span>
         </button>
         <button
           type="button"
@@ -138,22 +150,16 @@ export function RecoveryCard(props: RecoveryCardProps) {
           aria-label={`Water ${litres(vals.waterMl ?? 0)} of ${litres(targets.waterMl)} litres. Add 250 ml`}
           className={tile}
         >
-          <span className="relative">
-            <Ring value={vals.waterMl} target={targets.waterMl} color="#8CC8FF" delay={160} />
-            <svg aria-hidden="true" className="absolute inset-0" width="64" height="64" viewBox="0 0 64 64">
-              <path d="M32 24v16M24 32h16" stroke="#8CC8FF" strokeWidth="2.4" strokeLinecap="round" />
-            </svg>
-          </span>
-          <span key={vals.waterMl ?? 0} className="num text-[20px] animate-tick">
-            {litres(vals.waterMl ?? 0)}
-            <span className="text-[13px] text-muted">/{litres(targets.waterMl)}L</span>
-          </span>
-          <span className="text-xs text-muted">Water · tap +250</span>
+          <Fill value={vals.waterMl} target={targets.waterMl} fill="#F2A65A" ink="#3D1F05" delay={160}>
+            <span key={vals.waterMl ?? 0} className="num text-[20px] animate-tick">{litres(vals.waterMl ?? 0)}</span>
+            <span className="text-[11px] font-bold opacity-75">of {litres(targets.waterMl)} L</span>
+          </Fill>
+          <span className="text-[13px] font-bold text-muted">Water, tap +250</span>
         </button>
       </div>
 
       {holdMessage && (
-        <div className="flex gap-2.5 items-start p-3 rounded-[14px] bg-surface-2">
+        <div className="flex gap-2.5 items-start p-3.5 rounded-3xl bg-bg">
           <WarnIcon size={20} className="shrink-0 mt-px text-danger" />
           <div className="flex flex-col gap-0.5">
             <strong className="text-sm font-semibold">Progression on hold today</strong>
@@ -165,7 +171,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
       <button
         type="button"
         onClick={() => setEditing("water")}
-        className="self-center -mt-1 -mb-1 min-h-11 px-3 text-[13px] text-muted"
+        className="self-center -mt-1 -mb-1 min-h-11 px-3 text-[15px] font-semibold text-accent"
       >
         Edit water total
       </button>
@@ -189,7 +195,7 @@ export function RecoveryCard(props: RecoveryCardProps) {
 }
 
 const FIELD_INPUT =
-  "w-full h-14 rounded-[14px] bg-bg text-fg text-center num text-[28px] focus:outline-none shadow-[inset_0_0_0_1px_#2A2A2E] focus:shadow-[inset_0_0_0_1.5px_#FF6A2B] placeholder:text-faint";
+  "w-full h-14 rounded-full bg-surface text-fg text-center num text-[28px] focus:outline-none focus:ring-[2.5px] focus:ring-inset focus:ring-accent placeholder:text-faint";
 
 function CheckInForm({
   field,

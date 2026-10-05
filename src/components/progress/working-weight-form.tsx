@@ -90,7 +90,7 @@ export default function WorkingWeightForm({
         >
           <div className="flex flex-col px-1.5">
             <span className="text-[17px] font-cta">Working weight</span>
-            <span className="text-[13px] text-muted">{exerciseName} · goes in the audit log for your PT</span>
+            <span className="text-[13px] text-muted">{exerciseName}, goes in the audit log for your PT</span>
           </div>
           <div className="grid grid-cols-[7.5rem_1fr] gap-2">
             <div className="flex flex-col gap-1">
@@ -134,7 +134,7 @@ export default function WorkingWeightForm({
           )}
 
           {guard ? (
-            <div role="alert" className="rounded-[16px] bg-accent-bg shadow-[inset_0_0_0_1px_rgba(255,106,43,.35)] p-3 flex flex-col gap-3">
+            <div role="alert" className="rounded-[16px] bg-accent-bg shadow-[inset_0_0_0_1px_rgba(198,61,34,.35)] p-3 flex flex-col gap-3">
               <p className="m-0 text-sm leading-[1.45] text-fg-2">{guard}</p>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" className="btn-ghost" onClick={() => setGuard(null)}>

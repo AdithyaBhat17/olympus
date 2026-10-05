@@ -10,7 +10,8 @@ import { deleteSession } from "@/lib/actions";
 import { mutate } from "@/lib/offline/mutate";
 import { hapticTick } from "@/lib/haptics";
 import { saveRest } from "@/components/session/timers";
-import { cn } from "@/lib/utils";
+import { cn, kindClass } from "@/lib/utils";
+import { Confetti } from "@/components/ui/confetti";
 
 interface FinishScreenProps {
   sessionId: string;
@@ -19,6 +20,8 @@ interface FinishScreenProps {
   eyebrow: string;
   /** "Session B" */
   label: string;
+  /** A, B, C or null: picks the colour block. */
+  sessionType: string | null;
   startedAt: string | null;
   /** Known server-side once the session is finished; null while it is live. */
   durationSec: number | null;
@@ -49,10 +52,10 @@ const CATCH: Record<SessionCatch["kind"], { mark: React.ReactNode; tile: string;
         <path d="M12 19V5M6 11l6-6 6 6" />
       </svg>
     ),
-    tile: "bg-[rgba(140,200,255,.12)] text-info",
+    tile: "bg-[rgba(142,59,94,.12)] text-info",
     label: "Progress",
   },
-  underload: { mark: "!", tile: "bg-[rgba(255,106,43,.14)] text-accent num text-[17px] font-black", label: "Underloaded" },
+  underload: { mark: "!", tile: "bg-[rgba(198,61,34,.14)] text-accent num text-[17px] font-black", label: "Underloaded" },
   blocked: { mark: "×", tile: "bg-danger-bg text-danger num text-[18px]", label: "Blocked" },
   recovery: { mark: "×", tile: "bg-danger-bg text-danger num text-[18px]", label: "Recovery" },
 };
@@ -67,14 +70,6 @@ function summaryLine(catches: SessionCatch[]): string {
   return `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
 }
 
-const SPARKS = [
-  { dx: "-120px", dy: "-30px", c: "#FF6A2B", s: 6 },
-  { dx: "110px", dy: "-44px", c: "#8CC8FF", s: 6 },
-  { dx: "-80px", dy: "40px", c: "#F5F3EE", s: 4 },
-  { dx: "140px", dy: "24px", c: "#FF6A2B", s: 6 },
-  { dx: "-150px", dy: "6px", c: "#8CC8FF", s: 4 },
-  { dx: "60px", dy: "-70px", c: "#F5F3EE", s: 4 },
-];
 
 export default function FinishScreen({
   sessionId,
@@ -82,6 +77,7 @@ export default function FinishScreen({
   sentAt,
   eyebrow,
   label,
+  sessionType,
   startedAt,
   durationSec,
   workingSets,
@@ -188,7 +184,7 @@ export default function FinishScreen({
       router.push("/history");
       router.refresh();
     } catch {
-      toast.error("Couldn't delete — check your connection");
+      toast.error("Couldn't delete. Check your connection.");
     }
   }
 
@@ -197,75 +193,68 @@ export default function FinishScreen({
       await navigator.clipboard.writeText(markdown);
       toast.success("Copied to clipboard");
     } catch {
-      toast.error("Couldn't copy — try Save instead");
+      toast.error("Couldn't copy. Try Save instead.");
     }
   }
 
   const time = elapsed != null ? formatDuration(elapsed) : null;
-  const tile = "px-3 py-3.5 rounded-[20px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-1 min-w-0";
+  const prs = catches.filter((c) => c.kind === "pr").length;
 
   return (
-    <div className="flex flex-col pb-[calc(env(safe-area-inset-bottom)+180px)]">
-      <header className="page-top px-3 flex justify-between items-center">
-        <Link
-          href={live ? `/session/${sessionId}` : "/history"}
-          aria-label={live ? "Back to session" : "Back to log"}
-          className="btn-round"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </Link>
-        <span className="eyebrow">{eyebrow}</span>
-        <span className="w-11" aria-hidden />
-      </header>
+    <div className={cn(kindClass(sessionType), "flex flex-col pb-[calc(env(safe-area-inset-bottom)+180px)]")}>
+      <div className="relative overflow-hidden bg-k text-k-on pb-12">
+        {!sent && <Confetti />}
+        <header className="relative page-top px-4 flex justify-between items-center">
+          <Link
+            href={live ? `/session/${sessionId}` : "/history"}
+            aria-label={live ? "Back to session" : "Back to log"}
+            className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </Link>
+          <span className="text-[15px] font-semibold opacity-90">{eyebrow}</span>
+          <span className="w-11" aria-hidden />
+        </header>
 
-      <div className="relative flex flex-col items-center pt-7 px-5 pb-2 text-center">
-        <div aria-hidden className="absolute inset-x-0 top-10 h-[120px]">
-          {SPARKS.map((p, i) => (
-            <span
-              key={i}
-              className="absolute left-1/2 top-1/2 rounded-full animate-spark"
-              style={{ width: p.s, height: p.s, background: p.c, ["--dx" as string]: p.dx, ["--dy" as string]: p.dy }}
-            />
-          ))}
+        <div className="relative px-6 pt-6 flex flex-col gap-1.5">
+          <h1 className="m-0 text-[56px] font-extrabold leading-[58px] tracking-[-1px] animate-pop-in">
+            {live || !sent ? (prs > 0 ? "New PR!" : "Crushed it.") : "Sent."}
+          </h1>
+          <p className="arrive arrive-1 m-0 text-[17px] opacity-90">
+            {label}. {summaryLine(catches)}
+          </p>
         </div>
-        <span className="w-16 h-16 rounded-[22px] bg-accent text-accent-ink flex items-center justify-center animate-stamp">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-        </span>
-        <h1 className="arrive arrive-1 mt-[18px] mb-0 num text-[52px] leading-[0.92]">
-          {label}
-          {live ? ", done." : sent ? ", sent." : ", done."}
-        </h1>
-        <p className="arrive arrive-2 mt-2 mb-0 text-fg-2">{summaryLine(catches)}</p>
+
+        <section aria-label="Summary" className="relative mt-6 px-5 grid grid-cols-3 justify-items-center gap-3">
+          {[
+            { value: time ? time.value : "—", unit: time?.unit, label: "time" },
+            { value: String(workingSets), unit: null, label: "work sets" },
+            { value: avgRpe != null ? avgRpe.toFixed(1) : "—", unit: null, label: "avg RPE" },
+          ].map((t, i) => (
+            <span
+              key={t.label}
+              className="w-[104px] h-[104px] rounded-full bg-white flex flex-col items-center justify-center animate-pop-in"
+              style={{ animationDelay: `${150 + i * 100}ms` }}
+            >
+              <span className="num text-[30px] text-k-text">
+                {t.value}
+                {t.unit && <span className="text-[15px]"> {t.unit}</span>}
+              </span>
+              <span className="text-[13px] font-bold text-muted">{t.label}</span>
+            </span>
+          ))}
+        </section>
       </div>
 
-      <section aria-label="Summary" className="arrive arrive-2 grid grid-cols-3 gap-1.5 mx-3 mt-[18px]">
-        <div className={tile}>
-          <span className="tile-label">Time</span>
-          <span className="num text-[30px]">
-            {time ? time.value : "—"}
-            {time?.unit && <span className="text-base text-muted"> {time.unit}</span>}
-          </span>
-        </div>
-        <div className={tile}>
-          <span className="tile-label">Work sets</span>
-          <span className="num text-[30px]">{workingSets}</span>
-        </div>
-        <div className={tile}>
-          <span className="tile-label">Avg RPE</span>
-          <span className="num text-[30px]">{avgRpe != null ? avgRpe.toFixed(1) : "—"}</span>
-        </div>
-      </section>
-
+      <div className="-mt-8 relative rounded-t-[40px] bg-bg pt-2">
       <section aria-labelledby="c-h" className="arrive arrive-3 mx-3 mt-[22px]">
         <h2 id="c-h" className="section-label mx-2 mb-2.5">
           What your PT will see
         </h2>
         {catches.length === 0 ? (
-          <p className="m-0 px-4 py-3.5 rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327] text-sm text-muted">
+          <p className="m-0 px-5 py-4 rounded-3xl bg-surface text-[15px] text-muted">
             Nothing flagged. Clean session.
           </p>
         ) : (
@@ -273,11 +262,15 @@ export default function FinishScreen({
             {catches.map((c, i) => {
               const s = CATCH[c.kind];
               return (
-                <li key={i} className="flex gap-3 items-center px-4 py-3.5 rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327]">
-                  <span className={cn("w-8 h-8 shrink-0 rounded-[10px] flex items-center justify-center", s.tile)} aria-hidden>
+                <li
+                  key={i}
+                  className="flex gap-3 items-center px-4 py-3.5 rounded-3xl bg-surface animate-rise"
+                  style={{ animationDelay: `${300 + i * 60}ms` }}
+                >
+                  <span className={cn("w-10 h-10 shrink-0 rounded-full flex items-center justify-center", s.tile)} aria-hidden>
                     {s.mark}
                   </span>
-                  <span className="flex-1 text-sm leading-[1.4]">
+                  <span className="flex-1 text-[15px] leading-5">
                     <span className="sr-only">{s.label}: </span>
                     {c.text}
                   </span>
@@ -299,9 +292,9 @@ export default function FinishScreen({
           maxLength={2000}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Wrist felt fine, deadlift grip slipped on set 3…"
-          className="w-full rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327] text-fg text-[16px] leading-[1.45] px-4 py-3.5 resize-none outline-none focus:shadow-[inset_0_0_0_1.5px_#FF6A2B] placeholder:text-faint"
+          className="w-full rounded-[28px] bg-surface text-fg text-[17px] leading-6 px-5 py-4 resize-none outline-none focus:ring-[2.5px] focus:ring-inset focus:ring-k placeholder:text-faint"
         />
-        <p className="mx-2 mt-2 mb-0 text-xs text-faint">Autosaved as you type · works offline</p>
+        <p className="mx-2 mt-2 mb-0 text-[13px] text-muted">Autosaved as you type, works offline</p>
       </section>
 
       <details className="mx-3 mt-[22px] group">
@@ -310,9 +303,9 @@ export default function FinishScreen({
             <path d="M9 6l6 6-6 6" />
           </svg>
           {live ? "Lift Log entry" : "Export & delete"}
-          <span className="font-mono text-[11px] normal-case tracking-normal text-faint truncate">{fileName}</span>
+          <span className="text-[13px] font-normal text-muted truncate">{fileName}</span>
         </summary>
-        <pre className="m-0 mt-1 p-3.5 rounded-[18px] bg-surface-sunk font-mono text-[11px] leading-[1.6] text-fg-2 whitespace-pre-wrap break-words max-h-[360px] overflow-auto">
+        <pre className="m-0 mt-1 p-4 rounded-[24px] bg-surface text-[13px] leading-[1.6] text-fg-2 whitespace-pre-wrap break-words max-h-[360px] overflow-auto font-sans">
           {markdown}
         </pre>
         <div className="grid grid-cols-2 gap-1.5 mt-2">
@@ -327,21 +320,28 @@ export default function FinishScreen({
           <button
             type="button"
             onClick={() => void handleDelete()}
-            className="mt-2 w-full h-12 rounded-2xl bg-surface shadow-[inset_0_0_0_1px_#232327] text-danger-soft text-[15px] font-semibold"
+            className="mt-2 w-full h-12 rounded-full bg-surface text-danger text-[15px] font-bold"
           >
             Delete session
           </button>
         )}
       </details>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] bg-[linear-gradient(180deg,rgba(10,10,11,0),#0A0A0B_30%)]">
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] bg-[linear-gradient(180deg,rgba(251,246,244,0),#FBF6F4_30%)]">
         <div className="max-w-lg mx-auto flex flex-col gap-2">
           {sent && !live ? (
             <Link href="/today" className="btn-chalk">
               Back to Today
             </Link>
           ) : (
-            <button type="button" onClick={() => void complete("sendToPT")} disabled={leaving} className="btn-primary">
+            <button
+              type="button"
+              onClick={() => void complete("sendToPT")}
+              disabled={leaving}
+              className="relative w-full h-[60px] rounded-full bg-k text-k-on font-extrabold text-[19px] flex items-center justify-center gap-2.5 disabled:opacity-50"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
               </svg>
@@ -353,7 +353,7 @@ export default function FinishScreen({
               type="button"
               onClick={() => void complete("finish")}
               disabled={leaving}
-              className="h-12 rounded-2xl text-fg-2 font-medium text-[15px] disabled:opacity-50"
+              className="h-12 rounded-full text-fg-2 font-bold text-[15px] disabled:opacity-50"
             >
               Finish without sending
             </button>
@@ -363,14 +363,14 @@ export default function FinishScreen({
                 type="button"
                 onClick={() => void complete("sendToPT")}
                 disabled={leaving}
-                className="h-12 rounded-2xl text-fg-2 font-medium text-[15px]"
+                className="h-12 rounded-full text-fg-2 font-bold text-[15px]"
               >
                 Send again with these notes
               </button>
             )
           )}
           {!live && !sent && (
-            <Link href="/today" className="h-12 rounded-2xl text-fg-2 font-medium text-[15px] flex items-center justify-center">
+            <Link href="/today" className="h-12 rounded-full text-fg-2 font-bold text-[15px] flex items-center justify-center">
               Back to Today
             </Link>
           )}

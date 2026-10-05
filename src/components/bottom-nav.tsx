@@ -9,18 +9,18 @@ const tabs = [
     href: "/today",
     label: "Today",
     match: ["/today", "/settings"],
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </>
-    ),
+    icon: <path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" />,
   },
   {
     href: "/history",
     label: "Log",
     match: ["/history", "/log"],
-    icon: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
+    icon: (
+      <>
+        <rect x="3.5" y="5" width="17" height="15" rx="3.5" />
+        <path d="M3.5 10h17M8 3v4M16 3v4" />
+      </>
+    ),
   },
   {
     href: "/progress",
@@ -28,8 +28,8 @@ const tabs = [
     match: ["/progress"],
     icon: (
       <>
-        <path d="M3 17l6-6 4 4 8-8" />
-        <path d="M15 7h6v6" />
+        <path d="M4 4v16h16" />
+        <path d="M7.5 15l4-4.5 3 3L20 7" />
       </>
     ),
   },
@@ -37,58 +37,75 @@ const tabs = [
     href: "/exercises",
     label: "Library",
     match: ["/exercises"],
-    icon: <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />,
+    icon: (
+      <>
+        <path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z" />
+        <path d="M5 16.5a3 3 0 0 1 3-3h11M9 8.5h6" />
+      </>
+    ),
   },
 ];
 
 /** Hidden while training and on full-screen form cues. */
 const HIDE_ON = ["/session", "/form"];
+const ITEM = 66; // px per tab inside the pill
 
 /**
- * Floating capsule tab bar: 12px from the sides, 26px above the safe area,
- * blurred glass, chalk pill on the active tab.
+ * Floating ink pill: icons only, a white capsule springs to the active tab.
  */
 export default function BottomNav() {
   const pathname = usePathname();
   if (HIDE_ON.some((p) => pathname.startsWith(p))) return null;
+  const active = tabs.findIndex((t) => t.match.some((m) => pathname.startsWith(m)));
 
   return (
     <nav
       aria-label="Primary"
-      className="glass fixed z-50 left-3 right-3 mx-auto max-w-[480px] h-16 rounded-[32px] p-1.5 grid grid-cols-4"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 26px)" }}
+      className="fixed z-50 inset-x-0 flex justify-center pointer-events-none"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
     >
-      {tabs.map((tab) => {
-        const active = tab.match.some((m) => pathname.startsWith(m));
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            prefetch
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "rounded-[26px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold",
-              active ? "bg-fg text-bg" : "text-muted"
-            )}
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className={cn("transition-transform duration-200 ease-press", active && "-translate-y-px")}
+      <div
+        className="pointer-events-auto relative h-16 rounded-full bg-fg px-1.5 grid grid-cols-4 items-center shadow-[0_12px_30px_rgba(30,20,18,.3)]"
+        style={{ width: ITEM * tabs.length + 12 }}
+      >
+        {active >= 0 && (
+          <span
+            aria-hidden
+            className="absolute left-1.5 top-1.5 h-[52px] rounded-full bg-white transition-transform duration-500 ease-spring"
+            style={{ width: ITEM, transform: `translateX(${active * ITEM}px)` }}
+          />
+        )}
+        {tabs.map((tab, i) => {
+          const on = i === active;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              prefetch
+              aria-label={tab.label}
+              aria-current={on ? "page" : undefined}
+              className={cn(
+                "relative z-10 h-[52px] flex items-center justify-center transition-colors duration-300",
+                on ? "text-fg" : "text-white"
+              )}
             >
-              {tab.icon}
-            </svg>
-            {tab.label}
-          </Link>
-        );
-      })}
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {tab.icon}
+              </svg>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

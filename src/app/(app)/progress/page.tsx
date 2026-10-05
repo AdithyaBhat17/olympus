@@ -9,7 +9,7 @@ import { formatLoad, progressDelta, topSet } from "@/domain";
 import ProgressList, { type ProgressRow } from "@/components/progress/progress-list";
 import { PageHeader } from "@/components/page-header";
 
-export const metadata = { title: "Progress · Olympus" };
+export const metadata = { title: "Progress" };
 
 export default async function ProgressPage() {
   const userId = await requireUserEmail();

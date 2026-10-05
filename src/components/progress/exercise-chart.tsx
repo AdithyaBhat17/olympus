@@ -107,20 +107,20 @@ export default function ExerciseChart({
   return (
     <section
       aria-label="Top set over time"
-      className="arrive arrive-1 mx-3 mt-4 pt-4 px-3 pb-3 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327]"
+      className="arrive arrive-1 kind-a mx-4 mt-4 pt-5 px-4 pb-4 rounded-[36px] bg-k text-k-on"
     >
       <figure id={`${baseId}-panel`} className="m-0">
         <svg key={range} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label={summary}>
           <defs>
             <linearGradient id={`${baseId}-g`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#FF6A2B" stopOpacity=".28" />
-              <stop offset="1" stopColor="#FF6A2B" stopOpacity="0" />
+              <stop offset="0" stopColor="currentColor" stopOpacity=".22" />
+              <stop offset="1" stopColor="currentColor" stopOpacity="0" />
             </linearGradient>
           </defs>
           {ticks.map((t) => (
             <g key={t.y}>
-              <line x1={0} y1={t.y} x2={W} y2={t.y} stroke="#232327" strokeWidth={1} strokeDasharray="2 4" />
-              <text x={W - 4} y={t.y - 4} textAnchor="end" fill="#5E5C58" fontSize={10} className="font-mono">
+              <line x1={0} y1={t.y} x2={W} y2={t.y} stroke="currentColor" strokeOpacity={0.25} strokeWidth={1} strokeDasharray="2 4" />
+              <text x={W - 4} y={t.y - 4} textAnchor="end" fill="currentColor" fillOpacity={0.8} fontSize={11} fontWeight={600}>
                 {formatKg(Math.round(t.v * 100) / 100)}
               </text>
             </g>
@@ -135,8 +135,8 @@ export default function ExerciseChart({
               <polyline
                 points={pts.map((p) => p.join(",")).join(" ")}
                 fill="none"
-                stroke="#FF6A2B"
-                strokeWidth={3}
+                stroke="currentColor"
+                strokeWidth={4}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 strokeDasharray={Math.ceil(lineLen)}
@@ -152,20 +152,20 @@ export default function ExerciseChart({
                 cy={last[1]}
                 r={5}
                 fill="none"
-                stroke="#FF6A2B"
+                stroke="#F2A65A"
                 strokeWidth={2}
                 className="animate-ping"
                 style={{ transformBox: "fill-box", transformOrigin: "center" }}
               />
-              <circle cx={last[0]} cy={last[1]} r={5} fill="#FF6A2B" stroke="#141416" strokeWidth={2} />
+              <circle cx={last[0]} cy={last[1]} r={7} fill="#F2A65A" stroke="currentColor" strokeWidth={3} className="animate-pop-in [animation-delay:1s]" style={{ transformBox: "fill-box", transformOrigin: "center" }} />
             </>
           )}
           {first && end && first !== end && (
             <>
-              <text x={2} y={H - 4} fill="#5E5C58" fontSize={10} className="font-mono">
+              <text x={2} y={H - 4} fill="currentColor" fillOpacity={0.85} fontSize={11} fontWeight={600}>
                 {formatDdMm(first.date)}
               </text>
-              <text x={PLOT_W} y={H - 4} textAnchor="end" fill="#5E5C58" fontSize={10} className="font-mono">
+              <text x={PLOT_W} y={H - 4} textAnchor="end" fill="currentColor" fillOpacity={0.85} fontSize={11} fontWeight={600}>
                 {formatDdMm(end.date)}
               </text>
             </>
@@ -194,7 +194,7 @@ export default function ExerciseChart({
           </table>
         </figcaption>
       </figure>
-      <div role="radiogroup" aria-label="Range" className="seg mt-2.5">
+      <div role="radiogroup" aria-label="Range" className="flex gap-2 mt-3">
         {RANGES.map((r) => (
           <button
             key={r.key}
@@ -203,7 +203,10 @@ export default function ExerciseChart({
             aria-checked={range === r.key}
             aria-controls={`${baseId}-panel`}
             onClick={() => setRange(r.key)}
-            className={cn("seg-btn h-11", range === r.key && "seg-on")}
+            className={cn(
+              "flex-1 h-11 rounded-full text-[15px] font-extrabold transition-colors",
+              range === r.key ? "bg-white text-k-text" : "bg-white/20"
+            )}
           >
             {r.label}
           </button>

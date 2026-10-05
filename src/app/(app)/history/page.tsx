@@ -9,7 +9,7 @@ import { formatKg } from "@/domain/load";
 import { PageHeader } from "@/components/page-header";
 import HistoryList, { type HistoryDay, type HistorySession, type SessionKind } from "@/components/history-list";
 
-export const metadata = { title: "Log · Olympus" };
+export const metadata = { title: "Log" };
 
 const WEEKS = 5;
 
@@ -64,11 +64,11 @@ export default async function HistoryPage() {
       rpes.length ? `RPE ${formatKg(Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10)}` : null,
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join(", ");
     return {
       id: s.id,
       date: s.date,
-      title: `${formatDayShort(s.date)} · ${title}`,
+      title: `${formatDayShort(s.date)}, ${title}`,
       meta: meta || `${s.sessionExercises.length} exercises`,
       kind,
       live: s.status === "IN_PROGRESS",

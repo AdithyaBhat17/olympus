@@ -6,7 +6,7 @@ import { workingWeights } from "@/server/history";
 import { LiveSession } from "@/components/session/live-session";
 import type { SwapCandidate } from "@/components/session/swap-sheet";
 
-export const metadata = { title: "Live session · Olympus" };
+export const metadata = { title: "Live session" };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

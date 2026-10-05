@@ -133,7 +133,7 @@ export function Sheet({ open, onClose, label, children, variant = "bottom", clas
         aria-label="Close"
         tabIndex={-1}
         onClick={onClose}
-        className="no-press absolute inset-0 bg-black/55 animate-fade-in cursor-default"
+        className="no-press absolute inset-0 bg-fg/50 animate-fade-in cursor-default"
       />
       <div
         ref={panelRef}
@@ -143,7 +143,7 @@ export function Sheet({ open, onClose, label, children, variant = "bottom", clas
         tabIndex={-1}
         className={cn(
           "relative w-full max-w-lg mx-auto max-h-[92dvh] overflow-y-auto overscroll-contain",
-          "bg-sheet rounded-t-[32px] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]",
+          "bg-sheet rounded-t-[40px] shadow-[0_-8px_30px_rgba(30,20,18,.12)]",
           "px-3 pt-2 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+12px))]",
           "flex flex-col gap-3 animate-sheet-up outline-none",
           className

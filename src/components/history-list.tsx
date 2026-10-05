@@ -10,9 +10,9 @@ export type SessionKind = "A" | "B" | "C" | "X" | "O";
 export interface HistorySession {
   id: string;
   date: string;
-  /** "Thu 1 Oct · Push + legs" */
+  /** "Thu 1 Oct, Push + legs" */
   title: string;
-  /** "48 min · 18 sets · RPE 8.0" */
+  /** "48 min, 18 sets, RPE 8.0" */
   meta: string;
   kind: SessionKind;
   live: boolean;
@@ -26,12 +26,13 @@ export interface HistoryDay {
   future: boolean;
 }
 
+/** Session colours, matching the Today card and the lifting screen. */
 const CELL: Record<SessionKind, string> = {
-  A: "bg-accent",
-  B: "bg-info",
-  C: "bg-fg",
-  X: "bg-cardio",
-  O: "bg-cardio",
+  A: "bg-[#C63D22] text-white",
+  B: "bg-[#8E3B5E] text-white",
+  C: "bg-[#F2A65A] text-[#3D1F05]",
+  X: "bg-fg text-bg",
+  O: "bg-fg text-bg",
 };
 
 const FILTERS: Array<{ id: SessionKind | null; label: string }> = [
@@ -43,10 +44,10 @@ const FILTERS: Array<{ id: SessionKind | null; label: string }> = [
 ];
 
 function KindTile({ kind }: { kind: SessionKind }) {
-  const base = "w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0";
+  const base = "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0";
   if (kind === "X" || kind === "O") {
     return (
-      <span className={cn(base, "bg-cardio text-fg")} aria-hidden>
+      <span className={cn(base, CELL[kind])} aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {kind === "X" ? <path d="M3 12h4l3-8 4 16 3-8h4" /> : <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />}
         </svg>
@@ -56,7 +57,7 @@ function KindTile({ kind }: { kind: SessionKind }) {
   return (
     <span
       aria-hidden
-      className={cn(base, "num text-[18px]", kind === "A" ? "bg-accent text-accent-ink" : kind === "B" ? "bg-info text-bg" : "bg-fg text-bg")}
+      className={cn(base, "num text-[20px]", CELL[kind])}
     >
       {kind}
     </span>
@@ -104,24 +105,24 @@ export default function HistoryList({
     <>
       <section
         aria-label="Training calendar, last five weeks"
-        className="arrive arrive-1 mx-3 mt-[18px] p-4 rounded-[24px] bg-surface shadow-[inset_0_0_0_1px_#232327]"
+        className="arrive arrive-1 mx-4 mt-4 px-4 py-[18px] rounded-[32px] bg-surface"
       >
         <div className="flex justify-between items-center mb-3">
-          <span className="font-semibold">{range}</span>
-          <span className="flex gap-2.5 text-xs text-muted">
+          <span className="text-[20px] font-extrabold">{range}</span>
+          <span className="flex gap-2.5 text-[13px] font-semibold text-muted">
             {(["A", "B", "C"] as const).map((k) => (
               <span key={k} className="flex items-center gap-[5px]">
-                <span className={cn("w-2 h-2 rounded-[3px]", CELL[k])} />
+                <span className={cn("w-2.5 h-2.5 rounded-full", CELL[k])} />
                 {k}
               </span>
             ))}
             <span className="flex items-center gap-[5px]">
-              <span className="w-2 h-2 rounded-[3px] bg-cardio" />
+              <span className="w-2.5 h-2.5 rounded-full bg-fg" />
               Cardio
             </span>
           </span>
         </div>
-        <div aria-hidden className="grid grid-cols-7 gap-1.5 text-[11px] text-faint text-center mb-1.5">
+        <div aria-hidden className="grid grid-cols-7 gap-1.5 text-[13px] font-semibold text-muted text-center mb-1.5">
           {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
             <span key={i}>{d}</span>
           ))}
@@ -135,17 +136,19 @@ export default function HistoryList({
                 role="listitem"
                 aria-label={`${d.date}${d.kind ? `: ${d.kind === "X" ? "cardio" : d.kind === "O" ? "session" : `Session ${d.kind}`}` : ""}${d.today ? ", today" : ""}`}
                 className={cn(
-                  "aspect-square rounded-lg animate-day-pop transition-colors duration-200",
-                  on ? CELL[d.kind!] : "bg-[#1A1A1D]",
+                  "aspect-square rounded-full flex items-center justify-center num text-[15px] animate-pop-in transition-colors duration-200",
+                  on ? cn(CELL[d.kind!], "font-extrabold") : "text-muted font-semibold",
                   d.future && "opacity-40",
-                  d.today && "shadow-[0_0_0_2px_#0A0A0B,0_0_0_3.5px_#F5F3EE]"
+                  d.today && !on && "text-accent ring-[3px] ring-inset ring-accent"
                 )}
                 style={{ animationDelay: `${i * 12}ms` }}
-              />
+              >
+                {Number(d.date.slice(8))}
+              </span>
             );
           })}
         </div>
-        <div className="flex justify-between mt-3.5 pt-3 border-t border-line">
+        <div className="flex justify-between mt-4 pt-3.5 border-t border-surface-3">
           {[
             { v: stats.thisWeek, l: "This week" },
             { v: stats.avg, l: "Avg / week" },
@@ -153,20 +156,20 @@ export default function HistoryList({
           ].map((s) => (
             <span key={s.l} className="flex flex-col">
               <span className="num text-[24px]">{s.v}</span>
-              <span className="text-xs text-muted">{s.l}</span>
+              <span className="text-[13px] font-semibold text-muted">{s.l}</span>
             </span>
           ))}
         </div>
       </section>
 
-      <div role="group" aria-label="Filter" className="arrive arrive-2 flex gap-1.5 px-3 pt-4 overflow-x-auto scroller">
+      <div role="group" aria-label="Filter" className="arrive arrive-2 flex gap-2 px-4 pt-4 overflow-x-auto scroller">
         {FILTERS.map((f) => (
           <button
             key={f.label}
             type="button"
             aria-pressed={filter === f.id}
             onClick={() => setFilter(f.id)}
-            className={cn("chip h-11 sm:h-[34px]", filter === f.id && "chip-on")}
+            className={cn("chip h-11 transition-colors", filter === f.id && "chip-on")}
           >
             {f.label}
           </button>
@@ -174,44 +177,52 @@ export default function HistoryList({
       </div>
 
       {sessions.length === 0 ? (
-        <div className="mx-3 mt-6 card flex flex-col gap-2">
-          <p className="m-0 font-semibold">No sessions logged yet</p>
-          <p className="m-0 text-sm text-muted leading-[1.45]">Start today&apos;s session from Today, or add an old one by hand.</p>
+        <div className="mx-4 mt-6 card flex flex-col gap-2 px-5 py-5">
+          <p className="m-0 text-[22px] font-extrabold">Nothing logged yet</p>
+          <p className="m-0 text-[15px] text-muted leading-5">Start today&apos;s session from Today, or add an old one by hand.</p>
         </div>
       ) : groups.length === 0 ? (
-        <p className="px-5 py-10 text-sm text-muted text-center">No sessions of that type in the last few weeks.</p>
+        <p className="px-5 py-10 text-[15px] text-muted text-center">No sessions of that type in the last few weeks.</p>
       ) : (
         groups.map((g, gi) => (
-          <section key={`${g.label}-${gi}`} aria-labelledby={`g-${gi}`} className="arrive arrive-3 mx-3 mt-[18px]">
-            <h2 id={`g-${gi}`} className="section-label mx-2 mb-2.5">
+          <section key={`${g.label}-${gi}`} aria-labelledby={`g-${gi}`} className="arrive arrive-3 mx-4 mt-6">
+            <h2 id={`g-${gi}`} className="section-label mx-1.5 mb-2.5">
               {g.label}
             </h2>
-            <div className="card-group">
-              {g.rows.map((s) => (
+            <div className="flex flex-col gap-2">
+              {g.rows.map((s, ri) => (
                 <Link
                   key={s.id}
                   href={s.live ? `/session/${s.id}` : `/session/${s.id}/finish`}
-                  className="press-soft group flex items-center gap-3.5 px-4 py-3.5 text-fg border-b border-line last:border-b-0"
+                  className="press-soft group flex items-center gap-3.5 py-3 pl-3 pr-4 rounded-3xl bg-surface text-fg animate-rise"
+                  style={{ animationDelay: `${Math.min(gi * 3 + ri, 12) * 45}ms` }}
                 >
                   <KindTile kind={s.kind} />
                   <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="font-semibold truncate">{s.title}</span>
-                    <span className="text-[13px] text-muted truncate">{s.meta}</span>
+                    <span className="font-bold truncate">{s.title}</span>
+                    <span className="text-[15px] text-muted truncate">{s.meta}</span>
                   </span>
                   {s.live ? (
-                    <span className="flex items-center gap-1.5 text-xs text-accent">
+                    <span className="flex items-center gap-1.5 text-[13px] font-bold text-accent">
                       <span className="w-1.5 h-1.5 rounded-full bg-accent animate-live-dot" />
                       Live
                     </span>
                   ) : s.kind !== "X" ? (
-                    <span className={cn("text-xs", s.sent ? "text-info" : "text-accent")}>{s.sent ? "Sent" : "Not sent"}</span>
+                    <span
+                      className={cn(
+                        "h-7 px-2.5 rounded-full inline-flex items-center text-[13px] font-extrabold",
+                        s.sent ? "bg-bg text-muted" : "bg-apricot text-apricot-ink"
+                      )}
+                    >
+                      {s.sent ? "Sent" : "Not sent"}
+                    </span>
                   ) : null}
                   <svg
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#5E5C58"
+                    stroke="#9C8A84"
                     strokeWidth="2.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"

@@ -88,7 +88,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
           </h1>
           <p className="text-sm text-muted">
             Signed in as <span className="text-fg-2">{email}</span>. Access goes to{" "}
-            <span className="font-mono text-xs text-fg-2">{host}</span>
+            <span className="text-xs text-fg-2">{host}</span>
             {client.clientName && (
               <>
                 {" "}

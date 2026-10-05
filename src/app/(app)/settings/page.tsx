@@ -20,7 +20,7 @@ import { GymFloorPrefs } from "@/components/settings/gym-floor-prefs";
 import SignOutButton from "@/components/sign-out-button";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Settings · Olympus" };
+export const metadata = { title: "Settings" };
 
 function ago(d: Date | null | undefined): string {
   if (!d) return "never";
@@ -92,8 +92,8 @@ export default async function SettingsPage({
           {name.charAt(0).toUpperCase()}
         </span>
         <span className="flex flex-col gap-0.5 min-w-0">
-          <span className="font-display font-extrabold stretch-80 text-[30px] leading-none truncate">{name}</span>
-          <span className="text-[13px] text-muted truncate">Signed in with Google · {session?.user?.email}</span>
+          <span className="font-display font-extrabold text-[30px] leading-none truncate">{name}</span>
+          <span className="text-[13px] text-muted truncate">Signed in with Google, {session?.user?.email}</span>
         </span>
       </div>
 
@@ -102,9 +102,9 @@ export default async function SettingsPage({
         <h2 id="pt-h" className="section-label mx-2 mb-2.5">
           Your PT
         </h2>
-        <div className="p-4 rounded-[20px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3">
+        <div className="p-4 rounded-[20px] bg-surface flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <span className={`${ico} bg-[rgba(140,200,255,.12)] text-info`}>
+            <span className={`${ico} bg-[rgba(142,59,94,.12)] text-info`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 12h4l2-5 4 10 2-5h4" />
               </svg>
@@ -113,7 +113,7 @@ export default async function SettingsPage({
               <span className="font-semibold">Claude connector</span>
               <span className={`text-[13px] ${connected ? "text-info" : "text-muted"}`}>
                 {connected
-                  ? `Connected${lastPush ? ` · last ${lastPush.tool === "push_plan" ? "push" : "write"} ${syncedAt(lastPush.createdAt)}` : ""}`
+                  ? `Connected${lastPush ? `, last ${lastPush.tool === "push_plan" ? "push" : "write"} ${syncedAt(lastPush.createdAt)}` : ""}`
                   : "Not connected"}
               </span>
             </span>
@@ -147,9 +147,9 @@ export default async function SettingsPage({
                   {writes.slice(0, 15).map((c) => (
                     <li key={c.id} className="py-2.5 px-1 border-b border-line last:border-0 flex flex-col gap-1">
                       <div className="flex justify-between gap-3 text-sm">
-                        <span className="font-mono text-[13px] text-fg-2">{c.tool}</span>
-                        <span className={`font-mono text-[11px] ${c.ok ? "text-muted" : "text-danger-text"}`}>
-                          {c.ok ? "" : "REJECTED · "}
+                        <span className="text-[13px] text-fg-2">{c.tool}</span>
+                        <span className={`text-[11px] ${c.ok ? "text-muted" : "text-danger-text"}`}>
+                          {c.ok ? "" : "Rejected, "}
                           {c.createdAt.toLocaleString("en-GB", {
                             day: "2-digit",
                             month: "2-digit",
@@ -185,8 +185,8 @@ export default async function SettingsPage({
             <span className="flex-1 flex flex-col gap-0.5 min-w-0">
               <span>Whoop</span>
               <span className="text-xs text-muted">
-                {whoop?.accessToken ? `Sleep · synced ${syncedAt(whoop.lastSyncAt)}` : "Sleep · not connected"}
-                {sleepSource === "whoop" && recovery.today?.sleepMin != null && ` · ${formatSleep(recovery.today.sleepMin)}`}
+                {whoop?.accessToken ? `Sleep, synced ${syncedAt(whoop.lastSyncAt)}` : "Sleep, not connected"}
+                {sleepSource === "whoop" && recovery.today?.sleepMin != null && `, ${formatSleep(recovery.today.sleepMin)}`}
               </span>
               {whoop?.lastError && <span className="text-xs text-danger-text">Last error: {whoop.lastError}</span>}
             </span>
@@ -206,9 +206,9 @@ export default async function SettingsPage({
               <span className="flex-1 flex flex-col gap-0.5 min-w-0">
                 <span>Apple Health</span>
                 <span className="text-xs text-muted">
-                  Protein · water via Shortcut
-                  {health?.ingestTokenHash ? ` · last push ${ago(health.lastSyncAt)}` : ""}
-                  {nutritionSource === "apple_health" && recovery.today?.proteinG != null && ` · ${recovery.today.proteinG} g today`}
+                  Protein, water via Shortcut
+                  {health?.ingestTokenHash ? `, last push ${ago(health.lastSyncAt)}` : ""}
+                  {nutritionSource === "apple_health" && recovery.today?.proteinG != null && `, ${recovery.today.proteinG} g today`}
                 </span>
               </span>
               <span className="h-11 px-3 rounded-[10px] bg-surface-3 text-fg-2 text-[13px] flex items-center">Get Shortcut</span>
@@ -257,7 +257,7 @@ export default async function SettingsPage({
           Form cues
         </Link>
         <SignOutButton />
-        <p className="m-0 mt-1 text-center text-xs text-faint">Olympus · offline-ready · v3</p>
+        <p className="m-0 mt-1 text-center text-xs text-faint">Olympus, offline-ready, v3</p>
       </div>
     </div>
   );

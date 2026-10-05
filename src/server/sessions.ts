@@ -51,6 +51,8 @@ export interface ExerciseMeta {
   isCompound: boolean;
   bodyRegion: "upper" | "lower" | null;
   formCueId: string | null;
+  /** "barbell", "machine"… — decides whether the lifting screen draws plates. */
+  equipment: string | null;
 }
 
 export interface LiveSetView {
@@ -113,6 +115,7 @@ function meta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | 
     isCompound: row.isCompound,
     bodyRegion: row.bodyRegion,
     formCueId: row.formCueId ?? null,
+    equipment: row.equipment ?? null,
   };
 }
 

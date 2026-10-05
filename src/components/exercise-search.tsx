@@ -120,7 +120,7 @@ export default function ExerciseSearch({
         <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-line rounded-xl max-h-64 overflow-y-auto z-50 shadow-xl shadow-black/40 animate-scale-in">
           {Object.entries(grouped).map(([category, exs]) => (
             <div key={category}>
-              <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted bg-surface-2 sticky top-0">
+              <div className="px-3 py-1.5 text-[11px] font-semibold text-muted bg-surface-2 sticky top-0">
                 {category}
               </div>
               {exs.map((exercise) => (

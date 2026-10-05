@@ -130,10 +130,10 @@ function LoadSheetBody({
     ? "minutes"
     : perSide
       ? mode === "plates"
-        ? `plates per side · + ${carriage == null ? "?" : formatKg(carriage)} kg carriage = ${truth == null ? "—" : formatKg(truth)}`
-        : `kg per side${carriage != null ? ` · incl. ${formatKg(carriage)} kg carriage` : ""}`
+        ? `plates per side, plus ${carriage == null ? "?" : formatKg(carriage)} kg carriage, ${truth == null ? "—" : formatKg(truth)} in total`
+        : `kg per side${carriage != null ? `, incl. ${formatKg(carriage)} kg carriage` : ""}`
       : cw
-        ? "kg counterweight · lower = harder"
+        ? "kg counterweight, lower = harder"
         : "kg on the stack";
 
   const ctaLabel =
@@ -150,12 +150,12 @@ function LoadSheetBody({
       <div className="flex justify-between items-center px-1.5">
         <div className="flex flex-col gap-0.5 min-w-0">
           <h2 className="m-0 text-[17px] font-cta">
-            {timed ? `Block ${setLabel} · minutes` : `Set ${setLabel} · load`}
+            {timed ? `Block ${setLabel}, minutes` : `Set ${setLabel}, load`}
           </h2>
           <span className="text-[13px] text-muted truncate">
             {exercise.name}
-            {last && !timed && ` · last ${formatKg(last.weight)} × ${last.reps}`}
-            {last && timed && ` · last ${last.reps} min`}
+            {last && !timed && `, last ${formatKg(last.weight)} × ${last.reps}`}
+            {last && timed && `, last ${last.reps} min`}
           </span>
         </div>
         <button
@@ -224,7 +224,7 @@ function LoadSheetBody({
               key={k}
               type="button"
               onClick={() => pick(k)}
-              className="h-11 px-3 rounded-full bg-[#1F1F22] text-fg-2 num text-[16px]"
+              className="h-11 px-3 rounded-full bg-surface text-fg-2 num text-[16px]"
             >
               {formatKg(k)}
             </button>
@@ -235,7 +235,7 @@ function LoadSheetBody({
               onClick={() => pick(ptMax)}
               className="h-11 px-3 rounded-full bg-info-bg text-info num text-[16px]"
             >
-              {formatKg(ptMax)} · PT max
+              {formatKg(ptMax)}, PT max
             </button>
           )}
         </div>
@@ -249,7 +249,7 @@ function LoadSheetBody({
             onClick={() => press(k)}
             aria-label={k === "del" ? "Delete" : k === "." ? "Decimal point" : k}
             disabled={k === "." && timed}
-            className="h-[54px] rounded-[14px] bg-key active:bg-key-down font-display font-bold stretch-80 text-[26px] flex items-center justify-center disabled:opacity-30"
+            className="h-[54px] rounded-[14px] bg-key active:bg-key-down font-display font-bold text-[26px] flex items-center justify-center disabled:opacity-30"
           >
             {k === "del" ? <BackspaceIcon size={22} /> : k}
           </button>

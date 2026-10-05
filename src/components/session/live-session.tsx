@@ -11,6 +11,7 @@ import { discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions"
 import { mutate } from "@/lib/offline/mutate";
 import { subscribePending } from "@/lib/offline/outbox";
 import { useWakeLock } from "@/lib/wake-lock";
+import { cn, kindClass } from "@/lib/utils";
 import { ChevronDownIcon, WarnIcon } from "./icons";
 import { Elapsed, RestPill, loadRest, saveRest, type RestState } from "./timers";
 import { ExerciseCard } from "./exercise-card";
@@ -144,7 +145,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
 
   const typeLabel = view.sessionType ? `Session ${view.sessionType}` : null;
   const headerTitle =
-    typeLabel && !view.title.startsWith("Session ") ? `${typeLabel} · ${view.title}` : view.title;
+    typeLabel && !view.title.startsWith("Session ") ? `${typeLabel}, ${view.title}` : view.title;
 
   const putOverlay = (key: string, index: number, v: SetLogEntry | null | undefined) =>
     setOverlay((prev) => {
@@ -193,7 +194,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
             setRest({
               endAt: Date.now() + item.restSec * 1000,
               totalSec: item.restSec,
-              label: item.exercise.isCompound ? "Rest · compound" : "Rest · accessory",
+              label: item.exercise.isCompound ? "Rest after a big lift" : "Rest",
             });
           }
         },
@@ -268,6 +269,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
             loadMode: c.loadMode as LiveItemView["exercise"]["loadMode"],
             carriageKgPerSide: c.carriageKgPerSide,
             formCueId: null,
+            equipment: null,
           },
           blockedReason: c.blockedReason,
           lastTopKg: c.lastKg,
@@ -342,29 +344,30 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   };
 
   return (
-    <div className="flex flex-col pb-[calc(env(safe-area-inset-bottom)+40px)]">
-      <header className="page-top px-3 grid grid-cols-[44px_1fr_auto] items-center gap-2">
-        <Link href="/today" prefetch aria-label="Back to Today" className="btn-round">
+    <div className={cn(kindClass(view.sessionType), "min-h-dvh flex flex-col pb-[calc(env(safe-area-inset-bottom)+40px)]")}>
+      <div className="bg-k text-k-on">
+      <header className="page-top px-4 grid grid-cols-[44px_1fr_auto] items-center gap-2">
+        <Link href="/today" prefetch aria-label="Back to Today" className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
           <ChevronDownIcon size={20} strokeWidth={2.4} />
         </Link>
         <div className="flex flex-col items-center gap-0.5 min-w-0">
-          <span className="text-[13px] text-muted truncate max-w-full">{headerTitle}</span>
+          <span className="text-[13px] font-semibold opacity-85 truncate max-w-full">{headerTitle}</span>
           <span className="flex items-center gap-[7px]">
-            <span className="w-[7px] h-[7px] rounded-full bg-accent animate-live-dot" aria-hidden />
+            <span className="w-[7px] h-[7px] rounded-full bg-white animate-live-dot" aria-hidden />
             <span className="num text-[20px]" role="timer" aria-label="Session time">
               <Elapsed startedAt={view.startedAt} />
             </span>
           </span>
         </div>
-        <Link href={`/session/${view.id}/finish`} prefetch className="btn-pill font-semibold">
+        <Link href={`/session/${view.id}/finish`} prefetch className="h-11 px-[18px] rounded-full bg-white/20 flex items-center text-[17px] font-bold">
           Finish
         </Link>
       </header>
 
       {pending > 0 && (
-        <p role="status" className="m-0 mt-2 text-center text-xs text-muted">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-faint mr-1.5 align-middle" />
-          {pending} change{pending === 1 ? "" : "s"} saved on this phone · will sync
+        <p role="status" className="m-0 mt-2 text-center text-[13px] font-semibold opacity-85">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 align-middle" />
+          {pending} change{pending === 1 ? "" : "s"} saved on this phone, will sync
         </p>
       )}
 
@@ -379,9 +382,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         {items.map((it) => {
           const p = it.done ? 1 : it.key === current?.key ? itemProgress(it) : 0;
           return (
-            <span key={it.key} className="relative h-1 flex-1 rounded-sm bg-key overflow-hidden">
+            <span key={it.key} className="relative h-1.5 flex-1 rounded-full bg-white/25 overflow-hidden">
               <span
-                className="absolute inset-0 bg-accent origin-left transition-transform duration-300 ease-arrive"
+                className="absolute inset-0 bg-white origin-left transition-transform duration-500 ease-spring"
                 style={{ transform: `scaleX(${p})` }}
               />
             </span>
@@ -390,11 +393,12 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       </div>
 
       {view.progressionOnHold && (
-        <p className="mx-5 mt-3 mb-0 flex gap-2 items-center text-[13px] text-muted">
-          <WarnIcon size={16} className="text-danger shrink-0" />
-          Progression on hold — hit last session&apos;s loads, no bumps.
+        <p className="mx-5 mt-3 mb-0 flex gap-2 items-center text-[15px] font-semibold opacity-90">
+          <WarnIcon size={16} className="shrink-0" />
+          Progression on hold today: match last session&apos;s loads, no bumps.
         </p>
       )}
+      </div>
 
       {current ? (
         <ExerciseCard
@@ -419,16 +423,16 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           />
         </ExerciseCard>
       ) : (
-        <section className="mx-3 mt-3.5 p-5 rounded-[28px] bg-surface shadow-[inset_0_0_0_1px_#232327] flex flex-col gap-3 items-start">
-          <h1 className="m-0 num text-[36px]">{items.length ? "All exercises done" : "No exercises in this session"}</h1>
-          <p className="m-0 text-sm text-muted">
+        <section className="bg-k text-k-on px-6 pt-6 pb-10 flex flex-col gap-3 items-start">
+          <h1 className="m-0 text-[40px] font-extrabold leading-[44px]">{items.length ? "All exercises done" : "No exercises in this session"}</h1>
+          <p className="m-0 text-[17px] opacity-90">
             {items.length
               ? "Tap a completed exercise to edit it, or wrap up."
               : "This plan has no items. Discard it and start from Today."}
           </p>
           {items.length > 0 && (
-            <Link href={`/session/${view.id}/finish`} prefetch className="btn-primary">
-              Finish session
+            <Link href={`/session/${view.id}/finish`} prefetch className="mt-2 h-[60px] px-8 rounded-full bg-white text-k-text font-extrabold text-[19px] flex items-center">
+              Finish workout
             </Link>
           )}
         </section>
@@ -441,7 +445,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         <button
           type="button"
           onClick={() => void discard()}
-          className="min-h-11 px-4 text-sm text-faint underline underline-offset-4"
+          className="min-h-11 px-4 text-[15px] font-semibold text-muted"
         >
           Discard session
         </button>
@@ -484,7 +488,7 @@ function NoteForm({ exercise, onSave }: { exercise: string | null; onSave: (text
     >
       <div className="flex flex-col px-1.5">
         <span className="text-[17px] font-cta">Note for your PT</span>
-        {exercise && <span className="text-[13px] text-muted">{exercise} · added to the session notes</span>}
+        {exercise && <span className="text-[13px] text-muted">{exercise}, added to the session notes</span>}
       </div>
       <textarea
         data-autofocus
@@ -493,7 +497,7 @@ function NoteForm({ exercise, onSave }: { exercise: string | null; onSave: (text
         maxLength={300}
         onChange={(e) => setText(e.target.value)}
         placeholder="Grip slipped on set 3…"
-        className="w-full rounded-[18px] bg-surface shadow-[inset_0_0_0_1px_#232327] text-fg text-[16px] leading-[1.45] p-3.5 resize-none outline-none focus:shadow-[inset_0_0_0_1.5px_#FF6A2B] placeholder:text-faint"
+        className="w-full rounded-[18px] bg-surface text-fg text-[16px] leading-[1.45] p-3.5 resize-none outline-none focus:ring-[2.5px] focus:ring-inset focus:ring-accent placeholder:text-faint"
       />
       <button type="submit" className="btn-primary" disabled={!text.trim()}>
         Add note

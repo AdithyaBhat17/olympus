@@ -47,13 +47,13 @@ export function loadWithUnit(mode: LoadMode, kg: number): string {
   return mode === "TOTAL" ? `${formatKg(kg)} kg` : formatLoad(mode, kg);
 }
 
-/** Up-next row: "3 × 8–10 · 57". */
+/** Up-next row: "3 × 8–10, 57". */
 export function upNextSummary(item: LiveItemView): string {
   const target = targetLabel(item);
   if (item.exercise.loadMode === "TIME") return plannedMinutes(item)?.label ?? target ?? `${item.sets.length} blocks`;
   const open = openKg(item);
   const parts = [target, open != null ? formatLoad(item.exercise.loadMode, open) : null].filter(Boolean);
-  return parts.length ? parts.join(" · ") : `${item.sets.length} sets`;
+  return parts.length ? parts.join(", ") : `${item.sets.length} sets`;
 }
 
 export function loggedSets(item: Pick<LiveItemView, "sets">): SetLogEntry[] {
@@ -61,7 +61,7 @@ export function loggedSets(item: Pick<LiveItemView, "sets">): SetLogEntry[] {
 }
 
 /**
- * Completed row: "3 × 47 cw · RPE 8" when every working set used the same
+ * Completed row: "3 × 47 cw, RPE 8" when every working set used the same
  * load, otherwise the top set "85 × 5". `pr` = any set flagged top_set_pr.
  */
 export function completedSummary(item: LiveItemView): { text: string; pr: boolean } {
@@ -74,11 +74,11 @@ export function completedSummary(item: LiveItemView): { text: string; pr: boolea
   if (mode === "TIME") {
     const total = sets.reduce((a, s) => a + s.reps, 0);
     const hr = sets.map((s) => s.avgHr).filter((h): h is number => h != null);
-    return { text: `${total} min${hr.length ? ` · avg HR ${Math.round(hr.reduce((a, b) => a + b, 0) / hr.length)}` : ""}`, pr: false };
+    return { text: `${total} min${hr.length ? `, avg HR ${Math.round(hr.reduce((a, b) => a + b, 0) / hr.length)}` : ""}`, pr: false };
   }
   const top = topSet(mode, pool);
   const rpes = pool.map((s) => s.rpe).filter((r): r is number => r != null);
-  const rpe = rpes.length ? ` · RPE ${Math.max(...rpes)}` : "";
+  const rpe = rpes.length ? `, RPE ${Math.max(...rpes)}` : "";
   const sameLoad = pool.every((s) => s.weight === pool[0].weight);
   if (sameLoad && !pr) {
     return { text: `${pool.length} × ${formatLoad(mode, pool[0].weight)}${rpe}`, pr };

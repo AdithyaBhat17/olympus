@@ -391,13 +391,13 @@ export default function SessionForm({
               {/* Per-set rows */}
               <div className="space-y-2">
                 <div className="grid grid-cols-[2rem_1fr_1fr_2.75rem] gap-2 items-center">
-                  <span className="text-[11px] font-semibold text-faint uppercase">
+                  <span className="text-[11px] font-semibold text-faint">
                     Set
                   </span>
-                  <span className="text-[11px] font-semibold text-faint uppercase text-center">
+                  <span className="text-[11px] font-semibold text-faint text-center">
                     Reps
                   </span>
-                  <span className="text-[11px] font-semibold text-faint uppercase text-center">
+                  <span className="text-[11px] font-semibold text-faint text-center">
                     Weight (kg)
                   </span>
                   <span />
@@ -464,7 +464,7 @@ export default function SessionForm({
 
               {/* RPE */}
               <div className="mt-3">
-                <label htmlFor={`rpe-${index}`} className="text-[11px] font-semibold text-faint uppercase mb-1 block">
+                <label htmlFor={`rpe-${index}`} className="text-[11px] font-semibold text-faint mb-1 block">
                   RPE
                 </label>
                 <select

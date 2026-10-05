@@ -54,21 +54,24 @@ function groupOf(category: string): Exclude<Filter, "all" | "blocked"> {
   return "core";
 }
 
-/** Geist Mono tags: equipment, COMPOUND, load-mode rules. */
+/** Small pills: equipment, compound, load-mode rules. */
 function tagsFor(ex: LibraryExercise): Array<{ text: string; ice?: boolean }> {
   const tags: Array<{ text: string; ice?: boolean }> = [];
-  if (ex.equipment) tags.push({ text: ex.equipment.replace(/_/g, " ").toUpperCase() });
-  if (ex.isCompound) tags.push({ text: "COMPOUND" });
-  if (ex.loadMode === "COUNTERWEIGHT") tags.push({ text: "CW · LOWER = HARDER", ice: true });
+  if (ex.equipment) {
+    const e = ex.equipment.replace(/_/g, " ").toLowerCase();
+    tags.push({ text: e.charAt(0).toUpperCase() + e.slice(1) });
+  }
+  if (ex.isCompound) tags.push({ text: "Compound" });
+  if (ex.loadMode === "COUNTERWEIGHT") tags.push({ text: "Counterweight, lower is harder", ice: true });
   if (ex.loadMode === "PER_SIDE")
     tags.push({
-      text: `PER SIDE${ex.carriageKgPerSide != null ? ` · +${formatKg(ex.carriageKgPerSide)}` : ""}`,
+      text: `Per side${ex.carriageKgPerSide != null ? `, +${formatKg(ex.carriageKgPerSide)}` : ""}`,
       ice: true,
     });
-  if (ex.loadMode === "TIME") tags.push({ text: "TIMED" });
-  if (ex.status === "SUB") tags.push({ text: "SUB" });
-  if (ex.isCustom) tags.push({ text: "CUSTOM" });
-  if (ex.hasFormCues) tags.push({ text: "FORM CUES" });
+  if (ex.loadMode === "TIME") tags.push({ text: "Timed" });
+  if (ex.status === "SUB") tags.push({ text: "Substitute" });
+  if (ex.isCustom) tags.push({ text: "Yours" });
+  if (ex.hasFormCues) tags.push({ text: "Form cues" });
   return tags.slice(0, 3);
 }
 
@@ -103,9 +106,9 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
       <div className="arrive arrive-1 px-3 pt-4">
         <label
           htmlFor={searchId}
-          className="flex items-center gap-2.5 h-12 px-3.5 rounded-2xl bg-surface-2 transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_1.5px_#FF6A2B]"
+          className="flex items-center gap-2.5 h-12 px-3.5 rounded-full bg-surface transition-shadow duration-200 focus-within:ring-[2.5px] focus-within:ring-inset focus-within:ring-accent"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8C87" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#74625D" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" className="shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-4-4" />
           </svg>
@@ -158,7 +161,7 @@ export default function ExerciseList({ exercises }: ExerciseListProps) {
       {grouped.map(({ category, exercises: exs }, gi) => (
         <section key={category} aria-labelledby={`lib-${gi}`} className="arrive arrive-3 mx-3 mt-5">
           <h2 id={`lib-${gi}`} className="section-label mx-2 mb-2.5">
-            {category.replace(/ — /g, " · ")}
+            {category.replace(/ — /g, ", ")}
           </h2>
           <ul className="card-group m-0 p-0 list-none">
             {exs.map((ex) => (
@@ -190,7 +193,7 @@ function ExerciseRow({ ex }: { ex: LibraryExercise }) {
               </span>
             )}
           </span>
-          <span className="font-mono text-[11px] text-muted">Blocked</span>
+          <span className="text-[11px] text-muted">Blocked</span>
         </div>
         {ex.substitutes.length > 0 && <p className="m-0 text-xs text-info">Use instead → {ex.substitutes.join(", ")}</p>}
       </li>

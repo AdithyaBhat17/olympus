@@ -2,12 +2,13 @@ import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
 
 /**
- * Olympus v3 "Chalk & Ember" tokens — from the Olympus Redesign canvas.
- * Display + numerals: Archivo (wdth axis, 72–80%). Body: Geist. Meta: Geist Mono.
+ * Olympus "Coral" tokens — light, colour-blocked, Apple-native type.
+ * System fonts only (SF Pro on Apple devices, SF Pro Rounded for numerals).
  *
  * Colour meaning is strict:
- *   accent (ember) = "your move" — primary CTA, active set, the ✓.
- *   info (ice)     = "from your PT" or "progress / up".
+ *   accent (coral) = "your move" — primary CTA, active set, the check.
+ *   info (berry)   = "from your PT" or "progress / up".
+ *   k-*            = the current session type's colour block (.kind-a/b/c/cardio).
  */
 const config: Config = {
   content: [
@@ -18,54 +19,66 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0A0A0B",
-        "bg-deep": "#000000",
-        "bg-nav": "rgba(28,28,31,.72)",
-        surface: "#141416",
-        "surface-2": "#1C1C1F",
-        "surface-3": "#232327",
-        "surface-sunk": "#0F0F11",
-        sheet: "#161618",
-        key: "#26262A",
-        "key-down": "#3A3A40",
-        line: "#232327",
-        "line-soft": "#1C1C1F",
-        "line-strong": "#2A2A2E",
-        fg: "#F5F3EE",
-        "fg-2": "#C9C7C1",
-        muted: "#8E8C87",
-        faint: "#5E5C58",
-        sleep: "#B7A6FF",
-        cardio: "#3A3A40",
+        bg: "#FBF6F4",
+        "bg-deep": "#F6EEEA",
+        "bg-nav": "rgba(30,20,18,.72)",
+        surface: "#F3E8E4",
+        "surface-2": "#EEE2DD",
+        "surface-3": "#E9D9D3",
+        "surface-sunk": "#F0E6E2",
+        sheet: "#FBF6F4",
+        key: "#E9D9D3",
+        "key-down": "#DCC8C0",
+        line: "#E9D9D3",
+        "line-soft": "#EEE2DD",
+        "line-strong": "#DCC8C0",
+        fg: "#1E1412",
+        "fg-2": "#3F302C",
+        muted: "#74625D",
+        faint: "#9C8A84",
+        sleep: "#5B4BC4",
+        apricot: { DEFAULT: "#F2A65A", ink: "#3D1F05" },
+        berry: "#8E3B5E",
+        // Session-type colour block, set by .kind-* on an ancestor (see globals.css).
+        k: {
+          DEFAULT: "rgb(var(--k) / <alpha-value>)",
+          on: "rgb(var(--k-on) / <alpha-value>)",
+          text: "rgb(var(--k-text) / <alpha-value>)",
+          1: "rgb(var(--k1) / <alpha-value>)",
+          2: "rgb(var(--k2) / <alpha-value>)",
+          3: "rgb(var(--k3) / <alpha-value>)",
+        },
+        cardio: "#DCC8C0",
         accent: {
-          DEFAULT: "#FF6A2B",
-          hover: "#FF8A55",
-          ink: "#1A0A00",
-          bg: "rgba(255,106,43,.12)",
-          line: "rgba(255,106,43,.35)",
-          soft: "#FFB08A",
-          ring: "rgba(255,106,43,.35)",
+          DEFAULT: "#C63D22",
+          hover: "#B0341C",
+          ink: "#FFFFFF",
+          bg: "rgba(198,61,34,.12)",
+          line: "rgba(198,61,34,.35)",
+          soft: "#8F2914",
+          ring: "rgba(198,61,34,.35)",
         },
         info: {
-          DEFAULT: "#8CC8FF",
-          ink: "#0A0A0B",
-          bg: "rgba(140,200,255,.1)",
-          line: "rgba(140,200,255,.35)",
-          text: "#D6E9FF",
+          DEFAULT: "#8E3B5E",
+          ink: "#FBF6F4",
+          bg: "rgba(142,59,94,.1)",
+          line: "rgba(142,59,94,.35)",
+          text: "#6E2A47",
         },
         danger: {
-          DEFAULT: "#FF7A6B",
-          soft: "#FF9A8E",
-          text: "#FFB3A8",
-          bg: "rgba(255,122,107,.1)",
-          line: "rgba(255,122,107,.35)",
-          dot: "#3A1E1A",
+          DEFAULT: "#B3261E",
+          soft: "#C9473F",
+          text: "#8C1D18",
+          bg: "rgba(179,38,30,.1)",
+          line: "rgba(179,38,30,.35)",
+          dot: "#F4D9D6",
         },
       },
       fontFamily: {
-        sans: ["var(--font-geist)", "system-ui", "sans-serif"],
-        display: ["var(--font-archivo)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        sans: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "system-ui", "sans-serif"],
+        display: ["ui-rounded", '"SF Pro Rounded"', "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
+        // No monospace anywhere: "mono" is the same system face with tabular figures.
+        mono: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "system-ui", "sans-serif"],
       },
       fontWeight: {
         cta: "650",
@@ -109,6 +122,12 @@ const config: Config = {
         ping: "ping-r 1.6s ease-out 1.1s infinite",
         "word-up": "word-up .7s cubic-bezier(.2,.8,.2,1) both",
         bar: "bar .9s cubic-bezier(.7,0,.2,1) .25s both",
+        bob: "bob 3.2s ease-in-out infinite",
+        wave: "wave 4s linear infinite",
+        breathe: "breathe 1.8s ease-in-out infinite",
+        "plate-in": "plate-in .4s cubic-bezier(.3,.7,.4,1.3) both",
+        fall: "fall linear infinite",
+        "pop-in": "pop-in .45s cubic-bezier(.3,.7,.4,1.4) both",
       },
       keyframes: {
         rise: {
@@ -128,12 +147,12 @@ const config: Config = {
           to: { opacity: "1", transform: "none" },
         },
         "pulse-ember": {
-          "0%": { boxShadow: "0 0 0 0 rgba(255,106,43,.6)" },
-          "100%": { boxShadow: "0 0 0 7px rgba(255,106,43,0)" },
+          "0%": { boxShadow: "0 0 0 0 rgba(198,61,34,.6)" },
+          "100%": { boxShadow: "0 0 0 7px rgba(198,61,34,0)" },
         },
         "pulse-ice": {
-          "0%": { boxShadow: "0 0 0 0 rgba(140,200,255,.55)" },
-          "100%": { boxShadow: "0 0 0 7px rgba(140,200,255,0)" },
+          "0%": { boxShadow: "0 0 0 0 rgba(142,59,94,.55)" },
+          "100%": { boxShadow: "0 0 0 7px rgba(142,59,94,0)" },
         },
         sheen: {
           "0%": { transform: "translateX(-120%)" },
@@ -193,6 +212,28 @@ const config: Config = {
         bar: {
           "0%": { transform: "scaleX(0)" },
           "100%": { transform: "scaleX(1)" },
+        },
+        bob: {
+          "0%,100%": { transform: "translateY(0) rotate(-8deg)" },
+          "50%": { transform: "translateY(-6px) rotate(-6deg)" },
+        },
+        wave: { to: { transform: "translateX(-50%)" } },
+        breathe: {
+          "0%,100%": { boxShadow: "inset 0 0 0 3px rgb(var(--k)), 0 0 0 0 rgb(var(--k) / .45)" },
+          "50%": { boxShadow: "inset 0 0 0 3px rgb(var(--k)), 0 0 0 7px rgb(var(--k) / 0)" },
+        },
+        "plate-in": {
+          from: { opacity: "0", transform: "translateX(18px)" },
+          to: { opacity: "1", transform: "none" },
+        },
+        fall: {
+          "0%": { transform: "translate(0,-60px) rotate(0)" },
+          "100%": { transform: "translate(var(--dx),110vh) rotate(540deg)" },
+        },
+        "pop-in": {
+          "0%": { opacity: "0", transform: "scale(.4)" },
+          "70%": { opacity: "1", transform: "scale(1.12)" },
+          "100%": { transform: "scale(1)" },
         },
       },
     },
