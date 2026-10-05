@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { todayInTz } from "@/lib/dates";
 import { upsertCheckIn } from "@/server/checkins";
 import { markIngested, userForIngestToken } from "@/server/integrations/apple-health";
+import { todayFor } from "@/server/profile";
 
 /**
  * Apple Health bridge for an iOS Shortcut (MyFitnessPal → Apple Health →
@@ -58,8 +58,9 @@ export async function POST(req: Request) {
   const days = "days" in parsed.data ? parsed.data.days : [parsed.data];
 
   const saved: Array<{ date: string; proteinG: number | null; waterMl: number | null; sleepMin: number | null }> = [];
+  const today = await todayFor(userId);
   for (const d of days) {
-    const date = d.date ?? todayInTz();
+    const date = d.date ?? today;
     const patch: Record<string, number> = {};
     if (d.proteinG != null) patch.proteinG = d.proteinG;
     if (d.waterMl != null) patch.waterMl = d.waterMl;

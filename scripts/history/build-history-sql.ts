@@ -93,7 +93,7 @@ for (const e of data.newExercises) {
 // --- Constraints from the log's standing-constraints section -----------------
 for (const c of data.constraints) {
   out.push(
-    `INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES (NULL, ${q(c.region)}, ${q(c.rule)}, ARRAY[${c.blockedPatterns.map(q).join(", ")}]::TEXT[]) ON CONFLICT (region) WHERE user_id IS NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns`
+    `INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES (${q(data.userId)}, ${q(c.region)}, ${q(c.rule)}, ARRAY[${c.blockedPatterns.map(q).join(", ")}]::TEXT[]) ON CONFLICT (user_id, region) WHERE user_id IS NOT NULL DO UPDATE SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns`
   );
 }
 

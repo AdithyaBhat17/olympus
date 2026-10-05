@@ -40,6 +40,12 @@ Run these in order in the Neon SQL editor (or `psql`). They're idempotent.
 5. `supabase/seed-002-liftlog-v2.sql` — injury constraints, load modes,
    carriage values, and the machines the programme uses (with slugs Claude
    uses as `exerciseId`)
+6. `supabase/migration-004-cardio-and-fixes.sql`, `supabase/migration-005-form-cues.sql`
+7. `supabase/seed-003-history.sql` — the imported Lift Log history
+8. `supabase/migration-006-per-user.sql` — athlete profiles (timezone,
+   targets, rotation) and per-user exercise blocks; hands the seeded
+   injuries and blocks to the owner. The owner's email is at the top of the
+   file (and in the seeds): change it if you deploy for someone else.
 
 A Neon URL uses Neon's HTTP driver. Any other URL uses node-postgres, so
 local Postgres works for development.
@@ -57,8 +63,19 @@ cp .env.local.example .env.local
 
 Every variable is documented in `.env.local.example`. You need at least
 `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and
-`APP_URL`. Set `ALLOWED_EMAILS` to your Google address: it locks sign-in,
-the MCP connector, and edits to the shared exercise library to you.
+`APP_URL`. Set `ALLOWED_EMAILS` to your Google address: it locks sign-in
+and the MCP connector to you.
+
+### Sharing with friends
+
+Every athlete's data is their own: sessions, plans, check-ins, coach flags,
+injuries, blocked exercises, timezone, nutrition targets and rotation. To let
+someone in, add their Google address to `ALLOWED_EMAILS` and set
+`OWNER_EMAILS` to yours, so only you can recalibrate the shared machines in
+the exercise library. On first visit their timezone comes from their browser;
+they set targets, rotation and injuries in Settings › Your training and
+Settings › Injuries & limits, and connect their own Claude with the same
+connector URL.
 
 ### 5. Run
 

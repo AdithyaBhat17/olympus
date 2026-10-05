@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
 import { formatDayShort } from "@/lib/dates";
 import { DomainError, getSessionView, sessionExport } from "@/server/sessions";
-import { TARGETS, type SessionCatch, type SetLogEntry } from "@/domain";
+import type { SessionCatch, SetLogEntry } from "@/domain";
 import FinishScreen from "@/components/finish/finish-screen";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,10 +38,11 @@ export default async function FinishPage({
 
   const catches: SessionCatch[] = [...exp.catches];
   const protein = view.checkIn?.proteinG;
-  if (protein != null && protein < TARGETS.proteinG) {
+  const floor = view.targets.proteinG;
+  if (protein != null && floor != null && protein < floor) {
     catches.push({
       kind: "recovery",
-      text: `Protein ${protein} of ${TARGETS.proteinG} g, still ${TARGETS.proteinG - protein} g short of the floor.`,
+      text: `Protein ${protein} of ${floor} g, still ${floor - protein} g short of the floor.`,
     });
   }
 

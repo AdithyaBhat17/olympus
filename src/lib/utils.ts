@@ -21,8 +21,9 @@ export function formatDateShort(dateStr: string): string {
   });
 }
 
+/** Today in the device's own timezone (en-CA formats as YYYY-MM-DD). */
 export function todayISO(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toLocaleDateString("en-CA");
 }
 
 /** "Lower Body — Quad Dominant" as display copy: "Lower Body, Quad Dominant". */
@@ -30,16 +31,14 @@ export function formatCategory(category: string): string {
   return category.replace(/ — /g, ", ");
 }
 
-/** Colour block for a session type: A coral, B berry, C apricot, anything else (cardio, other) ink. */
+const KINDS = ["kind-a", "kind-b", "kind-c"] as const;
+
+/**
+ * Colour block for a session type: A coral, B berry, C apricot, then round
+ * again (D coral, E berry…). Anything that isn't a rotation letter (cardio,
+ * other) is ink.
+ */
 export function kindClass(sessionType: string | null | undefined): string {
-  switch (sessionType) {
-    case "A":
-      return "kind-a";
-    case "B":
-      return "kind-b";
-    case "C":
-      return "kind-c";
-    default:
-      return "kind-cardio";
-  }
+  if (!sessionType || !/^[A-Z]$/.test(sessionType)) return "kind-cardio";
+  return KINDS[(sessionType.charCodeAt(0) - 65) % KINDS.length];
 }

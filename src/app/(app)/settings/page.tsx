@@ -8,6 +8,8 @@ import { recentToolCalls } from "@/server/audit";
 import { getWhoop, whoopConfigured } from "@/server/integrations/whoop";
 import { getAppleHealth } from "@/server/integrations/apple-health";
 import { getRecovery } from "@/server/checkins";
+import { getProfile } from "@/server/profile";
+import { listConstraintRows } from "@/server/exercises";
 import { BackIcon } from "@/components/page-header";
 import { CopyField } from "@/components/settings/copy-field";
 import {
@@ -17,6 +19,8 @@ import {
 } from "@/components/settings/connection-buttons";
 import { PushToggle } from "@/components/settings/push-toggle";
 import { GymFloorPrefs } from "@/components/settings/gym-floor-prefs";
+import { ProfileForm } from "@/components/settings/profile-form";
+import { Injuries } from "@/components/settings/injuries";
 import SignOutButton from "@/components/sign-out-button";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +36,9 @@ function ago(d: Date | null | undefined): string {
 }
 
 /** "07:12" today, else "3 d ago". */
-function syncedAt(d: Date | null | undefined): string {
+function syncedAt(d: Date | null | undefined, tz: string): string {
   if (!d) return "never";
-  return Date.now() - d.getTime() < 20 * 3600 * 1000 ? formatTimeInTz(d) : ago(d);
+  return Date.now() - d.getTime() < 20 * 3600 * 1000 ? formatTimeInTz(d, tz) : ago(d);
 }
 
 const WHOOP_FLASH: Record<string, string> = {
@@ -64,13 +68,16 @@ export default async function SettingsPage({
   const h = await headers();
   const origin = publicOrigin(new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h }));
 
-  const [clients, calls, whoop, health, recovery] = await Promise.all([
+  const [clients, calls, whoop, health, recovery, profile, injuries] = await Promise.all([
     connectionStatus(userId),
     recentToolCalls(userId, 40),
     getWhoop(userId),
     getAppleHealth(userId),
     getRecovery(userId),
+    getProfile(userId),
+    listConstraintRows(userId),
   ]);
+  const tz = profile.timezone;
   const writes = calls.filter((c) => c.kind === "write");
   const lastPush = calls.find((c) => c.tool === "push_plan" && c.ok) ?? writes[0] ?? null;
   const sleepSource = recovery.today?.sources.sleep;
@@ -113,7 +120,7 @@ export default async function SettingsPage({
               <span className="font-semibold">Claude connector</span>
               <span className={`text-[13px] ${connected ? "text-info" : "text-muted"}`}>
                 {connected
-                  ? `Connected${lastPush ? `, last ${lastPush.tool === "push_plan" ? "push" : "write"} ${syncedAt(lastPush.createdAt)}` : ""}`
+                  ? `Connected${lastPush ? `, last ${lastPush.tool === "push_plan" ? "push" : "write"} ${syncedAt(lastPush.createdAt, tz)}` : ""}`
                   : "Not connected"}
               </span>
             </span>
@@ -155,7 +162,7 @@ export default async function SettingsPage({
                             month: "2-digit",
                             hour: "2-digit",
                             minute: "2-digit",
-                            timeZone: process.env.APP_TIMEZONE || "Asia/Dubai",
+                            timeZone: tz,
                           })}
                         </span>
                       </div>
@@ -167,6 +174,33 @@ export default async function SettingsPage({
             </details>
           )}
         </div>
+      </section>
+
+      {/* Your training ----------------------------------------------------- */}
+      <section aria-labelledby="train-h" className="arrive arrive-2 mx-3 mt-[22px]">
+        <h2 id="train-h" className="section-label mx-2 mb-2.5">
+          Your training
+        </h2>
+        <ProfileForm
+          initial={{
+            timezone: tz,
+            rotation: profile.rotation,
+            minSleepMin: profile.targets.minSleepMin,
+            kcal: profile.targets.kcal,
+            proteinG: profile.targets.proteinG,
+            waterMl: profile.targets.waterMl,
+          }}
+        />
+      </section>
+
+      {/* Injuries & limits -------------------------------------------------- */}
+      <section aria-labelledby="inj-h" className="arrive arrive-2 mx-3 mt-[22px]">
+        <h2 id="inj-h" className="section-label mx-2 mb-2.5">
+          Injuries &amp; limits
+        </h2>
+        <Injuries
+          items={injuries.map((c) => ({ id: c.id, region: c.region, rule: c.rule, blockedPatterns: c.blockedPatterns }))}
+        />
       </section>
 
       {/* Recovery sources -------------------------------------------------- */}
@@ -185,7 +219,7 @@ export default async function SettingsPage({
             <span className="flex-1 flex flex-col gap-0.5 min-w-0">
               <span>Whoop</span>
               <span className="text-xs text-muted">
-                {whoop?.accessToken ? `Sleep, synced ${syncedAt(whoop.lastSyncAt)}` : "Sleep, not connected"}
+                {whoop?.accessToken ? `Sleep, synced ${syncedAt(whoop.lastSyncAt, tz)}` : "Sleep, not connected"}
                 {sleepSource === "whoop" && recovery.today?.sleepMin != null && `, ${formatSleep(recovery.today.sleepMin)}`}
               </span>
               {whoop?.lastError && <span className="text-xs text-danger-text">Last error: {whoop.lastError}</span>}

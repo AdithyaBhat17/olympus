@@ -1,4 +1,4 @@
-import { TARGETS } from "./targets";
+import { DEFAULT_TARGETS, type Targets } from "./targets";
 
 export interface CheckIn {
   date: string;
@@ -20,6 +20,8 @@ export interface RecoverySummary {
    * for today, so nobody knows. Unknown must be asked about, never assumed fine.
    */
   gate: "clear" | "hold" | "unknown";
+  /** The sleep floor this was judged against. */
+  minSleepMin: number;
 }
 
 export function formatSleep(min: number | null | undefined): string {
@@ -32,8 +34,9 @@ export function formatSleep(min: number | null | undefined): string {
 /** `checkIns` newest first. */
 export function summarizeRecovery(
   checkIns: CheckIn[],
-  minSleepMin: number = TARGETS.minSleepMin
+  targets: Pick<Targets, "minSleepMin" | "proteinG"> = DEFAULT_TARGETS
 ): RecoverySummary {
+  const { minSleepMin, proteinG } = targets;
   let shortSleepStreak = 0;
   for (const c of checkIns) {
     if (c.sleepMin == null || c.sleepMin >= minSleepMin) break;
@@ -43,19 +46,20 @@ export function summarizeRecovery(
   const avgSleepMin = sleeps.length
     ? Math.round(sleeps.reduce((a, b) => a + b, 0) / sleeps.length)
     : null;
-  const daysUnderProtein = checkIns.filter(
-    (c) => c.proteinG != null && c.proteinG < TARGETS.proteinG
-  ).length;
+  const daysUnderProtein =
+    proteinG == null
+      ? 0
+      : checkIns.filter((c) => c.proteinG != null && c.proteinG < proteinG).length;
 
   const streaks: string[] = [];
   if (shortSleepStreak > 0) {
     streaks.push(
-      `${shortSleepStreak} night${shortSleepStreak === 1 ? "" : "s"} under ${minSleepMin / 60} h`
+      `${shortSleepStreak} night${shortSleepStreak === 1 ? "" : "s"} under ${formatHours(minSleepMin)} h`
     );
   }
   if (daysUnderProtein > 0) {
     streaks.push(
-      `${daysUnderProtein} of ${checkIns.length} days under ${TARGETS.proteinG} g protein`
+      `${daysUnderProtein} of ${checkIns.length} days under ${proteinG} g protein`
     );
   }
 
@@ -72,7 +76,13 @@ export function summarizeRecovery(
         : today.sleepMin < minSleepMin
           ? "hold"
           : "clear",
+    minSleepMin,
   };
+}
+
+/** 360 → "6", 390 → "6.5" */
+export function formatHours(min: number): string {
+  return String(Math.round((min / 60) * 10) / 10);
 }
 
 function ordinal(n: number): string {
@@ -88,7 +98,7 @@ export function holdMessage(summary: RecoverySummary): string | null {
     summary.shortSleepStreak > 1
       ? `, ${ordinal(summary.shortSleepStreak)} short night`
       : "";
-  return `Sleep under ${TARGETS.minSleepMin / 60} h${nth}. Hit last session's loads; no bumps.`;
+  return `Sleep under ${formatHours(summary.minSleepMin)} h${nth}. Hit last session's loads; no bumps.`;
 }
 
 /** One line for Claude/the app on whether load may go up today. */

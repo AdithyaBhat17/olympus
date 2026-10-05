@@ -1,17 +1,17 @@
 -- LiftLog v2 seed: constraints, load modes, carriage values, and the machines
 -- the current programme actually uses. Run after migration-003. Idempotent.
 
--- Constraints (global: user_id NULL) ---------------------------------------------
+-- Constraints (the owner's injuries; see migration-006) ---------------------------
 INSERT INTO constraints (user_id, region, rule, blocked_patterns) VALUES
-  (NULL, 'Left wrist · TFCC', 'No loaded supination or pronation on a fixed straight bar',
+  ('evilpotato345@gmail.com', 'Left wrist · TFCC', 'No loaded supination or pronation on a fixed straight bar',
     ARRAY['straight-bar curl', 'barbell curl', 'reverse barbell curl', 'straight-bar pushdown',
           'reverse-grip pushdown', 'fixed straight-bar preacher', 'barbell shrug',
           'flat-palm push-up']),
-  (NULL, 'Shoulder · impingement', 'No barbell overhead or behind-the-neck pressing',
+  ('evilpotato345@gmail.com', 'Shoulder · impingement', 'No barbell overhead or behind-the-neck pressing',
     ARRAY['barbell OHP', 'behind-the-neck press']),
-  (NULL, 'Right knee', 'Machine squat to the depth stop only, knees tracking the 2nd–3rd toe',
+  ('evilpotato345@gmail.com', 'Right knee', 'Machine squat to the depth stop only, knees tracking the 2nd–3rd toe',
     ARRAY[]::TEXT[])
-ON CONFLICT (region) WHERE user_id IS NULL DO UPDATE
+ON CONFLICT (user_id, region) WHERE user_id IS NOT NULL DO UPDATE
   SET rule = EXCLUDED.rule, blocked_patterns = EXCLUDED.blocked_patterns;
 
 -- Exercises the redesign programmes (slugs are what Claude passes as exerciseId) ---

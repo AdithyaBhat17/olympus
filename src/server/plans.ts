@@ -2,7 +2,6 @@ import "server-only";
 import { db } from "@/lib/db";
 import { planItems, plans, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
-import { todayInTz } from "@/lib/dates";
 import {
   DEFAULT_REST_SEC,
   topSet,
@@ -19,6 +18,7 @@ import { exerciseRef, getConstraints, listExercises, resolveRef } from "./exerci
 import { lastTopSetKg, resolveSets } from "./history";
 import { getCheckIn } from "./checkins";
 import { sendPushToUser } from "./push";
+import { todayFor } from "./profile";
 
 export type PlanRow = typeof plans.$inferSelect;
 export type PlanItemRow = typeof planItems.$inferSelect;
@@ -254,7 +254,7 @@ export async function getPlan(
 export async function getUpcomingPlan(
   userId: string
 ): Promise<(PlanRow & { items: PlanItemRow[] }) | null> {
-  const today = todayInTz();
+  const today = await todayFor(userId);
   const plan = await db.query.plans.findFirst({
     where: and(
       eq(plans.userId, userId),
@@ -293,7 +293,7 @@ export async function planFromLastSession(
   });
   const all = await listExercises(userId);
   const byId = new Map<string, DomainExercise>(all.map((e) => [e.id, e]));
-  const today = todayInTz();
+  const today = await todayFor(userId);
   const items: PlanPayload["items"] = (last?.sessionExercises ?? [])
     .sort((a, b) => a.orderIndex - b.orderIndex)
     .map((se, i) => {

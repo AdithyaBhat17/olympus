@@ -3,7 +3,6 @@ import { DomainError } from "./errors";
 import { db } from "@/lib/db";
 import { dailyCheckIns, planItems, plans, sessionExercises, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
-import { todayInTz } from "@/lib/dates";
 import {
   blockedReason,
   annotateSets,
@@ -18,6 +17,7 @@ import {
   type PlanSet,
   type SessionCatch,
   type SetLogEntry,
+  type Targets,
   type UnderloadNudge,
 } from "@/domain";
 import {
@@ -31,6 +31,7 @@ import { aggregateColumns, previousSessions, resolveSets, workingWeights } from 
 import { getCheckIn } from "./checkins";
 import { flagsFor, listOpenFlags } from "./flags";
 import { getPlan, setPlanStatus } from "./plans";
+import { getProfile, todayFor } from "./profile";
 
 type SessionRow = typeof sessions.$inferSelect;
 type SessionExerciseRow = typeof sessionExercises.$inferSelect;
@@ -102,6 +103,7 @@ export interface SessionView {
   items: LiveItemView[];
   progressionOnHold: boolean;
   checkIn: { sleepMin: number | null; proteinG: number | null; waterMl: number | null } | null;
+  targets: Pick<Targets, "proteinG" | "waterMl">;
 }
 
 function meta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
@@ -206,7 +208,7 @@ export async function getLiveSession(userId: string): Promise<SessionRow | null>
 
 export async function getSessionView(userId: string, sessionId: string): Promise<SessionView> {
   const session = await ownedSession(userId, sessionId);
-  const [{ domain, byId }, cons, logged, plan, openFlags, checkIn] = await Promise.all([
+  const [{ domain, byId }, cons, logged, plan, openFlags, checkIn, profile] = await Promise.all([
     exerciseIndex(userId),
     getConstraints(userId),
     db
@@ -217,6 +219,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     session.planId ? getPlan(userId, session.planId) : Promise.resolve(null),
     listOpenFlags(userId),
     getCheckIn(userId, session.date),
+    getProfile(userId),
   ]);
 
   const swaps = session.swaps ?? {};
@@ -297,7 +300,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     if (v) items.push(v);
   }
 
-  const gate = (plan?.recoveryGate?.minSleepH ?? 6) * 60;
+  const gate = plan?.recoveryGate ? plan.recoveryGate.minSleepH * 60 : profile.targets.minSleepMin;
   return {
     id: session.id,
     date: session.date,
@@ -322,6 +325,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     checkIn: checkIn
       ? { sleepMin: checkIn.sleepMin, proteinG: checkIn.proteinG, waterMl: checkIn.waterMl }
       : null,
+    targets: { proteinG: profile.targets.proteinG, waterMl: profile.targets.waterMl },
   };
 }
 
@@ -353,7 +357,7 @@ export async function startSession(
     .insert(sessions)
     .values({
       userId,
-      date: todayInTz(),
+      date: await todayFor(userId),
       sessionName: `Session ${plan.sessionType} · ${plan.title}`,
       weekNumber: prev?.weekNumber ?? 1,
       blockNumber: prev?.blockNumber ?? "1",
@@ -624,6 +628,7 @@ export function sessionExport(
     title: view.title,
     notes: view.notes,
     checkIn: view.checkIn,
+    targets: view.targets,
     exercises: view.items
       .filter((i) => i.sets.some((s) => s.logged))
       .map((i) => ({
@@ -865,7 +870,7 @@ export async function exportSessions(
 
   const planIds = Array.from(new Set(rows.map((r) => r.planId).filter((id): id is string => !!id)));
   const dates = Array.from(new Set(rows.map((r) => r.date)));
-  const [{ byId }, logged, planRows, checkIns] = await Promise.all([
+  const [{ byId }, logged, planRows, checkIns, profile] = await Promise.all([
     exerciseIndex(userId),
     db
       .select()
@@ -882,7 +887,9 @@ export async function exportSessions(
       .select()
       .from(dailyCheckIns)
       .where(and(eq(dailyCheckIns.userId, userId), inArray(dailyCheckIns.date, dates))),
+    getProfile(userId),
   ]);
+  const targets = { proteinG: profile.targets.proteinG, waterMl: profile.targets.waterMl };
 
   const planById = new Map(planRows.map((p) => [p.id, p]));
   const checkInByDate = new Map(checkIns.map((c) => [c.date, c]));
@@ -902,6 +909,7 @@ export async function exportSessions(
       title: sessionTitle(s, plan),
       notes: s.notes,
       checkIn: c ? { sleepMin: c.sleepMin, proteinG: c.proteinG, waterMl: c.waterMl } : null,
+      targets,
       exercises: assembleItems(plan, s.swaps ?? {}, loggedBySession.get(s.id) ?? []).flatMap((a) => {
         const ex = byId.get(a.exerciseId);
         const sets = a.row ? resolveSets(a.row) : [];
@@ -933,7 +941,7 @@ export async function recentSessionTypes(userId: string, limit = 10): Promise<st
 
 
 export interface RotationSummary {
-  /** Newest DONE rotation type ("A" | "B" | "C"), cardio skipped. */
+  /** Newest DONE session whose type is in the rotation; cardio skipped. */
   lastType: string | null;
   /** Per type: the most recent DONE session's date and title ("Push + legs"). */
   lastByType: Record<string, { date: string; title: string }>;

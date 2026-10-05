@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { cn, formatCategory } from "@/lib/utils";
 import { EXERCISE_CATEGORIES } from "@/lib/constants";
 import { createCustomExercise } from "@/lib/actions";
-import { setCarriageAction } from "@/lib/liftlog-actions";
+import { setCarriageAction, setExerciseBlockAction } from "@/lib/liftlog-actions";
 import { formatKg } from "@/domain/load";
 import type { LoadMode } from "@/domain/types";
 
@@ -25,6 +25,8 @@ export interface LibraryExercise {
   workingKg: number | null;
   blocked: boolean;
   blockedReason: string | null;
+  /** you = a personal block (can be undone here); injury = a Settings constraint. */
+  blockedBy: "you" | "injury" | "library" | null;
   substitutes: string[];
 }
 
@@ -193,7 +195,11 @@ function ExerciseRow({ ex }: { ex: LibraryExercise }) {
               </span>
             )}
           </span>
-          <span className="text-[11px] text-muted">Blocked</span>
+          {ex.blockedBy === "you" ? (
+            <UnblockButton ex={ex} />
+          ) : (
+            <span className="text-[11px] text-muted">{ex.blockedBy === "injury" ? "Injury" : "Blocked"}</span>
+          )}
         </div>
         {ex.substitutes.length > 0 && <p className="m-0 text-xs text-info">Use instead → {ex.substitutes.join(", ")}</p>}
       </li>
@@ -227,6 +233,32 @@ function ExerciseRow({ ex }: { ex: LibraryExercise }) {
         </div>
       )}
     </li>
+  );
+}
+
+function UnblockButton({ ex }: { ex: LibraryExercise }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      aria-label={`Unblock ${ex.name}`}
+      onClick={() =>
+        startTransition(async () => {
+          const res = await setExerciseBlockAction(ex.id, null);
+          if (!res.ok) {
+            toast.error(res.error);
+            return;
+          }
+          toast.success(`${ex.name} is back in your library`);
+          router.refresh();
+        })
+      }
+      className="h-11 -my-2 -mr-2 px-3 rounded-[14px] text-sm text-accent disabled:opacity-50"
+    >
+      {pending ? "Unblocking…" : "Unblock"}
+    </button>
   );
 }
 

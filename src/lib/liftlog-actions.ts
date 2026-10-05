@@ -9,7 +9,6 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireUserEmail } from "@/lib/auth";
-import { todayInTz } from "@/lib/dates";
 import {
   DomainError,
   discardSession,
@@ -25,7 +24,8 @@ import {
 import { planFromLastSession } from "@/server/plans";
 import { upsertCheckIn } from "@/server/checkins";
 import { addFlag, resolveFlag } from "@/server/flags";
-import { setCarriage } from "@/server/exercises";
+import { setCarriage, setExerciseBlock } from "@/server/exercises";
+import { todayFor } from "@/server/profile";
 import { updateWorkingWeight } from "@/server/working-weight";
 import { deleteSubscription, saveSubscription, sendPushToUser } from "@/server/push";
 
@@ -208,7 +208,7 @@ export async function upsertCheckInAction(input: {
       })
       .parse(input);
     const { date, ...patch } = v;
-    await upsertCheckIn(userId, date ?? todayInTz(), patch, "manual");
+    await upsertCheckIn(userId, date ?? (await todayFor(userId)), patch, "manual");
     revalidatePath("/today");
     return undefined;
   });
@@ -248,6 +248,21 @@ export async function setCarriageAction(
       z.number().min(0).max(100).nullable().parse(kgPerSide)
     );
     revalidatePath("/exercises");
+    return undefined;
+  });
+}
+
+/** Block a library exercise for this athlete (reason), or unblock it (null). */
+export async function setExerciseBlockAction(
+  exerciseId: string,
+  reason: string | null
+): Promise<ActionResult> {
+  return run(async () => {
+    const userId = await requireUserEmail();
+    const id = uuid.parse(exerciseId);
+    await setExerciseBlock(userId, id, z.string().max(200).nullable().parse(reason));
+    revalidatePath("/exercises");
+    revalidatePath(`/progress/${id}`);
     return undefined;
   });
 }

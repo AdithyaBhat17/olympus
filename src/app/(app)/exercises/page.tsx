@@ -1,4 +1,5 @@
 import { requireUserEmail } from "@/lib/auth";
+import { blockingConstraint } from "@/domain";
 import { describeExercise, getConstraints, listExerciseRows, toDomainExercise } from "@/server/exercises";
 import { workingWeights } from "@/server/history";
 import { PageHeader } from "@/components/page-header";
@@ -19,7 +20,7 @@ export default async function ExercisesPage() {
       id: row.id,
       name: row.name,
       category: row.category,
-      status: row.status,
+      status: ex.status,
       isCustom: row.isCustom,
       loadMode: ex.loadMode,
       carriageKgPerSide: ex.carriageKgPerSide,
@@ -29,6 +30,8 @@ export default async function ExercisesPage() {
       workingKg: ww.get(row.id)?.kg ?? null,
       blocked: hit.blocked,
       blockedReason: hit.blockedReason,
+      // An injury rule outranks a personal block: unblocking wouldn't free it.
+      blockedBy: !hit.blocked ? null : blockingConstraint(ex, cons) ? "injury" : row.userBlock ? "you" : "library",
       substitutes: hit.substitutes.map((s) => s.name),
     };
   });

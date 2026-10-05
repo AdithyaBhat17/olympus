@@ -5,9 +5,10 @@ import { formatDayShort, formatDdMm, todayInTz } from "@/lib/dates";
 import { listExerciseRows, toDomainExercise } from "@/server/exercises";
 import { exerciseHistory, workingWeights } from "@/server/history";
 import { getCheckIn } from "@/server/checkins";
+import { getProfile } from "@/server/profile";
 import {
-  TARGETS,
   estimatedOneRepMax,
+  formatHours,
   formatKg,
   isHarder,
   progressDelta,
@@ -20,6 +21,7 @@ import { BackIcon } from "@/components/page-header";
 import ExerciseChart, { type ChartPoint } from "@/components/progress/exercise-chart";
 import WorkingWeightForm from "@/components/progress/working-weight-form";
 import { isFormCueId } from "@/components/form-cues/cue-ids";
+import BlockToggle from "@/components/progress/block-toggle";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -57,12 +59,15 @@ export default async function ExerciseProgressPage({
   if (!row) notFound();
   const ex = toDomainExercise(row);
 
+  const profile = await getProfile(userId);
+  const today = todayInTz(profile.timezone);
+  const { minSleepMin } = profile.targets;
   const [fullHistory, ww, checkIn] = await Promise.all([
     exerciseHistory(userId, ex.id, 40),
     workingWeights(userId, [ex], { exerciseIds: [ex.id] }),
-    getCheckIn(userId, todayInTz()),
+    getCheckIn(userId, today),
   ]);
-  const sleepGateFails = checkIn?.sleepMin != null && checkIn.sleepMin < TARGETS.minSleepMin;
+  const sleepGateFails = checkIn?.sleepMin != null && checkIn.sleepMin < minSleepMin;
   const status = progressionStatus(ex, fullHistory, { sleepGateFails });
   // The list shows the most recent sessions; the chart and delta span all fetched.
   const history = fullHistory.slice(0, 12);
@@ -173,7 +178,7 @@ export default async function ExerciseProgressPage({
       </div>
 
       {points.some((p) => p.top != null) ? (
-        <ExerciseChart points={points} today={todayInTz()} loadMode={ex.loadMode} />
+        <ExerciseChart points={points} today={today} loadMode={ex.loadMode} />
       ) : (
         <section className="kind-accent mx-4 mt-4 px-6 py-8 rounded-[36px] bg-k text-k-on flex flex-col gap-1">
           <span className="text-[28px] font-extrabold">Nothing to chart yet</span>
@@ -235,7 +240,7 @@ export default async function ExerciseProgressPage({
               {after}
             </>
           )}{" "}
-          <span className="text-muted">Held if sleep &lt; {TARGETS.minSleepMin / 60} h on the day.</span>
+          <span className="text-muted">Held if sleep &lt; {formatHours(minSleepMin)} h on the day.</span>
         </p>
       </section>
 
@@ -290,6 +295,8 @@ export default async function ExerciseProgressPage({
           </svg>
         </Link>
       )}
+
+      <BlockToggle exerciseId={row.id} name={row.name} blocked={row.userBlock != null} reason={row.userBlock?.reason ?? null} />
     </div>
   );
 }

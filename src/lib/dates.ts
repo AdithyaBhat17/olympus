@@ -1,8 +1,20 @@
-/** The athlete's timezone; "today" means today here, not on the server. */
-export const APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Dubai";
+/**
+ * Fallback for an athlete who hasn't reported a timezone yet. Each athlete's
+ * own zone lives in athlete_profiles; "today" means today there.
+ */
+export const DEFAULT_TIMEZONE = process.env.APP_TIMEZONE || "UTC";
 
-/** YYYY-MM-DD for `d` in the app timezone. */
-export function isoDateInTz(d: Date = new Date(), tz: string = APP_TIMEZONE): string {
+export function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** YYYY-MM-DD for `d` in `tz`. */
+export function isoDateInTz(d: Date, tz: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",
@@ -11,8 +23,8 @@ export function isoDateInTz(d: Date = new Date(), tz: string = APP_TIMEZONE): st
   }).format(d);
 }
 
-export function todayInTz(): string {
-  return isoDateInTz(new Date());
+export function todayInTz(tz: string): string {
+  return isoDateInTz(new Date(), tz);
 }
 
 export function addDays(iso: string, days: number): string {
@@ -37,10 +49,10 @@ export function formatDdMm(iso: string): string {
   return `${d}/${m}`;
 }
 
-/** "16:40" in the app timezone. */
-export function formatTimeInTz(d: Date): string {
+/** "16:40" in `tz`. */
+export function formatTimeInTz(d: Date, tz: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: APP_TIMEZONE,
+    timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);

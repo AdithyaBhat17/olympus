@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import { resolveSets } from "@/server/history";
 import { addDays, formatDayShort, todayInTz } from "@/lib/dates";
+import { ROTATION_LETTER } from "@/domain/rotation";
+import { getProfile } from "@/server/profile";
 import { formatKg } from "@/domain/load";
 import { PageHeader } from "@/components/page-header";
 import HistoryList, { type HistoryDay, type HistorySession, type SessionKind } from "@/components/history-list";
@@ -21,15 +23,17 @@ function mondayOf(iso: string): string {
 }
 
 function kindOf(type: string | null, exercises: Array<{ category: string; loadMode: string }>): SessionKind {
-  if (type === "A" || type === "B" || type === "C") return type;
-  if (exercises.length > 0 && exercises.every((e) => e.loadMode === "TIME" || e.category === "Cardio")) return "X";
-  if (type?.toLowerCase() === "cardio") return "X";
-  return "O";
+  // Any session letter keeps its colour, even one from an older rotation.
+  if (type && ROTATION_LETTER.test(type)) return type;
+  if (exercises.length > 0 && exercises.every((e) => e.loadMode === "TIME" || e.category === "Cardio")) return "cardio";
+  if (type?.toLowerCase() === "cardio") return "cardio";
+  return "other";
 }
 
 export default async function HistoryPage() {
   const email = await requireUserEmail();
-  const today = todayInTz();
+  const profile = await getProfile(email);
+  const today = todayInTz(profile.timezone);
 
   const [userSessions, [{ total }], [first]] = await Promise.all([
     db.query.sessions.findMany({
@@ -60,7 +64,7 @@ export default async function HistoryPage() {
     const title = s.sessionName.replace(/^Session \S+\s*·\s*/, "");
     const meta = [
       minutes != null && minutes > 0 ? `${minutes} min` : null,
-      kind === "X" ? null : `${working.length} sets`,
+      kind === "cardio" ? null : `${working.length} sets`,
       rpes.length ? `RPE ${formatKg(Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10)}` : null,
     ]
       .filter(Boolean)
@@ -131,6 +135,7 @@ export default async function HistoryPage() {
         stats={{ thisWeek, avg, streak }}
         thisMonday={thisMonday}
         lastMonday={addDays(thisMonday, -7)}
+        rotation={profile.rotation}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { formatKg, formatLoad } from "./load";
 import { formatSleep } from "./recovery";
-import { TARGETS } from "./targets";
+import type { Targets } from "./targets";
 import type { LoadMode, SetLogEntry } from "./types";
 
 export interface ExportExercise {
@@ -18,6 +18,8 @@ export interface ExportSession {
   exercises: ExportExercise[];
   notes?: string | null;
   checkIn?: { sleepMin: number | null; proteinG: number | null; waterMl: number | null } | null;
+  /** The athlete's targets, shown as "x/target" next to the check-in. */
+  targets?: Pick<Targets, "proteinG" | "waterMl"> | null;
 }
 
 function ddmmyyyy(iso: string): string {
@@ -79,12 +81,14 @@ export function renderSessionMarkdown(s: ExportSession): string {
   ];
   const c = s.checkIn;
   if (c) {
+    const t = s.targets;
+    const litres = (ml: number) => (ml / 1000).toFixed(1);
     lines.push(
       "",
       [
         `Sleep ${c.sleepMin != null ? formatSleep(c.sleepMin).replace("h ", ":") : "—"}`,
-        `Protein ${c.proteinG ?? "—"}/${TARGETS.proteinG} g`,
-        `Water ${c.waterMl != null ? (c.waterMl / 1000).toFixed(1) : "—"}/${(TARGETS.waterMl / 1000).toFixed(1)} L`,
+        `Protein ${c.proteinG ?? "—"}${t?.proteinG != null ? `/${t.proteinG}` : ""} g`,
+        `Water ${c.waterMl != null ? litres(c.waterMl) : "—"}${t?.waterMl != null ? `/${litres(t.waterMl)}` : ""} L`,
       ].join(" · ")
     );
   }

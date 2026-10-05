@@ -1,23 +1,27 @@
 import "server-only";
-import { todayInTz } from "@/lib/dates";
-import { blockedReason, gateMessage, nextSessionType, TARGETS } from "@/domain";
+import { blockedReason, gateMessage, nextSessionType } from "@/domain";
 import { exerciseRef, getConstraints, listExercises } from "./exercises";
 import { workingWeights } from "./history";
 import { listOpenFlags } from "./flags";
 import { getRecovery } from "./checkins";
 import { recentSessionTypes } from "./sessions";
 import { getUpcomingPlan } from "./plans";
+import { getProfile, todayFor } from "./profile";
 
 /** Everything Claude needs before programming a session. */
 export async function getAthleteContext(userId: string) {
-  const all = await listExercises(userId);
+  const [all, profile, today] = await Promise.all([
+    listExercises(userId),
+    getProfile(userId),
+    todayFor(userId),
+  ]);
   const byId = new Map(all.map((e) => [e.id, e]));
   const [cons, ww, flags, types, recovery, upcoming] = await Promise.all([
     getConstraints(userId),
     workingWeights(userId, all),
     listOpenFlags(userId),
     recentSessionTypes(userId),
-    getRecovery(userId, todayInTz(), 7),
+    getRecovery(userId, today, 7),
     getUpcomingPlan(userId),
   ]);
 
@@ -41,7 +45,8 @@ export async function getAthleteContext(userId: string) {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return {
-    today: todayInTz(),
+    today,
+    timezone: profile.timezone,
     constraints: cons,
     // Only lifts Claude may programme. Blocked ones are listed separately so a
     // retired movement's last load can never be mistaken for a current one.
@@ -60,9 +65,10 @@ export async function getAthleteContext(userId: string) {
         reason: l.blockedReason,
       })),
     rotation: {
-      last: types[0] ?? null,
+      order: profile.rotation,
+      last: types.find((t) => profile.rotation.includes(t)) ?? null,
       recent: types.slice(0, 6),
-      nextDue: nextSessionType(types),
+      nextDue: nextSessionType(types, profile.rotation),
     },
     openCoachFlags: flags.map((f) => {
       // Exercise-scoped flags carry the same ids as workingWeights.
@@ -106,10 +112,12 @@ export async function getAthleteContext(userId: string) {
     progressionGate: recovery.summary.gate,
     progressionGateMessage: gateMessage(recovery.summary),
     progressionOnHold: recovery.summary.gate === "unknown" ? null : recovery.summary.progressionOnHold,
+    // null = the athlete doesn't track it; don't invent a target.
     nutritionTargets: {
-      kcal: TARGETS.kcal,
-      proteinFloorG: TARGETS.proteinG,
-      waterMl: TARGETS.waterMl,
+      kcal: profile.targets.kcal,
+      proteinFloorG: profile.targets.proteinG,
+      waterMl: profile.targets.waterMl,
     },
+    minSleepH: profile.targets.minSleepMin / 60,
   };
 }

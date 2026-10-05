@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { planItems, plans } from "@/lib/db/schema";
 import { and, desc, eq } from "drizzle-orm";
-import { addDays, todayInTz } from "@/lib/dates";
+import { addDays } from "@/lib/dates";
 import {
   gateMessage,
   progressionStatus,
@@ -28,6 +28,7 @@ import {
 import { updateWorkingWeight } from "../working-weight";
 import { recordToolCall } from "../audit";
 import { syncWhoopIfStale } from "../integrations/whoop";
+import { getProfile, todayFor } from "../profile";
 
 export interface McpCaller {
   userId: string;
@@ -136,7 +137,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     { name: "olympus-liftlog", version: "2.0.0" },
     {
       instructions: [
-        "LiftLog is Adithya's training log. The app is the single source of truth; you are the programmer that reads and writes it.",
+        "LiftLog is the signed-in athlete's training log. The app is the single source of truth; you are the programmer that reads and writes it. Everything here (injuries, targets, rotation, timezone) is that athlete's own: take it from the tools, never assume it.",
         "Before programming: get_athlete_context, then get_sessions for the last 2 sessions of the type that's due, then get_recovery.",
         "Loads are TRUE kg: per side for iso-lateral (PER_SIDE) machines, and for COUNTERWEIGHT machines a LOWER number is harder.",
         "push_plan validates against rules V1–V10. Errors block the write; warnings don't. Get the athlete's approval in chat before pushing.",
@@ -198,7 +199,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Athlete context",
       description:
-        "Constraints (injuries + blocked movement patterns), working weights (latest true load per exercise), rotation state (last A/B/C and next due), open coach flags, today's recovery, the upcoming plan, and nutrition targets (1,700 kcal / 155 g protein floor / 3.5 L water).",
+        "Constraints (injuries + blocked movement patterns), working weights (latest true load per exercise), rotation (the athlete's session letters in order, the last one done and the next due), open coach flags, today's recovery, the upcoming plan, the sleep floor, and nutrition targets (null = not tracked, so don't judge against it). Dates are in the athlete's timezone.",
       inputSchema: {},
     },
     async () => {
@@ -220,7 +221,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       inputSchema: {
         from: isoDate.optional(),
         to: isoDate.optional(),
-        sessionType: z.string().max(20).optional().describe("A, B, C or Cardio"),
+        sessionType: z.string().max(20).optional().describe("A rotation letter (get_athlete_context rotation.order) or Cardio"),
         exerciseId: z.string().optional().describe("Only sessions containing this exercise (slug, uuid or name)"),
         limit: z.number().int().min(1).max(30).default(5),
         includeInProgress: z.boolean().default(false),
@@ -243,7 +244,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Get recovery",
       description:
-        "Daily check-ins (sleep, protein, water) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks like '5 nights under 6 h'. Refreshes Whoop sleep first if it's connected and stale.",
+        "Daily check-ins (sleep, protein, water) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks against the athlete's own sleep floor and protein target. Refreshes Whoop sleep first if it's connected and stale.",
       inputSchema: {
         date: isoDate.optional().describe("Defaults to today in the athlete's timezone"),
         days: z.number().int().min(1).max(60).default(7),
@@ -251,7 +252,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     },
     async (a) => {
       await syncWhoopIfStale(userId).catch(() => {});
-      const date = a.date ?? todayInTz();
+      const date = a.date ?? (await todayFor(userId));
       const r = await getRecovery(userId, date, a.days);
       return ok(
         `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate}. ${gateMessage(r.summary)}`,
@@ -345,7 +346,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       inputSchema: {
         clientRef: z.string().min(1).max(100).describe("Idempotency key, e.g. 'pt-2026-10-02-B'"),
         date: isoDate,
-        sessionType: z.string().min(1).max(20).describe("A, B, C or Cardio"),
+        sessionType: z.string().min(1).max(20).describe("A rotation letter (get_athlete_context rotation.order) or Cardio"),
         title: z.string().min(1).max(100).describe("e.g. 'Back & Biceps'"),
         coachNotes: z.string().max(2000).nullable().optional(),
         recoveryGate: recoveryGateSchema.nullable().optional(),
@@ -462,7 +463,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
           .string()
           .max(100)
           .optional()
-          .describe("Session type (A/B/C) or exercise slug when scope isn't global"),
+          .describe("Session letter or exercise slug when scope isn't global"),
       },
     },
     async (a) => {
@@ -509,7 +510,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
       },
     },
     async ({ date, ...patch }) => {
-      const d = date ?? todayInTz();
+      const d = date ?? (await todayFor(userId));
       if (Object.keys(patch).length === 0) throw new DomainError("Pass at least one of sleepMin, proteinG, waterMl");
       const row = await upsertCheckIn(userId, d, patch, "claude");
       return ok(`Check-in for ${d} saved.`, {
@@ -574,12 +575,17 @@ export function buildMcpServer(caller: McpCaller): McpServer {
         "Pull context and the last two sessions of the next type, apply the rules, draft a table, wait for approval, then push_plan.",
       argsSchema: {
         date: isoDate.optional().describe("YYYY-MM-DD, defaults to today"),
-        sessionType: z.string().optional().describe("Override the rotation (A/B/C)"),
+        sessionType: z.string().optional().describe("Override the rotation (one of the athlete's session letters)"),
       },
     },
     async (args) => {
-      const date = args.date || todayInTz();
-      const cons = await getConstraints(userId);
+      const [profile, today, cons] = await Promise.all([
+        getProfile(userId),
+        todayFor(userId),
+        getConstraints(userId),
+      ]);
+      const date = args.date || today;
+      const minSleepH = profile.targets.minSleepMin / 60;
       return {
         messages: [
           {
@@ -594,7 +600,9 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                 "3. Call get_recovery. Gate 'hold': no load bumps, repeat last loads. Gate 'unknown': ask how I slept before adding any load.",
                 "4. For each exercise, call get_exercise_history if you need the progression status.",
                 "5. Apply the rules:",
-                "   - Never programme a blocked exercise; use its substitutes. Active constraints:",
+                cons.length
+                  ? "   - Never programme a blocked exercise; use its substitutes. Active constraints:"
+                  : "   - Never programme a blocked exercise; use its substitutes. No injury constraints on file.",
                 ...cons.map((c) => `     • ${c.region}: ${c.rule}`),
                 "   - Upper compounds +2.5 kg, lower compounds +5 kg, only after 2 clean sessions at the top of the range; accessories add reps first.",
                 "   - COUNTERWEIGHT machines: lower number = harder.",
@@ -602,7 +610,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
                 "   - Compounds rest 180 s. Alternate chest with core; triceps go last, never paired with chest press.",
                 "   - Open at last session's top set. Don't plan a light first set.",
                 "6. Show me the plan as a table (exercise | sets × reps | open kg | RPE | rest | notes) with the coach notes.",
-                "7. WAIT for my approval. Then call push_plan with clientRef `pt-<date>-<type>`, a recoveryGate of { minSleepH: 6, onFail: \"hold_progression\" }, and report any warnings.",
+                `7. WAIT for my approval. Then call push_plan with clientRef \`pt-<date>-<type>\`, a recoveryGate of { minSleepH: ${minSleepH}, onFail: "hold_progression" }, and report any warnings.`,
               ].join("\n"),
             },
           },

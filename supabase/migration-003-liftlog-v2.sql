@@ -96,13 +96,14 @@ CREATE INDEX IF NOT EXISTS idx_coach_flags_user ON coach_flags(user_id);
 
 CREATE TABLE IF NOT EXISTS constraints (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT, -- NULL = applies to every user
+  user_id TEXT, -- NULL rows are legacy and ignored (migration-006)
   region TEXT NOT NULL,
   rule TEXT NOT NULL,
   blocked_patterns TEXT[] NOT NULL DEFAULT '{}',
   active BOOLEAN NOT NULL DEFAULT TRUE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_constraints_global_region ON constraints(region) WHERE user_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_constraints_user_region ON constraints(user_id, region) WHERE user_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS working_weight_overrides (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
