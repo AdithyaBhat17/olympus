@@ -165,12 +165,12 @@ export const RIG_URL = "/models/athlete.glb";
 
 const PAL: Record<string, Pal> = {
   body: ["#FFFDF8", "#E3DFD6", "#9E9990", "#45423E", "#B5582F"],
-  pad: ["#5A5A61", "#38383E", "#1F1F23", "#111113", "#3A3A40"],
+  pad: ["#6B5A55", "#4A3B36", "#33282A", "#1E1412", "#4A3B36"],
   steel: ["#F2F2F5", "#B0B0B8", "#5C5C64", "#222226", "#7A7A82"],
-  dark: ["#4C4C53", "#303035", "#1B1B1E", "#0E0E10", "#303035"],
-  ember: ["#FFD7C2", "#FF9460", "#E2541C", "#5A1E08", "#FF8A55"],
-  emberDim: ["#7A4A36", "#5A2E1E", "#3A1A10", "#1E0E08", "#5A2E1E"],
-  ice: ["#EAF5FF", "#A9D6FF", "#5B9BDB", "#16304D", "#8CC8FF"],
+  dark: ["#5A4A45", "#3F302C", "#2A1F1C", "#140D0B", "#3F302C"],
+  ember: ["#F6CDBF", "#E0745A", "#C63D22", "#5A1A0E", "#D9573A"],
+  emberDim: ["#E9C3B8", "#C98F80", "#8F2914", "#3F140A", "#C98F80"],
+  ice: ["#F3DDE7", "#C98AA6", "#8E3B5E", "#3A1426", "#A65A7C"],
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- three.js scene graph is built dynamically */
@@ -389,7 +389,7 @@ export class FormEngine {
     let i = D.phases.findIndex((p) => t >= p.s && t < p.e);
     if (i < 0) i = 0;
     const p = D.phases[i];
-    const phaseText = p.count ? `${p.n} · ${Math.max(1, Math.ceil((p.e - t) * D.dur))}` : p.n;
+    const phaseText = p.count ? `${p.n}: ${Math.max(1, Math.ceil((p.e - t) * D.dur))}` : p.n;
     const read = this.cur ? this.cur.read : "";
     const prog = Math.round(t * 1000);
     const u = this.ui;
@@ -582,11 +582,11 @@ export class FormEngine {
     this.bY = new T.Vector3();
     this.bZ = new T.Vector3();
     this.SKIN = new T.Color(0xece7de);
-    this.EMB = new T.Color(0xff6a2b);
-    this.ICE = new T.Color(0x8cc8ff);
+    this.EMB = new T.Color(0xc63d22);
+    this.ICE = new T.Color(0x8e3b5e);
     // Physically based light units (r155+): scale the prototype's intensities by π.
     const PI = Math.PI;
-    scene.add(new T.HemisphereLight(0xfff3e6, 0x16161b, 0.75 * PI));
+    scene.add(new T.HemisphereLight(0xfff3e6, 0xd8c4bc, 0.75 * PI));
     const key = new T.DirectionalLight(0xffffff, 1.7 * PI);
     key.position.set(D.target[0] + 1.6, 3.8, 2.4);
     key.target.position.set(D.target[0], 0.6, 0);
@@ -604,10 +604,10 @@ export class FormEngine {
     key.shadow.radius = 6;
     scene.add(key);
     scene.add(key.target);
-    const rim = new T.DirectionalLight(0xff7a3c, 1.5 * PI);
+    const rim = new T.DirectionalLight(0xe0583a, 1.2 * PI);
     rim.position.set(-2.4, 2.4, -2.4);
     scene.add(rim);
-    const fill = new T.DirectionalLight(0x8cc8ff, 0.5 * PI);
+    const fill = new T.DirectionalLight(0xffe9e2, 0.5 * PI);
     fill.position.set(-1.6, 0.9, 2.8);
     scene.add(fill);
     // Floor: soft radial glow, a grid, and a shadow catcher.
@@ -617,9 +617,9 @@ export class FormEngine {
     fc.width = fc.height = 256;
     const fx = fc.getContext("2d")!;
     const fg = fx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    fg.addColorStop(0, "rgba(60,60,68,1)");
-    fg.addColorStop(0.55, "rgba(34,34,40,.75)");
-    fg.addColorStop(1, "rgba(20,20,22,0)");
+    fg.addColorStop(0, "rgba(226,206,198,1)");
+    fg.addColorStop(0.55, "rgba(233,217,211,.7)");
+    fg.addColorStop(1, "rgba(243,232,228,0)");
     fx.fillStyle = fg;
     fx.fillRect(0, 0, 256, 256);
     const ftex = new T.CanvasTexture(fc);
@@ -628,29 +628,29 @@ export class FormEngine {
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(C[0], 0, C[2]);
     scene.add(floor);
-    const grid = new T.GridHelper(R * 2, Math.round(R * 8), 0x3a3a42, 0x2c2c32);
+    const grid = new T.GridHelper(R * 2, Math.round(R * 8), 0xc9b2a9, 0xd9c6be);
     const gm = grid.material as THREE.Material;
     gm.transparent = true;
-    gm.opacity = 0.22;
+    gm.opacity = 0.5;
     gm.depthWrite = false;
     grid.position.set(C[0], 0.001, C[2]);
     scene.add(grid);
-    const catcher = new T.Mesh(new T.CircleGeometry(R * 1.3, 64), new T.ShadowMaterial({ opacity: 0.5 }));
+    const catcher = new T.Mesh(new T.CircleGeometry(R * 1.3, 64), new T.ShadowMaterial({ opacity: 0.22 }));
     catcher.rotation.x = -Math.PI / 2;
     catcher.position.set(C[0], 0.002, C[2]);
     catcher.receiveShadow = true;
     scene.add(catcher);
     const M = (o: THREE.MeshStandardMaterialParameters) => new T.MeshStandardMaterial(o);
     this.MAT = {
-      pad: M({ color: 0x2c2c32, roughness: 0.85 }),
+      pad: M({ color: 0x4a3b36, roughness: 0.85 }),
       steel: M({ color: 0xc9c9d2, metalness: 0.85, roughness: 0.28 }),
-      dark: M({ color: 0x25252a, roughness: 0.55, metalness: 0.35 }),
-      ember: M({ color: 0xff6a2b, emissive: 0xff5a1a, emissiveIntensity: 0.7, roughness: 0.4 }),
-      emberDim: M({ color: 0x5a2e1e, roughness: 0.7 }),
-      plate: M({ color: 0x1a1a1e, roughness: 0.5, metalness: 0.25, transparent: true, opacity: 0.62, depthWrite: false }),
-      rim: M({ color: 0xff6a2b, emissive: 0xff5a1a, emissiveIntensity: 0.9, roughness: 0.4 }),
-      line: new T.MeshBasicMaterial({ color: 0xc8c8ce }),
-      ghost: new T.MeshBasicMaterial({ color: 0x8cc8ff, transparent: true, opacity: 0.1, depthWrite: false }),
+      dark: M({ color: 0x2f2522, roughness: 0.55, metalness: 0.35 }),
+      ember: M({ color: 0xc63d22, emissive: 0x8f2914, emissiveIntensity: 0.5, roughness: 0.4 }),
+      emberDim: M({ color: 0xb88a7c, roughness: 0.7 }),
+      plate: M({ color: 0x3d2f2b, roughness: 0.5, metalness: 0.25, transparent: true, opacity: 0.62, depthWrite: false }),
+      rim: M({ color: 0xc63d22, emissive: 0x8f2914, emissiveIntensity: 0.6, roughness: 0.4 }),
+      line: new T.MeshBasicMaterial({ color: 0x9c8a84 }),
+      ghost: new T.MeshBasicMaterial({ color: 0x8e3b5e, transparent: true, opacity: 0.1, depthWrite: false }),
     };
     const skin = () =>
       new T.MeshPhysicalMaterial({
@@ -816,7 +816,7 @@ export class FormEngine {
       sheenColor: new T.Color(0xffe2cf),
       sheenRoughness: 0.5,
     });
-    const joints = new T.MeshStandardMaterial({ color: 0x2b2b31, roughness: 0.38, metalness: 0.45 });
+    const joints = new T.MeshStandardMaterial({ color: 0x3f302c, roughness: 0.38, metalness: 0.45 });
     root.traverse((o: any) => {
       if (o.isBone) bones[o.name.replace(/^mixamorig:?/, "").replace(/^DEF[-_]/, "")] = o;
       if (o.isMesh) {
@@ -856,7 +856,7 @@ export class FormEngine {
     });
     const p0 = this.cur || this.poseAt(this.t);
     const glow = () =>
-      new T.MeshBasicMaterial({ color: 0xff6a2b, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, depthTest: false });
+      new T.MeshBasicMaterial({ color: 0xc63d22, transparent: true, opacity: 0, blending: T.NormalBlending, depthWrite: false, depthTest: false });
     this.hi = [];
     p0.lofts.forEach((Lf, li) => {
       if (Lf.regions)
@@ -1070,7 +1070,7 @@ export class FormEngine {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.W, this.H);
     pose.guides.forEach((g) => this.drawGuide(ctx, g));
-    this.drawGuide(ctx, { pts: this.trail, col: "rgba(140,200,255,.5)", dash: true, w: 1.6 });
+    this.drawGuide(ctx, { pts: this.trail, col: "rgba(142,59,94,.45)", dash: true, w: 1.6 });
     this.drawTrackDot(ctx, pose.track);
     pose.rings.forEach((r) => this.drawRing(ctx, r));
     pose.labels.forEach((l) => this.drawLabel(ctx, l));
@@ -1239,7 +1239,7 @@ export class FormEngine {
   private glowOverlay(ctx: CanvasRenderingContext2D, g: LoftGeom, m: { a: number; c: string }) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, m.a);
-    ctx.shadowColor = m.c === "ice" ? "rgba(140,200,255,.85)" : "rgba(255,106,43,.85)";
+    ctx.shadowColor = m.c === "ice" ? "rgba(142,59,94,.6)" : "rgba(198,61,34,.6)";
     ctx.shadowBlur = 18 * m.a;
     this.fillLoft(ctx, g, PAL[m.c === "ice" ? "ice" : "ember"]);
     ctx.restore();
@@ -1292,7 +1292,7 @@ export class FormEngine {
     if (m && m.a > 0.02) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, m.a);
-      ctx.shadowColor = "rgba(255,106,43,.85)";
+      ctx.shadowColor = "rgba(198,61,34,.6)";
       ctx.shadowBlur = 14 * m.a;
       paint(PAL[m.c === "ice" ? "ice" : "ember"]);
       ctx.restore();
@@ -1318,11 +1318,11 @@ export class FormEngine {
     const cn = nearIs1 ? c1 : c0;
     ctx.save();
     ctx.globalAlpha = d.alpha || 1;
-    ctx.fillStyle = "#0C0C0E";
+    ctx.fillStyle = "#2A1F1C";
     this.poly(ctx, far);
     ctx.fill();
-    ctx.fillStyle = "#1A1A1D";
-    ctx.strokeStyle = "#1A1A1D";
+    ctx.fillStyle = "#3F302C";
+    ctx.strokeStyle = "#3F302C";
     ctx.lineWidth = 0.6;
     for (let i = 0; i < 30; i++) {
       const j = (i + 1) % 30;
@@ -1337,8 +1337,8 @@ export class FormEngine {
     }
     const rr = Math.max(1, d.r * cn[3]);
     const g = ctx.createRadialGradient(cn[0] - rr * 0.3, cn[1] - rr * 0.35, rr * 0.05, cn[0], cn[1], rr * 1.05);
-    g.addColorStop(0, d.face0 || "#34343A");
-    g.addColorStop(1, d.face1 || "#141416");
+    g.addColorStop(0, d.face0 || "#5A4A45");
+    g.addColorStop(1, d.face1 || "#2A1F1C");
     ctx.fillStyle = g;
     this.poly(ctx, near);
     ctx.fill();
@@ -1349,7 +1349,7 @@ export class FormEngine {
       ctx.stroke();
     }
     if (d.hub) {
-      ctx.fillStyle = "#6A6A72";
+      ctx.fillStyle = "#9C8A84";
       this.poly(ctx, this.discPts(d.c, d.hub, nearIs1 ? h + 0.001 : -h - 0.001));
       ctx.fill();
     }
@@ -1374,9 +1374,9 @@ export class FormEngine {
   private drawTrackDot(ctx: CanvasRenderingContext2D, p: V) {
     const tp = this.P(p);
     ctx.save();
-    ctx.fillStyle = "#8CC8FF";
-    ctx.shadowColor = "#8CC8FF";
-    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#8E3B5E";
+    ctx.shadowColor = "rgba(142,59,94,.5)";
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(tp[0], tp[1], 4.5, 0, 6.2832);
     ctx.fill();
@@ -1404,7 +1404,7 @@ export class FormEngine {
   private drawLabel(ctx: CanvasRenderingContext2D, l: Label) {
     const p = this.P(l.p);
     ctx.save();
-    ctx.font = '600 11px -apple-system, "SF Pro Text", system-ui, ui-monospace, monospace';
+    ctx.font = '600 11px -apple-system, "SF Pro Text", system-ui, sans-serif';
     const w = ctx.measureText(l.text).width + 14;
     const h = 20;
     const x = Math.max(4, Math.min(this.W - w - 4, p[0] + (l.dx == null ? 14 : l.dx)));
@@ -1421,7 +1421,7 @@ export class FormEngine {
     ctx.beginPath();
     ctx.arc(p[0], p[1], 3, 0, 6.2832);
     ctx.fill();
-    ctx.fillStyle = "rgba(10,10,11,.84)";
+    ctx.fillStyle = "rgba(251,246,244,.94)";
     this.rrect(ctx, x, y, w, h, 10);
     ctx.fill();
     ctx.stroke();
@@ -1445,16 +1445,16 @@ export class FormEngine {
       rx = Math.max(rx, Math.hypot(p[0] - C[0], p[1] - C[1]));
     });
     const g = ctx.createRadialGradient(C[0], C[1], 0, C[0], C[1], rx);
-    g.addColorStop(0, "rgba(46,46,52,.95)");
-    g.addColorStop(0.6, "rgba(30,30,34,.7)");
-    g.addColorStop(1, "rgba(20,20,22,0)");
+    g.addColorStop(0, "rgba(226,206,198,.95)");
+    g.addColorStop(0.6, "rgba(233,217,211,.7)");
+    g.addColorStop(1, "rgba(243,232,228,0)");
     ctx.fillStyle = g;
     this.poly(ctx, pts);
     ctx.fill();
     ctx.save();
     this.poly(ctx, pts);
     ctx.clip();
-    ctx.strokeStyle = "rgba(255,255,255,.05)";
+    ctx.strokeStyle = "rgba(30,20,18,.06)";
     ctx.lineWidth = 1;
     for (let v = -R; v <= R + 1e-6; v += 0.25) {
       let a = this.P([c[0] + v, 0, c[2] - R]);
@@ -1543,7 +1543,7 @@ export class FormEngine {
     // Motion smear: the last few frames' silhouettes, very faint, behind the figure.
     if (this.playing && !this.reduce) {
       sc.clearRect(0, 0, W, H);
-      for (let k = 1; k <= 3; k++) this.silhouette(sc, this.poseAt((this.t - k * 0.011 * this.speed + 1) % 1), false, "#F5F3EE");
+      for (let k = 1; k <= 3; k++) this.silhouette(sc, this.poseAt((this.t - k * 0.011 * this.speed + 1) % 1), false, "#C9B2A9");
       this.composite(ctx, 0.05);
     }
     const pose = this.poseAt(this.t);
@@ -1556,7 +1556,7 @@ export class FormEngine {
     });
     if (this.ghost) {
       sc.clearRect(0, 0, W, H);
-      this.silhouette(sc, this.ghost, false, "#8CC8FF");
+      this.silhouette(sc, this.ghost, false, "#8E3B5E");
       this.composite(ctx, 0.09);
     }
     const items: Array<{ z: number; f: () => void }> = [];
@@ -1579,7 +1579,7 @@ export class FormEngine {
     });
     items.sort((a, b) => b.z - a.z);
     items.forEach((it) => it.f());
-    this.drawGuide(ctx, { pts: this.trail, col: "rgba(140,200,255,.45)", dash: true, w: 1.6 });
+    this.drawGuide(ctx, { pts: this.trail, col: "rgba(142,59,94,.45)", dash: true, w: 1.6 });
     this.drawTrackDot(ctx, pose.track);
     pose.guides.forEach((g) => {
       if (g.top) this.drawGuide(ctx, g);

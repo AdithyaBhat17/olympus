@@ -8,9 +8,9 @@ import { FORM_DEFS } from "@/components/form-cues/defs";
 import FormViewer from "@/components/form-cues/form-viewer-lazy";
 
 function loadText(mode: LoadMode, kg: number): string {
-  if (mode === "PER_SIDE") return `${formatKg(kg)} KG/SIDE`;
-  if (mode === "COUNTERWEIGHT") return `${formatKg(kg)} KG CW`;
-  return `${formatKg(kg)} KG`;
+  if (mode === "PER_SIDE") return `${formatKg(kg)} kg a side`;
+  if (mode === "COUNTERWEIGHT") return `${formatKg(kg)} kg counterweight`;
+  return `${formatKg(kg)} kg`;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ cue: string }> }) {

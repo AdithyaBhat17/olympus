@@ -139,7 +139,7 @@ export default function FormViewer({
           {ui.phaseText || def?.phases[0].n}
         </div>
         <div className="absolute right-3.5 top-2.5 flex flex-col items-end pointer-events-none">
-          <span className="text-[10px] text-muted">{def?.readLabel}</span>
+          <span className="text-[11px] font-semibold text-muted">{def?.readLabel}</span>
           <span className="num text-[34px] text-info">{ui.read}</span>
         </div>
         {def && (
@@ -257,7 +257,7 @@ export default function FormViewer({
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 12.5l4.5 4.5L19 7.5" />
             </svg>
-            Got it — back to set
+            Got it, back to set
           </BackLink>
         </div>
       </div>

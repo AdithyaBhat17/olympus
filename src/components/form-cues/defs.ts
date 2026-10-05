@@ -35,7 +35,7 @@ function deadlift(E: FormEngine): FormDef {
       { n: "Lower", s: 0.58, e: 0.92 },
       { n: "Reset", s: 0.92, e: 1 },
     ],
-    readLabel: "BACK ANGLE",
+    readLabel: "Back angle",
     pose: (t) => {
       const out = E.newOut();
       const b = E.kf(BAR, t);
@@ -62,8 +62,8 @@ function deadlift(E: FormEngine): FormDef {
       out.segs.push({ a: [BX, b, -0.5], b: [BX, b, 0.5], ra: 0.014, rb: 0.014, k: "eq", col: "steel" });
       [-1, 1].forEach((sd) => {
         out.segs.push({ a: [BX, b, 0.5 * sd], b: [BX, b, 1.08 * sd], ra: 0.025, rb: 0.025, k: "eq", col: "steel" });
-        out.discs.push({ c: [BX, b, 0.565 * sd], r: 0.225, th: 0.045, rim: "#FF6A2B", hub: 0.03, alpha: 0.72 });
-        out.discs.push({ c: [BX, b, 0.615 * sd], r: 0.225, th: 0.045, rim: "#FF6A2B", hub: 0.03, alpha: 0.72 });
+        out.discs.push({ c: [BX, b, 0.565 * sd], r: 0.225, th: 0.045, rim: "#C63D22", hub: 0.03, alpha: 0.72 });
+        out.discs.push({ c: [BX, b, 0.615 * sd], r: 0.225, th: 0.045, rim: "#C63D22", hub: 0.03, alpha: 0.72 });
         out.discs.push({ c: [BX, b, 0.66 * sd], r: 0.04, th: 0.03, face0: "#9A9AA2", face1: "#3A3A40" });
       });
       const ph = t < 0.14 ? 0 : t < 0.44 ? 1 : t < 0.58 ? 2 : t < 0.92 ? 3 : 4;
@@ -74,13 +74,13 @@ function deadlift(E: FormEngine): FormDef {
         thigh: { a: [0, 0.9, 0.5, 0.5, 0][ph], c: "ember" },
         lat: { a: [0, 0.55, 0.4, 0.45, 0][ph], c: "ember" },
       };
-      if (ph === 0) out.rings.push({ c: E.add(P, E.mul(dir, 0.13)), n: dir, r: 0.17 + 0.025 * breathe, col: "#8CC8FF", a: 0.9 });
-      out.guides.push({ pts: [[BX, 0.003, -0.34], [BX, 0.003, 0.34]], col: "rgba(140,200,255,.55)", dash: true, w: 1.5 });
-      out.guides.push({ pts: [[BX, 0.225, 0.45], [BX, 0.9, 0.45]], col: "rgba(140,200,255,.22)", dash: true, w: 1, top: true });
+      if (ph === 0) out.rings.push({ c: E.add(P, E.mul(dir, 0.13)), n: dir, r: 0.17 + 0.025 * breathe, col: "#8E3B5E", a: 0.9 });
+      out.guides.push({ pts: [[BX, 0.003, -0.34], [BX, 0.003, 0.34]], col: "rgba(142,59,94,.55)", dash: true, w: 1.5 });
+      out.guides.push({ pts: [[BX, 0.225, 0.45], [BX, 0.9, 0.45]], col: "rgba(142,59,94,.22)", dash: true, w: 1, top: true });
       out.track = [BX, b, 0.45];
-      out.labels.push({ p: E.add(J.hips[1], [0, 0, 0.12]), text: `back ${Math.round(thd)}°`, col: "#8CC8FF", dx: -96, dy: -30 });
+      out.labels.push({ p: E.add(J.hips[1], [0, 0, 0.12]), text: `back ${Math.round(thd)}°`, col: "#8E3B5E", dx: -96, dy: -30 });
       if (ph === 0)
-        out.labels.push({ p: E.add(P, E.add(E.mul(dir, 0.13), [0, 0, 0.2])), text: "brace", col: "#8CC8FF", dx: 16, dy: 6 });
+        out.labels.push({ p: E.add(P, E.add(E.mul(dir, 0.13), [0, 0, 0.2])), text: "brace", col: "#8E3B5E", dx: 16, dy: 6 });
       out.read = `${Math.round(thd)}°`;
       return out;
     },
@@ -112,7 +112,7 @@ function latPulldown(E: FormEngine): FormDef {
       { n: "2 s return", s: 0.46, e: 0.92, count: true },
       { n: "Reach", s: 0.92, e: 1 },
     ],
-    readLabel: "ELBOW → HIP",
+    readLabel: "Elbow to hip",
     pose: (t) => {
       const out = E.newOut();
       const by = E.kf(BY, t);
@@ -151,15 +151,15 @@ function latPulldown(E: FormEngine): FormDef {
         { a: [bx, by, 0.45], b: [bx, by - 0.07, 0.62], ra: 0.013, rb: 0.013, k: "eq", col: "steel" },
         { a: [bx, by, -0.47], b: [bx, by, -0.33], ra: 0.02, rb: 0.02, k: "eq", col: "pad" },
         { a: [bx, by, 0.33], b: [bx, by, 0.47], ra: 0.02, rb: 0.02, k: "eq", col: "pad" },
-        { a: [0, 2.18, 0], b: [bx, by + 0.02, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.75)" },
-        { a: [0.06, 2.3, 0], b: [0.84, 2.3, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.5)" },
-        { a: [0.84, 2.3, 0], b: [0.84, 0.62 + lift, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.75)" }
+        { a: [0, 2.18, 0], b: [bx, by + 0.02, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.75)" },
+        { a: [0.06, 2.3, 0], b: [0.84, 2.3, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.5)" },
+        { a: [0.84, 2.3, 0], b: [0.84, 0.62 + lift, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.75)" }
       );
       for (let i = 0; i < 10; i++) {
         const y = 0.08 + i * 0.05 + (i >= 7 ? lift : 0);
         out.segs.push({ a: [0.84, y, -0.15], b: [0.84, y, 0.15], ra: 0.022, rb: 0.022, k: "eq", col: i >= 7 ? "ember" : "dark" });
       }
-      out.discs.push({ c: [0, 2.24, 0], r: 0.07, th: 0.03, rim: "#8E8C87", hub: 0.015 });
+      out.discs.push({ c: [0, 2.24, 0], r: 0.07, th: 0.03, rim: "#74625D", hub: 0.015 });
       const ph = t < 0.24 ? 0 : t < 0.46 ? 1 : t < 0.92 ? 2 : 3;
       const sq = 0.5 + 0.5 * Math.sin(t * 60);
       out.act = {
@@ -170,10 +170,10 @@ function latPulldown(E: FormEngine): FormDef {
       const el = J.el[1];
       const hip = J.hips[1];
       const cm = Math.round(Math.hypot(el[0] - hip[0], el[1] - hip[1]) * 100);
-      out.guides.push({ pts: [el, hip], col: "rgba(140,200,255,.6)", dash: true, w: 1.5, top: true });
+      out.guides.push({ pts: [el, hip], col: "rgba(142,59,94,.6)", dash: true, w: 1.5, top: true });
       out.track = el;
-      out.labels.push({ p: el, text: `${cm} cm to hip`, col: "#8CC8FF", dx: -126, dy: 8 });
-      if (ph === 1) out.rings.push({ c: E.add(J.sMid, [-0.06, -0.14, 0]), n: [1, 0, 0], r: 0.2 + 0.02 * sq, col: "#FF6A2B", a: 0.55 });
+      out.labels.push({ p: el, text: `${cm} cm to hip`, col: "#8E3B5E", dx: -126, dy: 8 });
+      if (ph === 1) out.rings.push({ c: E.add(J.sMid, [-0.06, -0.14, 0]), n: [1, 0, 0], r: 0.2 + 0.02 * sq, col: "#C63D22", a: 0.55 });
       out.read = `${cm} cm`;
       return out;
     },
@@ -206,7 +206,7 @@ function squat(E: FormEngine): FormDef {
       { n: "Up · 1 s", s: 0.56, e: 0.8 },
       { n: "Stand", s: 0.8, e: 1 },
     ],
-    readLabel: "KNEE ANGLE",
+    readLabel: "Knee angle",
     pose: (t) => {
       const out = E.newOut();
       const s = E.kf(S, t);
@@ -250,19 +250,19 @@ function squat(E: FormEngine): FormDef {
       );
       [-1, 1].forEach((sd, i) => {
         const a0: V = [0.14, 0.004, 0.17 * sd];
-        out.guides.push({ pts: [a0, E.add(a0, E.mul(fd(sd), 0.5))], col: "rgba(140,200,255,.6)", dash: true, w: 1.5 });
+        out.guides.push({ pts: [a0, E.add(a0, E.mul(fd(sd), 0.5))], col: "rgba(142,59,94,.6)", dash: true, w: 1.5 });
         const kn = J.knees[i];
-        out.guides.push({ pts: [[kn[0], kn[1], kn[2]], [kn[0], 0.004, kn[2]]], col: "rgba(140,200,255,.25)", dash: true, w: 1, top: true });
+        out.guides.push({ pts: [[kn[0], kn[1], kn[2]], [kn[0], 0.004, kn[2]]], col: "rgba(142,59,94,.25)", dash: true, w: 1, top: true });
       });
       const ph = t < 0.48 ? 0 : t < 0.56 ? 1 : t < 0.8 ? 2 : 3;
       out.act = {
         thigh: { a: [0.6, 0.85, 1, 0.08][ph], c: "ember" },
         glute: { a: [0.45, 0.7, 0.9, 0.05][ph], c: "ember" },
       };
-      if (atStop) out.rings.push({ c: [-0.14, STOP + 0.03, 0.34], n: [0, 1, 0], r: 0.09, col: "#FF6A2B", a: 0.9 });
+      if (atStop) out.rings.push({ c: [-0.14, STOP + 0.03, 0.34], n: [0, 1, 0], r: 0.09, col: "#C63D22", a: 0.9 });
       const kAng = Math.round(E.angle(J.hips[1], J.knees[1], J.ankles[1]));
-      out.labels.push({ p: J.knees[1], text: `knee ${kAng}°`, col: "#8CC8FF", dx: 18, dy: -10 });
-      if (atStop) out.labels.push({ p: [-0.14, STOP + 0.03, 0.34], text: "depth stop", col: "#FF8A55", dx: -98, dy: 12 });
+      out.labels.push({ p: J.knees[1], text: `knee ${kAng}°`, col: "#8E3B5E", dx: 18, dy: -10 });
+      if (atStop) out.labels.push({ p: [-0.14, STOP + 0.03, 0.34], text: "depth stop", col: "#C63D22", dx: -98, dy: 12 });
       out.track = J.knees[1];
       out.read = `${kAng}°`;
       return out;
@@ -294,7 +294,7 @@ function pushdown(E: FormEngine): FormDef {
       { n: "Back", s: 0.31, e: 0.94, count: true },
       { n: "Reset", s: 0.94, e: 1 },
     ],
-    readLabel: "ELBOW ANGLE",
+    readLabel: "Elbow angle",
     pose: (t) => {
       const out = E.newOut();
       const phi = E.kf(PHI, t);
@@ -326,28 +326,28 @@ function pushdown(E: FormEngine): FormDef {
       out.segs.push(
         { a: J.hands[0], b: K, ra: 0.016, rb: 0.016, k: "eq", col: "pad" },
         { a: J.hands[1], b: K, ra: 0.016, rb: 0.016, k: "eq", col: "pad" },
-        { a: K, b: PUL, ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.8)" },
+        { a: K, b: PUL, ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.8)" },
         { a: [0.56, 0, 0], b: [0.56, 2.15, 0], ra: 0.05, rb: 0.05, k: "eq", col: "dark" },
         { a: [0.56, 2.1, 0], b: [0.44, 2.1, 0], ra: 0.03, rb: 0.03, k: "eq", col: "dark" },
         { a: [0.56, 0, -0.28], b: [0.56, 0, 0.28], ra: 0.03, rb: 0.03, k: "eq", col: "dark" },
         { a: [0.74, 0, -0.17], b: [0.74, 1.3, -0.17], ra: 0.012, rb: 0.012, k: "eq", col: "steel" },
         { a: [0.74, 0, 0.17], b: [0.74, 1.3, 0.17], ra: 0.012, rb: 0.012, k: "eq", col: "steel" },
-        { a: [PUL[0] + 0.04, 2.1, 0], b: [0.74, 2.1, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.5)" },
-        { a: [0.74, 2.1, 0], b: [0.74, 0.62 + lift, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(200,200,206,.75)" }
+        { a: [PUL[0] + 0.04, 2.1, 0], b: [0.74, 2.1, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.5)" },
+        { a: [0.74, 2.1, 0], b: [0.74, 0.62 + lift, 0], ra: 0.006, rb: 0.006, k: "line", col: "rgba(116,98,93,.75)" }
       );
       for (let i = 0; i < 10; i++) {
         const y = 0.08 + i * 0.05 + (i >= 8 ? lift : 0);
         out.segs.push({ a: [0.74, y, -0.15], b: [0.74, y, 0.15], ra: 0.022, rb: 0.022, k: "eq", col: i >= 8 ? "ember" : "dark" });
       }
       out.spheres.push({ c: K, r: 0.03, k: "eq", col: "dark" });
-      out.discs.push({ c: PUL, r: 0.05, th: 0.03, rim: "#8E8C87", hub: 0.012 });
+      out.discs.push({ c: PUL, r: 0.05, th: 0.03, rim: "#74625D", hub: 0.012 });
       const ph = t < 0.21 ? 0 : t < 0.31 ? 1 : t < 0.94 ? 2 : 3;
       const sq = 0.5 + 0.5 * Math.sin(t * 70);
       out.act = { uarm: { a: [1, 0.8 + 0.2 * sq, 0.6, 0.08][ph], c: "ember" } };
-      out.rings.push({ c: J.el[1], n: ua0 || [0, -1, 0], r: 0.07, col: "#8CC8FF", a: 0.95 });
+      out.rings.push({ c: J.el[1], n: ua0 || [0, -1, 0], r: 0.07, col: "#8E3B5E", a: 0.95 });
       const eAng = Math.round(E.angle(J.sh[1], J.el[1], J.hands[1]));
-      out.labels.push({ p: J.el[1], text: "pinned", col: "#8CC8FF", dx: -86, dy: -12 });
-      out.labels.push({ p: J.hands[1], text: `elbow ${eAng}°`, col: "#8CC8FF", dx: 18, dy: 0 });
+      out.labels.push({ p: J.el[1], text: "pinned", col: "#8E3B5E", dx: -86, dy: -12 });
+      out.labels.push({ p: J.hands[1], text: `elbow ${eAng}°`, col: "#8E3B5E", dx: 18, dy: 0 });
       out.track = J.hands[1];
       out.read = `${eAng}°`;
       return out;
@@ -378,8 +378,8 @@ export const FORM_DEFS: Record<FormCueId, { make: (E: FormEngine) => FormDef; co
     copy: {
       tag: "wide grip",
       aria: "3D animation of a seated wide-grip lat pulldown: elbows drive down and back toward the hips, the bar touches the upper chest, a one-second squeeze, then a two-second controlled return",
-      do: ["Chest tall, slight lean back — keep it fixed", "Drive elbows to hips, bar to upper chest", "Pause 1 s, then 2 s back up"],
-      avoid: ["Swinging the torso to move the weight", "Shrugging — keep the shoulders down"],
+      do: ["Chest tall, slight lean back, and keep it fixed", "Drive elbows to hips, bar to upper chest", "Pause 1 s, then 2 s back up"],
+      avoid: ["Swinging the torso to move the weight", "Shrugging. Keep the shoulders down"],
     },
   },
   squat: {
