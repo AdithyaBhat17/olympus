@@ -51,7 +51,9 @@ export default function LoginPage() {
         <h1 className="m-0 text-[clamp(64px,22vw,96px)] font-extrabold leading-[0.92] tracking-[-1.5px]">
           <span className="block animate-word-up">Train.</span>
           <span className="block animate-word-up [animation-delay:80ms]">Log.</span>
-          <span className="block animate-word-up [animation-delay:160ms] text-apricot">Lift.</span>
+          <span className="block animate-word-up [animation-delay:160ms] underline decoration-apricot decoration-[6px] underline-offset-[10px]">
+            Lift.
+          </span>
         </h1>
         <p className="m-0 max-w-[300px] text-[19px] font-semibold leading-[1.4] opacity-90 animate-rise [animation-delay:400ms]">
           Your PT programs it through Claude. You lift. Olympus keeps the score.

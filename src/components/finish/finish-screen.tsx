@@ -199,13 +199,13 @@ export default function FinishScreen({
 
   const time = elapsed != null ? formatDuration(elapsed) : null;
   const hasPr = catches.some((c) => c.kind === "pr");
-  // Already sent and not live: the screen is a receipt, not a celebration.
+  // Sent and no longer live: the bottom bar offers "Back to Today".
   const done = sent && !live;
 
   return (
     <div className={cn(kindClass(sessionType), "flex flex-col pb-[calc(env(safe-area-inset-bottom)+180px)]")}>
       <div className="relative overflow-hidden bg-k text-k-on pb-12">
-        {!done && <Confetti />}
+        {live && <Confetti />}
         <header className="relative page-top px-4 flex justify-between items-center">
           <Link
             href={live ? `/session/${sessionId}` : "/history"}
@@ -222,7 +222,7 @@ export default function FinishScreen({
 
         <div className="relative px-6 pt-6 flex flex-col gap-1.5">
           <h1 className="m-0 text-[56px] font-extrabold leading-[58px] tracking-[-1px] animate-pop-in">
-            {done ? "Sent." : hasPr ? "New PR!" : "Crushed it."}
+            {live ? (hasPr ? "New PR!" : "Crushed it.") : sent ? "Sent." : "Done."}
           </h1>
           <p className="arrive arrive-1 m-0 text-[17px] opacity-90">
             {label}. {summaryLine(catches)}

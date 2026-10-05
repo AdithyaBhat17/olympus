@@ -70,6 +70,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const [notes, setNotes] = useState(view.notes ?? "");
   const [rest, setRestState] = useState<RestState | null>(null);
   const [pending, setPending] = useState(0);
+  const [activeKg, setActiveKg] = useState<number | null>(null);
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
 
@@ -414,12 +415,14 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           onRemoveSet={() => removeLastSet(current)}
           onNote={() => setNoteOpen(true)}
           onNext={() => nextItem && setSelectedKey(nextItem.key)}
+          activeKg={activeKg}
         >
           <SetTable
             key={`${current.key}:${current.exercise.id}`}
             item={current}
             onLog={(index, input, kind) => onLog(current, index, input, kind)}
             onUndoLast={() => removeLastSet(current)}
+            onActiveKg={setActiveKg}
           />
         </ExerciseCard>
       ) : (

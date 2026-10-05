@@ -33,14 +33,19 @@ export function platesFor(
 const PLATE_SIZES = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
 export const BAR_KG = 20;
 
-/** Barbell by kit, or by name when the kit isn't recorded ("Barbell Back Squat", "Deadlift"). */
+/**
+ * Barbell by kit; by name only when the kit isn't recorded ("Barbell Back Squat",
+ * "Deadlift"), so a "Dumbbell Romanian Deadlift" is not a barbell.
+ */
 export function isBarbell(ex: { name: string; equipment?: string | null }): boolean {
-  return ex.equipment === "barbell" || /\bbarbell\b|deadlift/i.test(ex.name);
+  if (ex.equipment) return ex.equipment === "barbell";
+  return /\bbarbell\b|deadlift/i.test(ex.name);
 }
 
 /**
  * Plates to load on one side for a true target, largest first, or null when the
- * lift isn't plate-loaded. `leftover` is the true kg standard plates can't make.
+ * lift isn't plate-loaded. `leftover` is the true kg standard plates can't make;
+ * negative when the target is lighter than the empty bar.
  */
 export function plateBreakdown(
   ex: Pick<DomainExercise, "loadMode" | "carriageKgPerSide" | "name"> & { equipment?: string | null },
@@ -52,6 +57,7 @@ export function plateBreakdown(
     side = platesFor(ex, targetTrueKg);
     sides = 1;
   } else if (ex.loadMode === "TOTAL" && isBarbell(ex)) {
+    if (targetTrueKg < BAR_KG) return { plates: [], leftover: roundKg(targetTrueKg - BAR_KG) };
     side = (targetTrueKg - BAR_KG) / 2;
     sides = 2;
   } else {

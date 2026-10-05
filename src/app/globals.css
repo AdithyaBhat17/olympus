@@ -188,10 +188,6 @@
     @apply bg-apricot text-apricot-ink font-extrabold;
   }
 
-  /* Controls sitting on a session colour block (.kind-*). */
-  .on-k {
-    @apply bg-white/20 text-current;
-  }
   /* White capsule CTA on a colour block. */
   .btn-on-k {
     @apply relative h-[60px] px-8 rounded-full bg-white text-k-text font-extrabold text-[19px]
@@ -214,14 +210,14 @@
   /* Active set: a static ring plus a pulse that only animates transform/opacity. */
   .breathe {
     @apply relative;
-    box-shadow: inset 0 0 0 3px rgb(var(--k));
+    box-shadow: inset 0 0 0 3px rgb(var(--k-text));
   }
   .breathe::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: 0 0 0 3px rgb(var(--k) / 0.45);
+    box-shadow: 0 0 0 3px rgb(var(--k-text) / 0.45);
     animation: breathe-ring 1.8s ease-out infinite;
     pointer-events: none;
   }
@@ -282,6 +278,12 @@
 
   .safe-top {
     padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  }
+
+  /* Controls sitting on a session colour block (.kind-*). Kept after the base
+     controls it modifies (.btn-round, .btn-pill, .seg-btn) so it wins on order. */
+  .on-k {
+    @apply bg-white/20 text-current;
   }
 
   /* Top padding for full-bleed pages under viewport-fit=cover. */

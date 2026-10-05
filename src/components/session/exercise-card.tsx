@@ -19,6 +19,8 @@ interface ExerciseCardProps {
   onRemoveSet: () => void;
   onNote: () => void;
   onNext: () => void;
+  /** Load of the set about to be logged; falls back to the planned opener. */
+  activeKg?: number | null;
   children: React.ReactNode;
 }
 
@@ -48,6 +50,7 @@ export function ExerciseCard({
   onRemoveSet,
   onNote,
   onNext,
+  activeKg,
   children,
 }: ExerciseCardProps) {
   const { exercise } = item;
@@ -69,7 +72,8 @@ export function ExerciseCard({
 
   const cueLines = [...item.coachFlags, ...item.cues];
 
-  const plates = open != null ? plateBreakdown(exercise, open) : null;
+  const heroKg = activeKg ?? open;
+  const plates = heroKg != null ? plateBreakdown(exercise, heroKg) : null;
 
   return (
     <section aria-label="Current exercise" className="flex flex-col">
@@ -90,14 +94,14 @@ export function ExerciseCard({
         <div key={`${exercise.id}-load`} className="flex items-end gap-3 animate-slide-up">
           <span className="flex items-baseline gap-1.5">
             <span className="num text-[88px] leading-[0.9] tracking-[-2px]">
-              {mode === "TIME" ? plannedMinutes(item)?.total ?? "—" : open != null ? formatKg(open) : "—"}
+              {mode === "TIME" ? plannedMinutes(item)?.total ?? "—" : heroKg != null ? formatKg(heroKg) : "—"}
             </span>
             <span className="text-[24px] font-bold opacity-85">
               {mode === "TIME" ? "min" : mode === "COUNTERWEIGHT" ? "kg cw" : mode === "PER_SIDE" ? "kg a side" : "kg"}
             </span>
           </span>
           {delta != null && delta > 0 && (
-            <span className="mb-2 tag tag-apricot text-[15px] animate-pop-in [animation-delay:300ms]">
+            <span className="mb-2 tag bg-white text-k-text font-extrabold text-[15px] animate-pop-in [animation-delay:300ms]">
               +{formatKg(delta)}
             </span>
           )}

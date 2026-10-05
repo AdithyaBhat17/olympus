@@ -12,9 +12,12 @@ const SIZE: Record<number, { w: number; h: number; opacity: number }> = {
 
 /** One side of the bar in the text colour; plates slide on as the load changes. */
 export function Plates({ plates, leftover }: { plates: number[]; leftover: number }) {
-  const label = `${plates.length ? `${plates.map((p) => formatKg(p)).join(" + ")} each side` : "Just the bar"}${
-    leftover > 0 ? `, ${formatKg(leftover)} kg short` : ""
-  }`;
+  const label =
+    leftover < 0
+      ? `${formatKg(-leftover)} kg lighter than the bar`
+      : `${plates.length ? `${plates.map((p) => formatKg(p)).join(" + ")} each side` : "Just the bar"}${
+          leftover > 0 ? `, ${formatKg(leftover)} kg short` : ""
+        }`;
   return (
     <div role="img" aria-label={label} className="flex flex-col gap-1">
       <div className="relative h-[116px]">

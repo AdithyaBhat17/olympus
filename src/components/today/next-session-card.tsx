@@ -225,7 +225,7 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
                 </span>
               )}
               {it.up ? (
-                <span className="tag tag-apricot">{it.up}</span>
+                <span className="tag bg-white text-k-text font-extrabold">{it.up}</span>
               ) : (
                 <span className="w-[38px]" aria-hidden />
               )}

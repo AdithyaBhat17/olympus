@@ -30,6 +30,8 @@ interface SetTableProps {
   /** Optimistic: applies immediately; resolves with the server's answer (null if queued or rejected). */
   onLog: (index: number, input: LogInput, kind: LogKind) => Promise<LogSetResult | null>;
   onUndoLast: () => void;
+  /** The load the next set will log, so the hero above can show it (and its plates). */
+  onActiveKg?: (kg: number | null) => void;
 }
 
 const MAX_REPS = 15;
@@ -47,7 +49,7 @@ export function setLabels(sets: LiveSetView[]): string[] {
   });
 }
 
-export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
+export function SetTable({ item, onLog, onUndoLast, onActiveKg }: SetTableProps) {
   const { exercise, sets } = item;
   const timed = exercise.loadMode === "TIME";
   const unit = timed ? "—" : exercise.loadMode === "COUNTERWEIGHT" ? "Counter" : exercise.loadMode === "PER_SIDE" ? "kg a side" : "kg";
@@ -94,6 +96,12 @@ export function SetTable({ item, onLog, onUndoLast }: SetTableProps) {
     });
     return out;
   }, [sets, drafts, timed]);
+
+  // Report the next set's load (or the last one logged, once all are done) to the hero.
+  const heroKg = activeIndex >= 0 ? values[activeIndex]?.kg ?? null : values[lastLogged]?.kg ?? null;
+  useEffect(() => {
+    onActiveKg?.(heroKg);
+  }, [heroKg, onActiveKg]);
 
   const patchDraft = (i: number, patch: Draft) => setDrafts((d) => ({ ...d, [i]: { ...d[i], ...patch } }));
   const clearDraft = (i: number) =>

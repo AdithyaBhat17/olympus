@@ -195,6 +195,10 @@ describe("plate breakdown", () => {
   });
   it("skips lifts that aren't plate-loaded", () => {
     expect(plateBreakdown({ ...EX.deadlift, name: "Lat Pulldown", equipment: "cable" }, 50)).toBeNull();
+    expect(plateBreakdown({ ...EX.deadlift, name: "Dumbbell Romanian Deadlift", equipment: "dumbbell" }, 40)).toBeNull();
+  });
+  it("flags a target lighter than the empty bar", () => {
+    expect(plateBreakdown(EX.deadlift, 15)).toEqual({ plates: [], leftover: -5 });
   });
 });
 
