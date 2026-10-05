@@ -57,7 +57,9 @@ function LiveCta({ href, startedAt, opening }: { href: string; startedAt: number
   return (
     <Link
       href={href}
-      prefetch
+      // /session/start creates a session on render; prefetching it races the
+      // tap's navigation and leaves a second live session behind.
+      prefetch={!opening}
       className="btn-on-k w-full"
     >
       <span className="w-2.5 h-2.5 rounded-full bg-k animate-live-dot" />
