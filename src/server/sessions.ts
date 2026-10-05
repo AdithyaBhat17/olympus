@@ -364,6 +364,20 @@ export async function startSession(
     })
     .returning({ id: sessions.id });
   await setPlanStatus(userId, plan.id, "IN_PROGRESS");
+
+  // Two concurrent starts (double tap, prefetch + navigation) can both miss
+  // getLiveSession and insert. Every racer agrees on the earliest live row;
+  // the others drop their own insert and resume that one.
+  const [winner] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.userId, userId), eq(sessions.status, "IN_PROGRESS")))
+    .orderBy(asc(sessions.startedAt), asc(sessions.id))
+    .limit(1);
+  if (winner && winner.id !== row.id) {
+    await db.delete(sessions).where(eq(sessions.id, row.id));
+    return winner.id;
+  }
   return row.id;
 }
 
@@ -574,7 +588,26 @@ export async function discardSession(userId: string, sessionId: string) {
   const session = await ownedSession(userId, sessionId);
   if (session.status !== "IN_PROGRESS") throw new DomainError("Only a live session can be discarded");
   await db.delete(sessions).where(eq(sessions.id, sessionId));
-  if (session.planId) await setPlanStatus(userId, session.planId, "READY");
+  if (!session.planId) return;
+  // Sweep up empty duplicates of this plan's live session (left by a start
+  // race) so Today doesn't show one still ticking after a discard.
+  const twins = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(eq(sessions.userId, userId), eq(sessions.planId, session.planId), eq(sessions.status, "IN_PROGRESS"))
+    );
+  if (twins.length) {
+    const logged = await db
+      .selectDistinct({ sessionId: sessionExercises.sessionId })
+      .from(sessionExercises)
+      .where(inArray(sessionExercises.sessionId, twins.map((t) => t.id)));
+    const keep = new Set(logged.map((l) => l.sessionId));
+    const empty = twins.filter((t) => !keep.has(t.id)).map((t) => t.id);
+    if (empty.length) await db.delete(sessions).where(inArray(sessions.id, empty));
+    if (keep.size) return;
+  }
+  await setPlanStatus(userId, session.planId, "READY");
 }
 
 // ---------------------------------------------------------------------------
