@@ -11,14 +11,13 @@ import { discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions"
 import { mutate } from "@/lib/offline/mutate";
 import { subscribePending } from "@/lib/offline/outbox";
 import { useWakeLock } from "@/lib/wake-lock";
-import { cn, kindClass } from "@/lib/utils";
+import { adhocItemKey, cn, kindClass } from "@/lib/utils";
 import { ChevronDownIcon, WarnIcon } from "./icons";
 import { Elapsed, RestPill, loadRest, saveRest, type RestState } from "./timers";
 import { ExerciseCard } from "./exercise-card";
 import { SetTable, setLabels, type LogInput, type LogKind } from "./set-table";
 import { CompletedList, UpNextList } from "./session-lists";
 import { SwapSheet, type SwapCandidate } from "./swap-sheet";
-import { adhocItemKey } from "@/lib/utils";
 import { candidateMeta, canRemoveAdded, loadAdded, saveAdded, withAddedItems } from "./added-exercises";
 import { Sheet } from "./sheet";
 
@@ -312,6 +311,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         return;
       }
       toast.success(overrideReason ? "Swapped and flagged for your PT" : "Exercise swapped");
+      // Swapped onto an exercise added here but not started: one card, not two.
+      const dup = items.find((i) => i.exercise.id === exerciseId && canRemoveAdded(i, added));
+      if (dup) dropAdded(dup);
       router.refresh();
     } catch {
       rollback();
@@ -335,8 +337,20 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     if (overrideReason) appendNote(`${c.name}, added though blocked: ${overrideReason}`);
   };
 
-  const removeAdded = (item: LiveItemView) => {
+  /** Forget an added exercise and its unsaved extra sets, so adding it again starts fresh. */
+  const dropAdded = (item: LiveItemView) => {
     setAdded(added.filter((id) => id !== item.exercise.id));
+    const forget = <T,>(m: Record<string, T>) => {
+      const next = { ...m };
+      delete next[item.key];
+      return next;
+    };
+    setSetCounts(forget);
+    setOverlay(forget);
+  };
+
+  const removeAdded = (item: LiveItemView) => {
+    dropAdded(item);
     setSelectedKey(null);
   };
 
@@ -447,7 +461,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           }
           next={nextItem ? { name: nextItem.exercise.name } : null}
           onSwap={current.planItemId ? () => setPicker({ swapKey: current.key }) : null}
-          onRemoveExercise={canRemoveAdded(current) ? () => removeAdded(current) : null}
+          onRemoveExercise={canRemoveAdded(current, added) ? () => removeAdded(current) : null}
           onAddSet={() => addSet(current)}
           onRemoveSet={() => removeLastSet(current)}
           onNote={() => setNoteOpen(true)}

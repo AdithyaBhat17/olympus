@@ -63,7 +63,7 @@ function addedItem(c: SwapCandidate): LiveItemView {
     notes: null,
     lastTopKg: c.lastKg,
     done: false,
-    coachFlags: [],
+    coachFlags: c.coachFlags,
     blockedReason: c.blockedReason,
   };
 }
@@ -87,7 +87,12 @@ export function withAddedItems(
   return extra.length ? [...items, ...extra] : items;
 }
 
-/** Only before its first set: after that it's part of the log (remove the sets instead). */
-export function canRemoveAdded(item: LiveItemView): boolean {
-  return item.key === adhocItemKey(item.exercise.id) && loggedSets(item).length === 0;
+/**
+ * Only an exercise added on this phone, and only before its first set: after
+ * that it's part of the log (remove the sets instead).
+ */
+export function canRemoveAdded(item: LiveItemView, added: string[]): boolean {
+  return (
+    added.includes(item.exercise.id) && item.key === adhocItemKey(item.exercise.id) && loggedSets(item).length === 0
+  );
 }

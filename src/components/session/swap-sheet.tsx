@@ -15,6 +15,8 @@ export interface SwapCandidate
     Pick<ExerciseMeta, "isCompound" | "bodyRegion" | "formCueId" | "equipment"> {
   /** Current working weight (last top set or override), true kg. */
   lastKg: number | null;
+  /** Open PT flags scoped to this exercise. */
+  coachFlags: string[];
 }
 
 interface SwapSheetProps {
@@ -66,11 +68,14 @@ function SwapBody({
     .filter((c) => !c.blocked)
     .sort((a, b) => Number(inSession.has(a.id)) - Number(inSession.has(b.id)));
   const blocked = pool.filter((c) => c.blocked);
-  const suggestedId = safe.find((c) => !inSession.has(c.id))?.id;
+  // Adding has no category to match, so nothing to suggest.
+  const suggestedId = replacing ? safe.find((c) => !inSession.has(c.id))?.id : undefined;
 
   const overrideSwap = (c: SwapCandidate) => {
     const reason = window.prompt(
-      `Why log ${c.name} anyway? This goes to your PT as a flag.`,
+      replacing
+        ? `Why log ${c.name} anyway? This goes to your PT as a flag.`
+        : `Why add ${c.name} anyway? This goes in the session notes for your PT.`,
       ""
     );
     if (reason == null) return;

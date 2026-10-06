@@ -5,6 +5,7 @@ import { dailyCheckIns, planItems, plans, sessionExercises, sessions } from "@/l
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { adhocItemKey } from "@/lib/utils";
 import {
+  DEFAULT_REST_SEC,
   blockedReason,
   annotateSets,
   formatSleep,
@@ -299,7 +300,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       it?.sets ?? [],
       it
         ? { restSec: it.restSec, straps: it.straps, cues: it.cues, pairGroup: it.pairGroup }
-        : { restSec: byId.get(a.exerciseId)?.isCompound ? 180 : 90 },
+        : { restSec: byId.get(a.exerciseId)?.isCompound ? DEFAULT_REST_SEC.compound : DEFAULT_REST_SEC.accessory },
       a.row
     );
     if (v) items.push(v);

@@ -35,6 +35,7 @@ const candidate = (id: string, isCompound = false): SwapCandidate => ({
   bodyRegion: "upper",
   formCueId: null,
   equipment: null,
+  coachFlags: [],
 });
 
 const item = (key: string, exerciseId: string, planItemId: string | null): LiveItemView => ({
@@ -93,8 +94,13 @@ describe("withAddedItems", () => {
 describe("canRemoveAdded", () => {
   it("allows removing an added exercise only before its first set", () => {
     const [empty] = withAddedItems([], ["fly"], candidates);
-    expect(canRemoveAdded(empty)).toBe(true);
-    expect(canRemoveAdded(item(adhocItemKey("fly"), "fly", null))).toBe(false);
-    expect(canRemoveAdded({ ...item("p1", "fly", "p1"), sets: empty.sets })).toBe(false);
+    expect(canRemoveAdded(empty, ["fly"])).toBe(true);
+    expect(canRemoveAdded(item(adhocItemKey("fly"), "fly", null), ["fly"])).toBe(false);
+    expect(canRemoveAdded({ ...item("p1", "fly", "p1"), sets: empty.sets }, ["fly"])).toBe(false);
+  });
+
+  it("never offers removal for an unplanned row this phone didn't add", () => {
+    const row = { ...item(adhocItemKey("fly"), "fly", null), sets: [{ index: 0, planned: null, logged: null, last: null }] };
+    expect(canRemoveAdded(row, [])).toBe(false);
   });
 });
