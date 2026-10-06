@@ -53,7 +53,12 @@ export function upNextSummary(item: LiveItemView): string {
   if (item.exercise.loadMode === "TIME") return plannedMinutes(item)?.label ?? target ?? `${item.sets.length} blocks`;
   const open = openKg(item);
   const parts = [target, open != null ? formatLoad(item.exercise.loadMode, open) : null].filter(Boolean);
-  return parts.length ? parts.join(", ") : `${item.sets.length} sets`;
+  return parts.length ? parts.join(", ") : setsLabel(item.sets.length);
+}
+
+/** "1 set", "3 sets". */
+export function setsLabel(n: number): string {
+  return `${n} set${n === 1 ? "" : "s"}`;
 }
 
 export function loggedSets(item: Pick<LiveItemView, "sets">): SetLogEntry[] {

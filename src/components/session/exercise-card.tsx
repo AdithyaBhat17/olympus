@@ -5,7 +5,7 @@ import { formatKg, isHarder, plateBreakdown, progressDelta } from "@/domain/load
 import type { LiveItemView } from "@/server/sessions";
 import { WarnIcon, InfoIcon } from "./icons";
 import { OptionsMenu, type MenuEntry } from "./options-menu";
-import { openKg, plannedMinutes, targetLabel, targetRpe } from "./format";
+import { openKg, plannedMinutes, setsLabel, targetLabel, targetRpe } from "./format";
 import { Plates } from "./plates";
 
 interface ExerciseCardProps {
@@ -16,7 +16,7 @@ interface ExerciseCardProps {
   next: { name: string } | null;
   onSwap: (() => void) | null;
   /** Set for an exercise added mid-session that has no sets logged yet. */
-  onRemoveExercise?: (() => void) | null;
+  onRemoveExercise: (() => void) | null;
   onAddSet: () => void;
   onRemoveSet: () => void;
   onNote: () => void;
@@ -114,7 +114,7 @@ export function ExerciseCard({
         {plates && <Plates {...plates} />}
 
         <div className="grid grid-cols-2 gap-2">
-          <Tile label="Target">{target ?? `${item.sets.length} set${item.sets.length === 1 ? "" : "s"}`}</Tile>
+          <Tile label="Target">{target ?? setsLabel(item.sets.length)}</Tile>
           <Tile label="Effort">{rpe != null ? `RPE ${formatKg(rpe)}` : "Your call"}</Tile>
         </div>
 

@@ -3,6 +3,7 @@ import { DomainError } from "./errors";
 import { db } from "@/lib/db";
 import { dailyCheckIns, planItems, plans, sessionExercises, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { adhocItemKey } from "@/lib/utils";
 import {
   blockedReason,
   annotateSets,
@@ -106,7 +107,7 @@ export interface SessionView {
   targets: Pick<Targets, "proteinG" | "waterMl">;
 }
 
-export function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
+function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
   return {
     id: row.id,
     slug: row.slug ?? null,
@@ -121,7 +122,7 @@ export function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCu
   };
 }
 
-async function exerciseIndex(userId: string) {
+export async function exerciseIndex(userId: string) {
   const rows = await listExerciseRows(userId);
   const domain = rows.map((r) => ({ ...toDomainExercise(r), formCueId: r.formCueId }));
   return { domain, byId: new Map(domain.map((e) => [e.id, e])) };
@@ -164,10 +165,14 @@ function assembleItems(
       row,
     });
   }
+  const adhoc = new Set<string>();
   for (const se of logged) {
     if (used.has(se.id)) continue;
+    // logSet keeps one unplanned row per exercise; imported sessions can repeat one.
+    const key = !se.planItemId && !adhoc.has(se.exerciseId) ? adhocItemKey(se.exerciseId) : `x-${se.id}`;
+    if (!se.planItemId) adhoc.add(se.exerciseId);
     out.push({
-      key: `x-${se.id}`,
+      key,
       // Keep the plan item id when it's this plan's, so logSet/removeSet find the row.
       planItemId: se.planItemId && planItemIds.has(se.planItemId) ? se.planItemId : null,
       exerciseId: se.exerciseId,

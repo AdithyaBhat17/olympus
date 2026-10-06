@@ -1,6 +1,15 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/**
+ * Live-session key of the unplanned row for an exercise. The server and the
+ * phone (an exercise added before its first set) both use it, so the item
+ * keeps its key once that set lands.
+ */
+export function adhocItemKey(exerciseId: string): string {
+  return `adhoc-${exerciseId}`;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

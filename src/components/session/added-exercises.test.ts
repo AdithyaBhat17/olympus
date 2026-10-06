@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ExerciseMeta, LiveItemView } from "@/server/sessions";
+import { adhocItemKey } from "@/lib/utils";
 import type { SwapCandidate } from "./swap-sheet";
-import { addedKey, withAddedItems } from "./added-exercises";
+import { canRemoveAdded, withAddedItems } from "./added-exercises";
 
 const meta = (id: string, isCompound = false): ExerciseMeta => ({
   id,
@@ -30,7 +31,10 @@ const candidate = (id: string, isCompound = false): SwapCandidate => ({
   blockedReason: null,
   substitutes: [],
   lastKg: 40,
-  meta: meta(id, isCompound),
+  isCompound,
+  bodyRegion: "upper",
+  formCueId: null,
+  equipment: null,
 });
 
 const item = (key: string, exerciseId: string, planItemId: string | null): LiveItemView => ({
@@ -60,8 +64,9 @@ describe("withAddedItems", () => {
     expect(out).toHaveLength(2);
     expect(out[0]).toBe(planned);
     expect(out[1]).toMatchObject({
-      key: addedKey("press"),
+      key: adhocItemKey("press"),
       planItemId: null,
+      exercise: meta("press", true),
       restSec: 180,
       lastTopKg: 40,
       done: false,
@@ -69,23 +74,27 @@ describe("withAddedItems", () => {
     });
   });
 
-  it("keeps the added key once the first set has created the server row", () => {
-    const out = withAddedItems([item("p1", "squat", "p1"), item("x-row1", "fly", null)], ["fly"], candidates);
-    expect(out.map((i) => i.key)).toEqual(["p1", addedKey("fly")]);
-    expect(out[1].sets[0].logged).toEqual({ reps: 8, weight: 40 });
+  it("defers to the server item once the first set has created the row", () => {
+    const logged = item(adhocItemKey("fly"), "fly", null);
+    const items = [item("p1", "squat", "p1"), logged];
+    expect(withAddedItems(items, ["fly"], candidates)).toBe(items);
   });
 
-  it("never claims a planned item of the same exercise", () => {
+  it("still adds an exercise that is also planned", () => {
     const out = withAddedItems([item("p1", "fly", "p1")], ["fly"], candidates);
-    expect(out.map((i) => i.key)).toEqual(["p1", addedKey("fly")]);
-  });
-
-  it("leaves unplanned rows that weren't added on this phone alone", () => {
-    const out = withAddedItems([item("x-row1", "fly", null)], [], candidates);
-    expect(out.map((i) => i.key)).toEqual(["x-row1"]);
+    expect(out.map((i) => i.key)).toEqual(["p1", adhocItemKey("fly")]);
   });
 
   it("skips ids missing from the library", () => {
     expect(withAddedItems([], ["gone"], candidates)).toEqual([]);
+  });
+});
+
+describe("canRemoveAdded", () => {
+  it("allows removing an added exercise only before its first set", () => {
+    const [empty] = withAddedItems([], ["fly"], candidates);
+    expect(canRemoveAdded(empty)).toBe(true);
+    expect(canRemoveAdded(item(adhocItemKey("fly"), "fly", null))).toBe(false);
+    expect(canRemoveAdded({ ...item("p1", "fly", "p1"), sets: empty.sets })).toBe(false);
   });
 });

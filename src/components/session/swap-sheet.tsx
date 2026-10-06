@@ -9,10 +9,12 @@ import { cn, formatCategory } from "@/lib/utils";
 import { Sheet } from "./sheet";
 import { CloseIcon, SearchIcon } from "./icons";
 
-export interface SwapCandidate extends ExerciseSearchHit {
+/** A library exercise, plus what the live screen needs to show it once picked. */
+export interface SwapCandidate
+  extends ExerciseSearchHit,
+    Pick<ExerciseMeta, "isCompound" | "bodyRegion" | "formCueId" | "equipment"> {
   /** Current working weight (last top set or override), true kg. */
   lastKg: number | null;
-  meta: ExerciseMeta;
 }
 
 interface SwapSheetProps {

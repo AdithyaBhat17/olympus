@@ -18,7 +18,8 @@ import { ExerciseCard } from "./exercise-card";
 import { SetTable, setLabels, type LogInput, type LogKind } from "./set-table";
 import { CompletedList, UpNextList } from "./session-lists";
 import { SwapSheet, type SwapCandidate } from "./swap-sheet";
-import { addedKey, loadAdded, saveAdded, withAddedItems } from "./added-exercises";
+import { adhocItemKey } from "@/lib/utils";
+import { candidateMeta, canRemoveAdded, loadAdded, saveAdded, withAddedItems } from "./added-exercises";
 import { Sheet } from "./sheet";
 
 /** Optimistic set edits per item key: index → entry (null = removed). */
@@ -66,8 +67,8 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const [swaps, setSwaps] = useState<SwapOverlay>({});
   const [setCounts, setSetCounts] = useState<Record<string, number>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [swapKey, setSwapKey] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  /** The exercise picker: swapping out an item, or adding one to the session. */
+  const [picker, setPicker] = useState<{ swapKey: string } | "add" | null>(null);
   const [added, setAddedState] = useState<string[]>([]);
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState(view.notes ?? "");
@@ -95,17 +96,6 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     setRestState(loadRest(view.id));
     setAddedState(loadAdded(view.id));
   }, [view.id]);
-  const setAdded = (ids: string[]) => {
-    setAddedState(ids);
-    saveAdded(view.id, ids);
-  };
-
-  const candidateById = useMemo(() => new Map(swap.candidates.map((c) => [c.id, c])), [swap.candidates]);
-
-  const baseItems = useMemo(
-    () => withAddedItems(view.items, added, candidateById),
-    [view.items, added, candidateById]
-  );
   const setRest = useCallback(
     (next: RestState | null) => {
       setRestState(next);
@@ -114,11 +104,25 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     [view.id]
   );
   const skipRest = useCallback(() => setRest(null), [setRest]);
+  const setAdded = useCallback(
+    (ids: string[]) => {
+      setAddedState(ids);
+      saveAdded(view.id, ids);
+    },
+    [view.id]
+  );
+
+  const candidateById = useMemo(() => new Map(swap.candidates.map((c) => [c.id, c])), [swap.candidates]);
+  const baseItems = useMemo(
+    () => withAddedItems(view.items, added, candidateById),
+    [view.items, added, candidateById]
+  );
 
   // Drop optimistic entries the server view now reflects.
   useEffect(() => {
     setOverlay((prev) => {
       const next: Overlay = {};
+      let dropped = false;
       for (const [key, entries] of Object.entries(prev)) {
         const serverItem = baseItems.find((x) => x.key === key);
         for (const [k, v] of Object.entries(entries)) {
@@ -128,9 +132,10 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
               ? server === null
               : server != null && server.reps === v.reps && server.weight === v.weight && (server.rpe ?? null) === (v.rpe ?? null);
           if (!reflected) (next[key] ??= {})[Number(k)] = v;
+          else dropped = true;
         }
       }
-      return next;
+      return dropped ? next : prev;
     });
   }, [baseItems]);
   useEffect(() => setSwaps({}), [view]);
@@ -149,6 +154,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const completed = items.filter((i) => i.done && i.key !== current?.key);
   const upNext = items.filter((i) => !i.done && i.key !== current?.key);
   const nextItem = current ? items.slice(currentIdx + 1).find((i) => !i.done) ?? upNext[0] ?? null : null;
+  const swapKey = picker && picker !== "add" ? picker.swapKey : null;
   const swapItem = swapKey ? items.find((i) => i.key === swapKey) ?? null : null;
   const positions = useMemo(() => new Map(items.map((it, i) => [it.key, i + 1])), [items]);
 
@@ -267,7 +273,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     if (!swapItem?.planItemId) return;
     const c = candidateById.get(exerciseId);
     const item = swapItem;
-    setSwapKey(null);
+    setPicker(null);
     setSelectedKey(item.key);
     if (c) {
       setSwaps((s) => ({
@@ -276,7 +282,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           ...item,
           swapped: true,
           plannedExercise: item.plannedExercise ?? item.exercise,
-          exercise: c.meta,
+          exercise: candidateMeta(c),
           blockedReason: c.blockedReason,
           lastTopKg: c.lastKg,
           sets: item.sets.map((s) => ({
@@ -314,7 +320,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   };
 
   const addExercise = (exerciseId: string, overrideReason?: string) => {
-    setAddOpen(false);
+    setPicker(null);
     const c = candidateById.get(exerciseId);
     if (!c) return;
     const existing = items.find((i) => i.exercise.id === exerciseId);
@@ -324,12 +330,11 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       return;
     }
     setAdded([...added, exerciseId]);
-    setSelectedKey(addedKey(exerciseId));
+    setSelectedKey(adhocItemKey(exerciseId));
     toast.success(`${c.name} added`, { id: "exercise-added" });
     if (overrideReason) appendNote(`${c.name}, added though blocked: ${overrideReason}`);
   };
 
-  /** Only before its first set: after that it's part of the log (remove the sets instead). */
   const removeAdded = (item: LiveItemView) => {
     setAdded(added.filter((id) => id !== item.exercise.id));
     setSelectedKey(null);
@@ -441,12 +446,8 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
             lastLoggedIndex(current) >= 0 || (!current.sets[current.sets.length - 1]?.planned && current.sets.length > 1)
           }
           next={nextItem ? { name: nextItem.exercise.name } : null}
-          onSwap={current.planItemId ? () => setSwapKey(current.key) : null}
-          onRemoveExercise={
-            current.key === addedKey(current.exercise.id) && !current.sets.some((s) => s.logged)
-              ? () => removeAdded(current)
-              : null
-          }
+          onSwap={current.planItemId ? () => setPicker({ swapKey: current.key }) : null}
+          onRemoveExercise={canRemoveAdded(current) ? () => removeAdded(current) : null}
           onAddSet={() => addSet(current)}
           onRemoveSet={() => removeLastSet(current)}
           onNote={() => setNoteOpen(true)}
@@ -483,7 +484,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       <div className="mx-3 mt-[22px]">
         <button
           type="button"
-          onClick={() => setAddOpen(true)}
+          onClick={() => setPicker("add")}
           className="w-full h-12 rounded-[14px] border border-dashed border-line-strong text-[15px] font-semibold text-fg-2"
         >
           + Add exercise
@@ -502,31 +503,21 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
 
       <RestPill sessionId={view.id} rest={rest} nextLabel={restNext} onAdd={addRest} onSkip={skipRest} />
 
-      {swapItem?.planItemId && (
+      {(picker === "add" || swapItem?.planItemId) && (
         <SwapSheet
           open
-          onClose={() => setSwapKey(null)}
-          replacing={{
-            name: swapItem.exercise.name,
-            exerciseId: swapItem.exercise.id,
-            category: swapItem.exercise.category,
-          }}
+          onClose={() => setPicker(null)}
+          replacing={
+            swapItem
+              ? { name: swapItem.exercise.name, exerciseId: swapItem.exercise.id, category: swapItem.exercise.category }
+              : null
+          }
           candidates={swap.candidates}
           constraintRegions={swap.constraintRegions}
           inSessionIds={items.map((i) => i.exercise.id)}
-          onPick={(id, reason) => void doSwap(id, reason)}
+          onPick={swapItem ? (id, reason) => void doSwap(id, reason) : addExercise}
         />
       )}
-
-      <SwapSheet
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        replacing={null}
-        candidates={swap.candidates}
-        constraintRegions={swap.constraintRegions}
-        inSessionIds={items.map((i) => i.exercise.id)}
-        onPick={addExercise}
-      />
 
       <Sheet open={noteOpen} onClose={() => setNoteOpen(false)} label="Note for your PT">
         {noteOpen && <NoteForm exercise={current?.exercise.name ?? null} onSave={saveNote} />}
