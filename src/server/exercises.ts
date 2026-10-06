@@ -56,6 +56,24 @@ export async function listExerciseRows(userId: string): Promise<ExerciseRow[]> {
   }));
 }
 
+/**
+ * A custom exercise of the athlete's own, for something the library lacks.
+ * Reuses the one they can already see under the same name. Returns its id.
+ */
+export async function addCustomExercise(
+  userId: string,
+  input: { name: string; category: ExerciseRow["category"] }
+): Promise<string> {
+  const name = input.name.trim();
+  const same = (await listExerciseRows(userId)).find((r) => r.name.toLowerCase() === name.toLowerCase());
+  if (same) return same.id;
+  const [row] = await db
+    .insert(exercises)
+    .values({ name, category: input.category, status: "YES", isCustom: true, createdBy: userId })
+    .returning({ id: exercises.id });
+  return row.id;
+}
+
 export async function listExercises(userId: string): Promise<DomainExercise[]> {
   return (await listExerciseRows(userId)).map(toDomainExercise);
 }

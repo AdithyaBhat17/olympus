@@ -3,7 +3,9 @@ import { DomainError } from "./errors";
 import { db } from "@/lib/db";
 import { dailyCheckIns, planItems, plans, sessionExercises, sessions } from "@/lib/db/schema";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { adhocItemKey } from "@/lib/utils";
 import {
+  DEFAULT_REST_SEC,
   blockedReason,
   annotateSets,
   formatSleep,
@@ -21,11 +23,13 @@ import {
   type UnderloadNudge,
 } from "@/domain";
 import {
+  describeExercise,
   exerciseRef,
   getConstraints,
   listExerciseRows,
   resolveRef,
   toDomainExercise,
+  type ExerciseSearchHit,
 } from "./exercises";
 import { aggregateColumns, previousSessions, resolveSets, workingWeights } from "./history";
 import { getCheckIn } from "./checkins";
@@ -106,7 +110,17 @@ export interface SessionView {
   targets: Pick<Targets, "proteinG" | "waterMl">;
 }
 
-function meta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
+/** A library exercise as the live screen's picker shows it. */
+export interface ExerciseCandidate
+  extends ExerciseSearchHit,
+    Pick<ExerciseMeta, "isCompound" | "bodyRegion" | "formCueId" | "equipment"> {
+  /** Current working weight (last top set or override), true kg. */
+  lastKg: number | null;
+  /** Open PT flags scoped to this exercise. */
+  coachFlags: string[];
+}
+
+function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
   return {
     id: row.id,
     slug: row.slug ?? null,
@@ -164,10 +178,14 @@ function assembleItems(
       row,
     });
   }
+  const adhoc = new Set<string>();
   for (const se of logged) {
     if (used.has(se.id)) continue;
+    // logSet keeps one unplanned row per exercise; imported sessions can repeat one.
+    const key = !se.planItemId && !adhoc.has(se.exerciseId) ? adhocItemKey(se.exerciseId) : `x-${se.id}`;
+    if (!se.planItemId) adhoc.add(se.exerciseId);
     out.push({
-      key: `x-${se.id}`,
+      key,
       // Keep the plan item id when it's this plan's, so logSet/removeSet find the row.
       planItemId: se.planItemId && planItemIds.has(se.planItemId) ? se.planItemId : null,
       exerciseId: se.exerciseId,
@@ -266,8 +284,8 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     return {
       key,
       planItemId,
-      exercise: meta(ex),
-      plannedExercise: plannedEx ? meta(plannedEx) : null,
+      exercise: exerciseMeta(ex),
+      plannedExercise: plannedEx ? exerciseMeta(plannedEx) : null,
       swapped: !!plannedExId && plannedExId !== exId,
       restSec: 120,
       straps: false,
@@ -294,7 +312,7 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       it?.sets ?? [],
       it
         ? { restSec: it.restSec, straps: it.straps, cues: it.cues, pairGroup: it.pairGroup }
-        : { restSec: byId.get(a.exerciseId)?.isCompound ? 180 : 90 },
+        : { restSec: byId.get(a.exerciseId)?.isCompound ? DEFAULT_REST_SEC.compound : DEFAULT_REST_SEC.accessory },
       a.row
     );
     if (v) items.push(v);
@@ -326,6 +344,33 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       ? { sleepMin: checkIn.sleepMin, proteinG: checkIn.proteinG, waterMl: checkIn.waterMl }
       : null,
     targets: { proteinG: profile.targets.proteinG, waterMl: profile.targets.waterMl },
+  };
+}
+
+/** The live screen's add/swap picker: every library exercise, blocked ones included. */
+export async function exercisePicker(
+  userId: string,
+  sessionId: string
+): Promise<{ candidates: ExerciseCandidate[]; constraintRegions: string[] }> {
+  const [{ domain }, cons, openFlags] = await Promise.all([
+    exerciseIndex(userId),
+    getConstraints(userId),
+    listOpenFlags(userId),
+  ]);
+  const weights = await workingWeights(userId, domain, { excludeSessionId: sessionId });
+  return {
+    candidates: domain.map((e) => ({
+      ...describeExercise(e, domain, cons),
+      lastKg: weights.get(e.id)?.kg ?? null,
+      isCompound: e.isCompound,
+      bodyRegion: e.bodyRegion,
+      formCueId: e.formCueId,
+      equipment: e.equipment ?? null,
+      coachFlags: flagsFor(openFlags, { exerciseId: e.id })
+        .filter((f) => f.scope === "exerciseId")
+        .map((f) => f.text),
+    })),
+    constraintRegions: Array.from(new Set(cons.map((c) => c.region))),
   };
 }
 

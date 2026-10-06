@@ -1,10 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
-import { getSessionView, type SessionView } from "@/server/sessions";
-import { describeExercise, getConstraints, listExercises } from "@/server/exercises";
-import { workingWeights } from "@/server/history";
+import { exercisePicker, getSessionView } from "@/server/sessions";
 import { LiveSession } from "@/components/session/live-session";
-import type { SwapCandidate } from "@/components/session/swap-sheet";
 
 export const metadata = { title: "Live session" };
 
@@ -15,21 +12,12 @@ export default async function LiveSessionPage({ params }: { params: Promise<{ id
   if (!UUID_RE.test(id)) notFound();
   const userId = await requireUserEmail();
 
-  let view: SessionView;
-  try {
-    view = await getSessionView(userId, id);
-  } catch {
-    notFound();
-  }
+  const [view, picker] = await Promise.all([
+    getSessionView(userId, id).catch(() => null),
+    exercisePicker(userId, id),
+  ]);
+  if (!view) notFound();
   if (view.status === "DONE") redirect(`/session/${id}/finish`);
 
-  const [all, cons] = await Promise.all([listExercises(userId), getConstraints(userId)]);
-  const weights = await workingWeights(userId, all, { excludeSessionId: id });
-  const candidates: SwapCandidate[] = all.map((e) => ({
-    ...describeExercise(e, all, cons),
-    lastKg: weights.get(e.id)?.kg ?? null,
-  }));
-  const constraintRegions = Array.from(new Set(cons.map((c) => c.region)));
-
-  return <LiveSession view={view} swap={{ candidates, constraintRegions }} />;
+  return <LiveSession view={view} swap={picker} />;
 }

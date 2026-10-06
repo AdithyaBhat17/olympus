@@ -7,17 +7,18 @@ import { toast } from "sonner";
 import { trueKg } from "@/domain/load";
 import type { SetLogEntry } from "@/domain/types";
 import type { LiveItemView, LogSetResult, SessionView } from "@/server/sessions";
-import { discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions";
+import { createExerciseAction, discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions";
 import { mutate } from "@/lib/offline/mutate";
 import { subscribePending } from "@/lib/offline/outbox";
 import { useWakeLock } from "@/lib/wake-lock";
-import { cn, kindClass } from "@/lib/utils";
+import { adhocItemKey, cn, kindClass } from "@/lib/utils";
 import { ChevronDownIcon, WarnIcon } from "./icons";
 import { Elapsed, RestPill, loadRest, saveRest, type RestState } from "./timers";
 import { ExerciseCard } from "./exercise-card";
 import { SetTable, setLabels, type LogInput, type LogKind } from "./set-table";
 import { CompletedList, UpNextList } from "./session-lists";
 import { SwapSheet, type SwapCandidate } from "./swap-sheet";
+import { candidateMeta, canRemoveAdded, loadAdded, saveAdded, withAddedItems } from "./added-exercises";
 import { Sheet } from "./sheet";
 
 /** Optimistic set edits per item key: index → entry (null = removed). */
@@ -65,7 +66,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const [swaps, setSwaps] = useState<SwapOverlay>({});
   const [setCounts, setSetCounts] = useState<Record<string, number>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [swapKey, setSwapKey] = useState<string | null>(null);
+  /** The exercise picker: swapping out an item, or adding one to the session. */
+  const [picker, setPicker] = useState<{ swapKey: string } | "add" | null>(null);
+  const [added, setAddedState] = useState<string[]>([]);
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState(view.notes ?? "");
   const [rest, setRestState] = useState<RestState | null>(null);
@@ -87,9 +90,10 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     };
   }, []);
 
-  // Rest timer survives reloads via localStorage (read after mount only).
+  // Rest timer and added exercises survive reloads via localStorage (read after mount only).
   useEffect(() => {
     setRestState(loadRest(view.id));
+    setAddedState(loadAdded(view.id));
   }, [view.id]);
   const setRest = useCallback(
     (next: RestState | null) => {
@@ -99,13 +103,32 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     [view.id]
   );
   const skipRest = useCallback(() => setRest(null), [setRest]);
+  const setAdded = useCallback(
+    (ids: string[]) => {
+      setAddedState(ids);
+      saveAdded(view.id, ids);
+    },
+    [view.id]
+  );
+
+  // Exercises created mid-session, until the next server view lists them.
+  const [created, setCreated] = useState<SwapCandidate[]>([]);
+  const candidateById = useMemo(
+    () => new Map([...created, ...swap.candidates].map((c) => [c.id, c])),
+    [created, swap.candidates]
+  );
+  const baseItems = useMemo(
+    () => withAddedItems(view.items, added, candidateById),
+    [view.items, added, candidateById]
+  );
 
   // Drop optimistic entries the server view now reflects.
   useEffect(() => {
     setOverlay((prev) => {
       const next: Overlay = {};
+      let dropped = false;
       for (const [key, entries] of Object.entries(prev)) {
-        const serverItem = view.items.find((x) => x.key === key);
+        const serverItem = baseItems.find((x) => x.key === key);
         for (const [k, v] of Object.entries(entries)) {
           const server = serverItem?.sets[Number(k)]?.logged ?? null;
           const reflected =
@@ -113,19 +136,20 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
               ? server === null
               : server != null && server.reps === v.reps && server.weight === v.weight && (server.rpe ?? null) === (v.rpe ?? null);
           if (!reflected) (next[key] ??= {})[Number(k)] = v;
+          else dropped = true;
         }
       }
-      return next;
+      return dropped ? next : prev;
     });
-    setSwaps({});
-  }, [view]);
+  }, [baseItems]);
+  useEffect(() => setSwaps({}), [view]);
 
   const items = useMemo(
     () =>
-      view.items.map((it) =>
+      baseItems.map((it) =>
         mergeItem(swaps[it.key] ?? it, swaps[it.key] ? undefined : overlay[it.key], setCounts[it.key] ?? 0)
       ),
-    [view.items, overlay, swaps, setCounts]
+    [baseItems, overlay, swaps, setCounts]
   );
 
   const current =
@@ -134,6 +158,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const completed = items.filter((i) => i.done && i.key !== current?.key);
   const upNext = items.filter((i) => !i.done && i.key !== current?.key);
   const nextItem = current ? items.slice(currentIdx + 1).find((i) => !i.done) ?? upNext[0] ?? null : null;
+  const swapKey = picker && picker !== "add" ? picker.swapKey : null;
   const swapItem = swapKey ? items.find((i) => i.key === swapKey) ?? null : null;
   const positions = useMemo(() => new Map(items.map((it, i) => [it.key, i + 1])), [items]);
 
@@ -248,41 +273,31 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   };
 
   /** Optimistic swap: show the new exercise now, reconcile on the next server view. */
-  const doSwap = async (exerciseId: string, overrideReason?: string) => {
+  const doSwap = async (c: SwapCandidate, note?: string) => {
     if (!swapItem?.planItemId) return;
-    const c = swap.candidates.find((x) => x.id === exerciseId);
+    // The server flags a blocked swap for the PT and wants a reason for it.
+    const overrideReason = c.blocked ? note || "Athlete's call" : null;
+    const exerciseId = c.id;
     const item = swapItem;
-    setSwapKey(null);
+    setPicker(null);
     setSelectedKey(item.key);
-    if (c) {
-      setSwaps((s) => ({
-        ...s,
-        [item.key]: {
-          ...item,
-          swapped: true,
-          plannedExercise: item.plannedExercise ?? item.exercise,
-          exercise: {
-            ...item.exercise,
-            id: c.id,
-            slug: c.slug,
-            name: c.name,
-            category: c.category,
-            loadMode: c.loadMode as LiveItemView["exercise"]["loadMode"],
-            carriageKgPerSide: c.carriageKgPerSide,
-            formCueId: null,
-            equipment: null,
-          },
-          blockedReason: c.blockedReason,
-          lastTopKg: c.lastKg,
-          sets: item.sets.map((s) => ({
-            ...s,
-            logged: null,
-            last: null,
-            planned: s.planned ? { ...s.planned, openKg: c.lastKg ?? undefined } : null,
-          })),
-        },
-      }));
-    }
+    setSwaps((s) => ({
+      ...s,
+      [item.key]: {
+        ...item,
+        swapped: true,
+        plannedExercise: item.plannedExercise ?? item.exercise,
+        exercise: candidateMeta(c),
+        blockedReason: c.blockedReason,
+        lastTopKg: c.lastKg,
+        sets: item.sets.map((s) => ({
+          ...s,
+          logged: null,
+          last: null,
+          planned: s.planned ? { ...s.planned, openKg: c.lastKg ?? undefined } : null,
+        })),
+      },
+    }));
     const rollback = () =>
       setSwaps((s) => {
         const next = { ...s };
@@ -293,7 +308,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       const res = await swapExerciseAction(view.id, {
         planItemId: item.planItemId!,
         exerciseId,
-        overrideReason: overrideReason ?? null,
+        overrideReason,
       });
       if (!res.ok) {
         rollback();
@@ -301,6 +316,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
         return;
       }
       toast.success(overrideReason ? "Swapped and flagged for your PT" : "Exercise swapped");
+      // Swapped onto an exercise added here but not started: one card, not two.
+      const dup = items.find((i) => i.exercise.id === exerciseId && canRemoveAdded(i, added));
+      if (dup) dropAdded(dup);
       router.refresh();
     } catch {
       rollback();
@@ -308,9 +326,59 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     }
   };
 
+  const addExercise = (c: SwapCandidate, note?: string) => {
+    setPicker(null);
+    const exerciseId = c.id;
+    const existing = items.find((i) => i.exercise.id === exerciseId);
+    if (existing) {
+      setSelectedKey(existing.key);
+      toast(`${c.name} is already in this session`, { id: "exercise-added" });
+      return;
+    }
+    setAdded([...added, exerciseId]);
+    setSelectedKey(adhocItemKey(exerciseId));
+    toast.success(`${c.name} added`, { id: "exercise-added" });
+    if (c.blocked) appendNote(`${c.name}, added though blocked${note ? `: ${note}` : "."}`);
+  };
+
+  const createExercise = async (name: string, category: string): Promise<SwapCandidate | null> => {
+    try {
+      const res = await createExerciseAction(view.id, { name, category });
+      if (!res.ok) {
+        toast.error(res.error);
+        return null;
+      }
+      setCreated((prev) => [...prev, res.data]);
+      return res.data;
+    } catch {
+      toast.error("Creating an exercise needs a connection.");
+      return null;
+    }
+  };
+
+  /** Forget an added exercise and its unsaved extra sets, so adding it again starts fresh. */
+  const dropAdded = (item: LiveItemView) => {
+    setAdded(added.filter((id) => id !== item.exercise.id));
+    const forget = <T,>(m: Record<string, T>) => {
+      const next = { ...m };
+      delete next[item.key];
+      return next;
+    };
+    setSetCounts(forget);
+    setOverlay(forget);
+  };
+
+  const removeAdded = (item: LiveItemView) => {
+    dropAdded(item);
+    setSelectedKey(null);
+  };
+
   const saveNote = (text: string) => {
     const name = current?.exercise.name;
-    const line = name ? `${name}: ${text}` : text;
+    appendNote(name ? `${name}: ${text}` : text);
+  };
+
+  const appendNote = (line: string) => {
     const next = notes.trim() ? `${notes.trim()}\n${line}` : line;
     const before = notes;
     setNoteOpen(false);
@@ -329,6 +397,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       const res = await discardSessionAction(view.id);
       if (!res.ok) return void toast.error(res.error);
       setRest(null);
+      saveAdded(view.id, []);
       router.push("/today");
     } catch {
       toast.error("Discarding needs a connection.");
@@ -410,7 +479,8 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
             lastLoggedIndex(current) >= 0 || (!current.sets[current.sets.length - 1]?.planned && current.sets.length > 1)
           }
           next={nextItem ? { name: nextItem.exercise.name } : null}
-          onSwap={current.planItemId ? () => setSwapKey(current.key) : null}
+          onSwap={current.planItemId ? () => setPicker({ swapKey: current.key }) : null}
+          onRemoveExercise={canRemoveAdded(current, added) ? () => removeAdded(current) : null}
           onAddSet={() => addSet(current)}
           onRemoveSet={() => removeLastSet(current)}
           onNote={() => setNoteOpen(true)}
@@ -444,6 +514,16 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       <UpNextList items={upNext} positions={positions} onSelect={setSelectedKey} />
       <CompletedList items={completed} onSelect={setSelectedKey} />
 
+      <div className="mx-3 mt-[22px]">
+        <button
+          type="button"
+          onClick={() => setPicker("add")}
+          className="w-full h-12 rounded-[14px] border border-dashed border-line-strong text-[15px] font-semibold text-fg-2"
+        >
+          + Add exercise
+        </button>
+      </div>
+
       <div className="mt-8 mb-24 flex justify-center">
         <button
           type="button"
@@ -456,19 +536,20 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
 
       <RestPill sessionId={view.id} rest={rest} nextLabel={restNext} onAdd={addRest} onSkip={skipRest} />
 
-      {swapItem?.planItemId && (
+      {(picker === "add" || swapItem?.planItemId) && (
         <SwapSheet
           open
-          onClose={() => setSwapKey(null)}
-          replacing={{
-            name: swapItem.exercise.name,
-            exerciseId: swapItem.exercise.id,
-            category: swapItem.exercise.category,
-          }}
+          onClose={() => setPicker(null)}
+          replacing={
+            swapItem
+              ? { name: swapItem.exercise.name, exerciseId: swapItem.exercise.id, category: swapItem.exercise.category }
+              : null
+          }
           candidates={swap.candidates}
           constraintRegions={swap.constraintRegions}
           inSessionIds={items.map((i) => i.exercise.id)}
-          onSwap={(id, reason) => void doSwap(id, reason)}
+          onPick={swapItem ? (c, reason) => void doSwap(c, reason) : addExercise}
+          onCreate={createExercise}
         />
       )}
 
