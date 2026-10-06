@@ -15,6 +15,8 @@ interface ExerciseCardProps {
   canRemoveSet: boolean;
   next: { name: string } | null;
   onSwap: (() => void) | null;
+  /** Set for an exercise added mid-session that has no sets logged yet. */
+  onRemoveExercise?: (() => void) | null;
   onAddSet: () => void;
   onRemoveSet: () => void;
   onNote: () => void;
@@ -46,6 +48,7 @@ export function ExerciseCard({
   canRemoveSet,
   next,
   onSwap,
+  onRemoveExercise,
   onAddSet,
   onRemoveSet,
   onNote,
@@ -69,6 +72,7 @@ export function ExerciseCard({
   if (exercise.formCueId) entries.push({ label: "Form cues", href: `/form/${exercise.formCueId}` });
   entries.push({ label: "Add set", onSelect: onAddSet });
   entries.push({ label: "Remove last set", onSelect: onRemoveSet, disabled: !canRemoveSet, danger: true });
+  if (onRemoveExercise) entries.push({ label: "Remove exercise", onSelect: onRemoveExercise, danger: true });
 
   const cueLines = [...item.coachFlags, ...item.cues];
 
@@ -110,7 +114,7 @@ export function ExerciseCard({
         {plates && <Plates {...plates} />}
 
         <div className="grid grid-cols-2 gap-2">
-          <Tile label="Target">{target ?? `${item.sets.length} sets`}</Tile>
+          <Tile label="Target">{target ?? `${item.sets.length} set${item.sets.length === 1 ? "" : "s"}`}</Tile>
           <Tile label="Effort">{rpe != null ? `RPE ${formatKg(rpe)}` : "Your call"}</Tile>
         </div>
 

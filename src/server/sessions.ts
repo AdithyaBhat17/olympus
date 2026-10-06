@@ -106,7 +106,7 @@ export interface SessionView {
   targets: Pick<Targets, "proteinG" | "waterMl">;
 }
 
-function meta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
+export function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
   return {
     id: row.id,
     slug: row.slug ?? null,
@@ -266,8 +266,8 @@ export async function getSessionView(userId: string, sessionId: string): Promise
     return {
       key,
       planItemId,
-      exercise: meta(ex),
-      plannedExercise: plannedEx ? meta(plannedEx) : null,
+      exercise: exerciseMeta(ex),
+      plannedExercise: plannedEx ? exerciseMeta(plannedEx) : null,
       swapped: !!plannedExId && plannedExId !== exId,
       restSec: 120,
       straps: false,

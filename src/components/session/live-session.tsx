@@ -18,6 +18,7 @@ import { ExerciseCard } from "./exercise-card";
 import { SetTable, setLabels, type LogInput, type LogKind } from "./set-table";
 import { CompletedList, UpNextList } from "./session-lists";
 import { SwapSheet, type SwapCandidate } from "./swap-sheet";
+import { addedKey, loadAdded, saveAdded, withAddedItems } from "./added-exercises";
 import { Sheet } from "./sheet";
 
 /** Optimistic set edits per item key: index → entry (null = removed). */
@@ -66,6 +67,8 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   const [setCounts, setSetCounts] = useState<Record<string, number>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [swapKey, setSwapKey] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [added, setAddedState] = useState<string[]>([]);
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState(view.notes ?? "");
   const [rest, setRestState] = useState<RestState | null>(null);
@@ -87,10 +90,22 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     };
   }, []);
 
-  // Rest timer survives reloads via localStorage (read after mount only).
+  // Rest timer and added exercises survive reloads via localStorage (read after mount only).
   useEffect(() => {
     setRestState(loadRest(view.id));
+    setAddedState(loadAdded(view.id));
   }, [view.id]);
+  const setAdded = (ids: string[]) => {
+    setAddedState(ids);
+    saveAdded(view.id, ids);
+  };
+
+  const candidateById = useMemo(() => new Map(swap.candidates.map((c) => [c.id, c])), [swap.candidates]);
+
+  const baseItems = useMemo(
+    () => withAddedItems(view.items, added, candidateById),
+    [view.items, added, candidateById]
+  );
   const setRest = useCallback(
     (next: RestState | null) => {
       setRestState(next);
@@ -105,7 +120,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     setOverlay((prev) => {
       const next: Overlay = {};
       for (const [key, entries] of Object.entries(prev)) {
-        const serverItem = view.items.find((x) => x.key === key);
+        const serverItem = baseItems.find((x) => x.key === key);
         for (const [k, v] of Object.entries(entries)) {
           const server = serverItem?.sets[Number(k)]?.logged ?? null;
           const reflected =
@@ -117,15 +132,15 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       }
       return next;
     });
-    setSwaps({});
-  }, [view]);
+  }, [baseItems]);
+  useEffect(() => setSwaps({}), [view]);
 
   const items = useMemo(
     () =>
-      view.items.map((it) =>
+      baseItems.map((it) =>
         mergeItem(swaps[it.key] ?? it, swaps[it.key] ? undefined : overlay[it.key], setCounts[it.key] ?? 0)
       ),
-    [view.items, overlay, swaps, setCounts]
+    [baseItems, overlay, swaps, setCounts]
   );
 
   const current =
@@ -250,7 +265,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   /** Optimistic swap: show the new exercise now, reconcile on the next server view. */
   const doSwap = async (exerciseId: string, overrideReason?: string) => {
     if (!swapItem?.planItemId) return;
-    const c = swap.candidates.find((x) => x.id === exerciseId);
+    const c = candidateById.get(exerciseId);
     const item = swapItem;
     setSwapKey(null);
     setSelectedKey(item.key);
@@ -261,17 +276,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           ...item,
           swapped: true,
           plannedExercise: item.plannedExercise ?? item.exercise,
-          exercise: {
-            ...item.exercise,
-            id: c.id,
-            slug: c.slug,
-            name: c.name,
-            category: c.category,
-            loadMode: c.loadMode as LiveItemView["exercise"]["loadMode"],
-            carriageKgPerSide: c.carriageKgPerSide,
-            formCueId: null,
-            equipment: null,
-          },
+          exercise: c.meta,
           blockedReason: c.blockedReason,
           lastTopKg: c.lastKg,
           sets: item.sets.map((s) => ({
@@ -308,9 +313,34 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     }
   };
 
+  const addExercise = (exerciseId: string, overrideReason?: string) => {
+    setAddOpen(false);
+    const c = candidateById.get(exerciseId);
+    if (!c) return;
+    const existing = items.find((i) => i.exercise.id === exerciseId);
+    if (existing) {
+      setSelectedKey(existing.key);
+      toast(`${c.name} is already in this session`, { id: "exercise-added" });
+      return;
+    }
+    setAdded([...added, exerciseId]);
+    setSelectedKey(addedKey(exerciseId));
+    toast.success(`${c.name} added`, { id: "exercise-added" });
+    if (overrideReason) appendNote(`${c.name}, added though blocked: ${overrideReason}`);
+  };
+
+  /** Only before its first set: after that it's part of the log (remove the sets instead). */
+  const removeAdded = (item: LiveItemView) => {
+    setAdded(added.filter((id) => id !== item.exercise.id));
+    setSelectedKey(null);
+  };
+
   const saveNote = (text: string) => {
     const name = current?.exercise.name;
-    const line = name ? `${name}: ${text}` : text;
+    appendNote(name ? `${name}: ${text}` : text);
+  };
+
+  const appendNote = (line: string) => {
     const next = notes.trim() ? `${notes.trim()}\n${line}` : line;
     const before = notes;
     setNoteOpen(false);
@@ -329,6 +359,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       const res = await discardSessionAction(view.id);
       if (!res.ok) return void toast.error(res.error);
       setRest(null);
+      saveAdded(view.id, []);
       router.push("/today");
     } catch {
       toast.error("Discarding needs a connection.");
@@ -411,6 +442,11 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           }
           next={nextItem ? { name: nextItem.exercise.name } : null}
           onSwap={current.planItemId ? () => setSwapKey(current.key) : null}
+          onRemoveExercise={
+            current.key === addedKey(current.exercise.id) && !current.sets.some((s) => s.logged)
+              ? () => removeAdded(current)
+              : null
+          }
           onAddSet={() => addSet(current)}
           onRemoveSet={() => removeLastSet(current)}
           onNote={() => setNoteOpen(true)}
@@ -444,6 +480,16 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       <UpNextList items={upNext} positions={positions} onSelect={setSelectedKey} />
       <CompletedList items={completed} onSelect={setSelectedKey} />
 
+      <div className="mx-3 mt-[22px]">
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="w-full h-12 rounded-[14px] border border-dashed border-line-strong text-[15px] font-semibold text-fg-2"
+        >
+          + Add exercise
+        </button>
+      </div>
+
       <div className="mt-8 mb-24 flex justify-center">
         <button
           type="button"
@@ -468,9 +514,19 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           candidates={swap.candidates}
           constraintRegions={swap.constraintRegions}
           inSessionIds={items.map((i) => i.exercise.id)}
-          onSwap={(id, reason) => void doSwap(id, reason)}
+          onPick={(id, reason) => void doSwap(id, reason)}
         />
       )}
+
+      <SwapSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        replacing={null}
+        candidates={swap.candidates}
+        constraintRegions={swap.constraintRegions}
+        inSessionIds={items.map((i) => i.exercise.id)}
+        onPick={addExercise}
+      />
 
       <Sheet open={noteOpen} onClose={() => setNoteOpen(false)} label="Note for your PT">
         {noteOpen && <NoteForm exercise={current?.exercise.name ?? null} onSave={saveNote} />}

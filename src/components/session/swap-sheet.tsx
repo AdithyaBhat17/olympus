@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatLoad } from "@/domain/load";
 import type { LoadMode } from "@/domain/types";
 import type { ExerciseSearchHit } from "@/server/exercises";
+import type { ExerciseMeta } from "@/server/sessions";
 import { cn, formatCategory } from "@/lib/utils";
 import { Sheet } from "./sheet";
 import { CloseIcon, SearchIcon } from "./icons";
@@ -11,17 +12,19 @@ import { CloseIcon, SearchIcon } from "./icons";
 export interface SwapCandidate extends ExerciseSearchHit {
   /** Current working weight (last top set or override), true kg. */
   lastKg: number | null;
+  meta: ExerciseMeta;
 }
 
 interface SwapSheetProps {
   open: boolean;
   onClose: () => void;
-  replacing: { name: string; exerciseId: string; category: string };
+  /** The exercise being swapped out; null when adding one to the session. */
+  replacing: { name: string; exerciseId: string; category: string } | null;
   candidates: SwapCandidate[];
   constraintRegions: string[];
   inSessionIds: string[];
   disabled?: boolean;
-  onSwap: (exerciseId: string, overrideReason?: string) => void;
+  onPick: (exerciseId: string, overrideReason?: string) => void;
 }
 
 function matches(c: SwapCandidate, words: string[]) {
@@ -31,7 +34,7 @@ function matches(c: SwapCandidate, words: string[]) {
 
 export function SwapSheet(props: SwapSheetProps) {
   return (
-    <Sheet open={props.open} onClose={props.onClose} label="Swap exercise" variant="full">
+    <Sheet open={props.open} onClose={props.onClose} label={props.replacing ? "Swap exercise" : "Add exercise"} variant="full">
       {props.open && <SwapBody {...props} />}
     </Sheet>
   );
@@ -44,7 +47,7 @@ function SwapBody({
   constraintRegions,
   inSessionIds,
   disabled,
-  onSwap,
+  onPick,
 }: SwapSheetProps) {
   const [query, setQuery] = useState("");
   const [overrideMode, setOverrideMode] = useState(false);
@@ -54,8 +57,8 @@ function SwapBody({
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const pool = candidates.filter(
     (c) =>
-      c.id !== replacing.exerciseId &&
-      (words.length ? matches(c, words) : c.category === replacing.category)
+      c.id !== replacing?.exerciseId &&
+      (words.length ? matches(c, words) : !replacing || c.category === replacing.category)
   );
   const safe = pool
     .filter((c) => !c.blocked)
@@ -70,7 +73,7 @@ function SwapBody({
     );
     if (reason == null) return;
     if (!reason.trim()) return;
-    onSwap(c.id, reason.trim().slice(0, 300));
+    onPick(c.id, reason.trim().slice(0, 300));
   };
 
   return (
@@ -86,8 +89,10 @@ function SwapBody({
             <CloseIcon size={22} />
           </button>
           <div className="flex flex-col min-w-0">
-            <span className="text-[13px] text-muted truncate">Replacing, {replacing.name}</span>
-            <h1 className="m-0 num text-[30px]">Swap exercise</h1>
+            <span className="text-[13px] text-muted truncate">
+              {replacing ? `Replacing, ${replacing.name}` : "Adding to today's session"}
+            </span>
+            <h1 className="m-0 num text-[30px]">{replacing ? "Swap exercise" : "Add exercise"}</h1>
           </div>
         </div>
         <label className="flex items-center gap-2.5 h-12 px-3.5 rounded-xl bg-surface border border-line focus-within:border-accent">
@@ -98,7 +103,7 @@ function SwapBody({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search, showing ${formatCategory(replacing.category)}`}
+            placeholder={replacing ? `Search, showing ${formatCategory(replacing.category)}` : "Search exercises"}
             autoComplete="off"
             className="grow min-w-0 border-none bg-transparent text-fg text-base outline-none placeholder:text-faint"
           />
@@ -124,11 +129,13 @@ function SwapBody({
 
       <section aria-labelledby="swap-safe" className="px-4 pt-2 flex flex-col gap-2">
         <h2 id="swap-safe" className="eyebrow mb-0.5">
-          Safe for you, {words.length ? "matches" : "same muscle"}
+          Safe for you, {words.length ? "matches" : replacing ? "same muscle" : "all exercises"}
         </h2>
         {safe.length === 0 && (
           <p className="text-sm text-muted py-2">
-            {words.length ? "Nothing safe matches that search." : "No safe alternatives in this category. Try searching."}
+            {words.length || !replacing
+              ? "Nothing safe matches that search."
+              : "No safe alternatives in this category. Try searching."}
           </p>
         )}
         {safe.map((c) => {
@@ -143,7 +150,7 @@ function SwapBody({
               key={c.id}
               type="button"
               disabled={disabled}
-              onClick={() => onSwap(c.id)}
+              onClick={() => onPick(c.id)}
               className={cn(
                 "text-left p-3.5 rounded-[14px] bg-surface flex items-center gap-3 min-h-11 disabled:opacity-60",
                 c.id === suggestedId ? "border-2 border-accent" : "border border-line"
@@ -178,7 +185,7 @@ function SwapBody({
             Blocked, won&apos;t be programmed
           </h2>
           {blocked.map((c) => {
-            const subs = c.substitutes.filter((s) => s.id !== replacing.exerciseId && !byId.get(s.id)?.blocked);
+            const subs = c.substitutes.filter((s) => s.id !== replacing?.exerciseId && !byId.get(s.id)?.blocked);
             const body = (
               <>
                 <span
@@ -219,7 +226,7 @@ function SwapBody({
                     key={s.id}
                     type="button"
                     disabled={disabled}
-                    onClick={() => onSwap(s.id)}
+                    onClick={() => onPick(s.id)}
                     className="ml-10 min-h-11 text-left text-[13px] text-info"
                   >
                     Use instead → {s.name}
