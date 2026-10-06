@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { trueKg } from "@/domain/load";
 import type { SetLogEntry } from "@/domain/types";
 import type { LiveItemView, LogSetResult, SessionView } from "@/server/sessions";
-import { discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions";
+import { createExerciseAction, discardSessionAction, swapExerciseAction } from "@/lib/liftlog-actions";
 import { mutate } from "@/lib/offline/mutate";
 import { subscribePending } from "@/lib/offline/outbox";
 import { useWakeLock } from "@/lib/wake-lock";
@@ -111,7 +111,12 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     [view.id]
   );
 
-  const candidateById = useMemo(() => new Map(swap.candidates.map((c) => [c.id, c])), [swap.candidates]);
+  // Exercises created mid-session, until the next server view lists them.
+  const [created, setCreated] = useState<SwapCandidate[]>([]);
+  const candidateById = useMemo(
+    () => new Map([...created, ...swap.candidates].map((c) => [c.id, c])),
+    [created, swap.candidates]
+  );
   const baseItems = useMemo(
     () => withAddedItems(view.items, added, candidateById),
     [view.items, added, candidateById]
@@ -268,31 +273,31 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
   };
 
   /** Optimistic swap: show the new exercise now, reconcile on the next server view. */
-  const doSwap = async (exerciseId: string, overrideReason?: string) => {
+  const doSwap = async (c: SwapCandidate, note?: string) => {
     if (!swapItem?.planItemId) return;
-    const c = candidateById.get(exerciseId);
+    // The server flags a blocked swap for the PT and wants a reason for it.
+    const overrideReason = c.blocked ? note || "Athlete's call" : null;
+    const exerciseId = c.id;
     const item = swapItem;
     setPicker(null);
     setSelectedKey(item.key);
-    if (c) {
-      setSwaps((s) => ({
-        ...s,
-        [item.key]: {
-          ...item,
-          swapped: true,
-          plannedExercise: item.plannedExercise ?? item.exercise,
-          exercise: candidateMeta(c),
-          blockedReason: c.blockedReason,
-          lastTopKg: c.lastKg,
-          sets: item.sets.map((s) => ({
-            ...s,
-            logged: null,
-            last: null,
-            planned: s.planned ? { ...s.planned, openKg: c.lastKg ?? undefined } : null,
-          })),
-        },
-      }));
-    }
+    setSwaps((s) => ({
+      ...s,
+      [item.key]: {
+        ...item,
+        swapped: true,
+        plannedExercise: item.plannedExercise ?? item.exercise,
+        exercise: candidateMeta(c),
+        blockedReason: c.blockedReason,
+        lastTopKg: c.lastKg,
+        sets: item.sets.map((s) => ({
+          ...s,
+          logged: null,
+          last: null,
+          planned: s.planned ? { ...s.planned, openKg: c.lastKg ?? undefined } : null,
+        })),
+      },
+    }));
     const rollback = () =>
       setSwaps((s) => {
         const next = { ...s };
@@ -303,7 +308,7 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
       const res = await swapExerciseAction(view.id, {
         planItemId: item.planItemId!,
         exerciseId,
-        overrideReason: overrideReason ?? null,
+        overrideReason,
       });
       if (!res.ok) {
         rollback();
@@ -321,10 +326,9 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     }
   };
 
-  const addExercise = (exerciseId: string, overrideReason?: string) => {
+  const addExercise = (c: SwapCandidate, note?: string) => {
     setPicker(null);
-    const c = candidateById.get(exerciseId);
-    if (!c) return;
+    const exerciseId = c.id;
     const existing = items.find((i) => i.exercise.id === exerciseId);
     if (existing) {
       setSelectedKey(existing.key);
@@ -334,7 +338,22 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
     setAdded([...added, exerciseId]);
     setSelectedKey(adhocItemKey(exerciseId));
     toast.success(`${c.name} added`, { id: "exercise-added" });
-    if (overrideReason) appendNote(`${c.name}, added though blocked: ${overrideReason}`);
+    if (c.blocked) appendNote(`${c.name}, added though blocked${note ? `: ${note}` : "."}`);
+  };
+
+  const createExercise = async (name: string, category: string): Promise<SwapCandidate | null> => {
+    try {
+      const res = await createExerciseAction(view.id, { name, category });
+      if (!res.ok) {
+        toast.error(res.error);
+        return null;
+      }
+      setCreated((prev) => [...prev, res.data]);
+      return res.data;
+    } catch {
+      toast.error("Creating an exercise needs a connection.");
+      return null;
+    }
   };
 
   /** Forget an added exercise and its unsaved extra sets, so adding it again starts fresh. */
@@ -529,7 +548,8 @@ export function LiveSession({ view, swap }: LiveSessionProps) {
           candidates={swap.candidates}
           constraintRegions={swap.constraintRegions}
           inSessionIds={items.map((i) => i.exercise.id)}
-          onPick={swapItem ? (id, reason) => void doSwap(id, reason) : addExercise}
+          onPick={swapItem ? (c, reason) => void doSwap(c, reason) : addExercise}
+          onCreate={createExercise}
         />
       )}
 

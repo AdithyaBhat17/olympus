@@ -19,12 +19,15 @@ import {
   sendToPT,
   startSession,
   swapExercise,
+  exercisePicker,
+  type ExerciseCandidate,
   type LogSetResult,
 } from "@/server/sessions";
+import { EXERCISE_CATEGORIES } from "@/lib/constants";
 import { planFromLastSession } from "@/server/plans";
 import { upsertCheckIn } from "@/server/checkins";
 import { addFlag, resolveFlag } from "@/server/flags";
-import { setCarriage, setExerciseBlock } from "@/server/exercises";
+import { addCustomExercise, setCarriage, setExerciseBlock } from "@/server/exercises";
 import { todayFor } from "@/server/profile";
 import { updateWorkingWeight } from "@/server/working-weight";
 import { deleteSubscription, saveSubscription, sendPushToUser } from "@/server/push";
@@ -138,6 +141,23 @@ export async function swapExerciseAction(
     });
     revalidatePath(`/session/${sessionId}`);
     return undefined;
+  });
+}
+
+/** Mid-session: create an exercise the library lacks, ready to add or swap in. */
+export async function createExerciseAction(
+  sessionId: string,
+  input: { name: string; category: string }
+): Promise<ActionResult<ExerciseCandidate>> {
+  return run(async () => {
+    const userId = await requireUserEmail();
+    const sid = uuid.parse(sessionId);
+    const v = z.object({ name: z.string().trim().min(1).max(100), category: z.enum(EXERCISE_CATEGORIES) }).parse(input);
+    const id = await addCustomExercise(userId, v);
+    const candidate = (await exercisePicker(userId, sid)).candidates.find((c) => c.id === id);
+    if (!candidate) throw new DomainError("Couldn't create that exercise");
+    revalidatePath("/exercises");
+    return candidate;
   });
 }
 

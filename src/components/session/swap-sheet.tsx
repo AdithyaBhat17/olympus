@@ -3,21 +3,13 @@
 import { useMemo, useState } from "react";
 import { formatLoad } from "@/domain/load";
 import type { LoadMode } from "@/domain/types";
-import type { ExerciseSearchHit } from "@/server/exercises";
-import type { ExerciseMeta } from "@/server/sessions";
+import type { ExerciseCandidate } from "@/server/sessions";
+import { EXERCISE_CATEGORIES } from "@/lib/constants";
 import { cn, formatCategory } from "@/lib/utils";
 import { Sheet } from "./sheet";
 import { CloseIcon, SearchIcon } from "./icons";
 
-/** A library exercise, plus what the live screen needs to show it once picked. */
-export interface SwapCandidate
-  extends ExerciseSearchHit,
-    Pick<ExerciseMeta, "isCompound" | "bodyRegion" | "formCueId" | "equipment"> {
-  /** Current working weight (last top set or override), true kg. */
-  lastKg: number | null;
-  /** Open PT flags scoped to this exercise. */
-  coachFlags: string[];
-}
+export type SwapCandidate = ExerciseCandidate;
 
 interface SwapSheetProps {
   open: boolean;
@@ -28,7 +20,10 @@ interface SwapSheetProps {
   constraintRegions: string[];
   inSessionIds: string[];
   disabled?: boolean;
-  onPick: (exerciseId: string, overrideReason?: string) => void;
+  /** A blocked pick carries the athlete's note for the PT ("" when they left none). */
+  onPick: (c: SwapCandidate, note?: string) => void;
+  /** Create an exercise the library lacks; resolves to it, or null on failure. */
+  onCreate: (name: string, category: string) => Promise<SwapCandidate | null>;
 }
 
 function matches(c: SwapCandidate, words: string[]) {
@@ -52,13 +47,15 @@ function SwapBody({
   inSessionIds,
   disabled,
   onPick,
+  onCreate,
 }: SwapSheetProps) {
   const [query, setQuery] = useState("");
-  const [overrideMode, setOverrideMode] = useState(false);
+  const [creating, setCreating] = useState<"pick-category" | "saving" | null>(null);
   const inSession = useMemo(() => new Set(inSessionIds), [inSessionIds]);
   const byId = useMemo(() => new Map(candidates.map((c) => [c.id, c])), [candidates]);
 
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const name = query.trim();
+  const words = name.toLowerCase().split(/\s+/).filter(Boolean);
   const pool = candidates.filter(
     (c) =>
       c.id !== replacing?.exerciseId &&
@@ -70,17 +67,25 @@ function SwapBody({
   const blocked = pool.filter((c) => c.blocked);
   // Adding has no category to match, so nothing to suggest.
   const suggestedId = replacing ? safe.find((c) => !inSession.has(c.id))?.id : undefined;
+  const canCreate = name.length > 0 && !candidates.some((c) => c.name.toLowerCase() === name.toLowerCase());
 
-  const overrideSwap = (c: SwapCandidate) => {
-    const reason = window.prompt(
-      replacing
-        ? `Why log ${c.name} anyway? This goes to your PT as a flag.`
-        : `Why add ${c.name} anyway? This goes in the session notes for your PT.`,
+  /** Safe picks go straight through. A blocked one is the athlete's call: warn, then flag it for the PT. */
+  const pick = (c: SwapCandidate) => {
+    if (!c.blocked) return onPick(c);
+    const note = window.prompt(
+      `${c.name} is blocked for you${c.blockedReason ? `: ${c.blockedReason.replace(/\.+$/, "")}` : ""}.\n\n` +
+        "It's your call. Your PT will see it flagged. Add a note for them (optional):",
       ""
     );
-    if (reason == null) return;
-    if (!reason.trim()) return;
-    onPick(c.id, reason.trim().slice(0, 300));
+    if (note == null) return;
+    onPick(c, note.trim().slice(0, 300));
+  };
+
+  const create = async (category: string) => {
+    setCreating("saving");
+    const c = await onCreate(name, category);
+    setCreating(null);
+    if (c) pick(c);
   };
 
   return (
@@ -109,7 +114,10 @@ function SwapBody({
             data-autofocus
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setCreating(null);
+            }}
             placeholder={replacing ? `Search, showing ${formatCategory(replacing.category)}` : "Search exercises"}
             autoComplete="off"
             className="grow min-w-0 border-none bg-transparent text-fg text-base outline-none placeholder:text-faint"
@@ -140,9 +148,11 @@ function SwapBody({
         </h2>
         {safe.length === 0 && (
           <p className="text-sm text-muted py-2">
-            {words.length || !replacing
-              ? "Nothing safe matches that search."
-              : "No safe alternatives in this category. Try searching."}
+            {!words.length
+              ? "No safe alternatives in this category. Try searching."
+              : blocked.length
+                ? "Nothing safe matches. The matches below are blocked for you, but you can still pick one."
+                : `Nothing in your library matches "${name}".`}
           </p>
         )}
         {safe.map((c) => {
@@ -157,7 +167,7 @@ function SwapBody({
               key={c.id}
               type="button"
               disabled={disabled}
-              onClick={() => onPick(c.id)}
+              onClick={() => pick(c)}
               className={cn(
                 "text-left p-3.5 rounded-[14px] bg-surface flex items-center gap-3 min-h-11 disabled:opacity-60",
                 c.id === suggestedId ? "border-2 border-accent" : "border border-line"
@@ -189,70 +199,83 @@ function SwapBody({
       {blocked.length > 0 && (
         <section aria-labelledby="swap-blocked" className="px-4 pt-6 flex flex-col gap-2">
           <h2 id="swap-blocked" className="eyebrow mb-0.5">
-            Blocked, won&apos;t be programmed
+            Blocked for you, your call
           </h2>
           {blocked.map((c) => {
             const subs = c.substitutes.filter((s) => s.id !== replacing?.exerciseId && !byId.get(s.id)?.blocked);
-            const body = (
-              <>
-                <span
-                  aria-hidden
-                  className="w-7 h-7 rounded-full bg-danger-dot flex items-center justify-center shrink-0 text-danger-soft"
-                >
-                  <CloseIcon size={14} strokeWidth={3} />
-                </span>
-                <span className="flex flex-col gap-1 min-w-0">
-                  <span className="font-semibold text-fg-2 line-through decoration-faint">{c.name}</span>
-                  {c.blockedReason && <span className="text-[13px] text-danger-text">{c.blockedReason}</span>}
-                </span>
-              </>
-            );
             return (
-              <div
-                key={c.id}
-                className={cn(
-                  "p-3.5 rounded-[14px] bg-surface-sunk border flex flex-col gap-1",
-                  overrideMode ? "border-danger-line" : "border-line-soft"
-                )}
-              >
-                {overrideMode ? (
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => overrideSwap(c)}
-                    aria-label={`Log ${c.name} anyway (blocked: ${c.blockedReason ?? "constraint"})`}
-                    className="flex gap-3 items-start text-left min-h-11"
+              <div key={c.id} className="p-3.5 rounded-[14px] bg-surface-sunk border border-danger-line flex flex-col gap-1">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => pick(c)}
+                  aria-label={`${c.name}, blocked: ${c.blockedReason ?? "constraint"}. Pick it anyway`}
+                  className="flex gap-3 items-start text-left min-h-11 disabled:opacity-60"
+                >
+                  <span
+                    aria-hidden
+                    className="w-7 h-7 rounded-full bg-danger-dot flex items-center justify-center shrink-0 text-danger-soft"
                   >
-                    {body}
-                  </button>
-                ) : (
-                  <div className="flex gap-3 items-start">{body}</div>
-                )}
-                {subs.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => onPick(s.id)}
-                    className="ml-10 min-h-11 text-left text-[13px] text-info"
-                  >
-                    Use instead → {s.name}
-                  </button>
-                ))}
+                    <CloseIcon size={14} strokeWidth={3} />
+                  </span>
+                  <span className="grow flex flex-col gap-1 min-w-0">
+                    <span className="font-semibold text-fg-2">{c.name}</span>
+                    {c.blockedReason && <span className="text-[13px] text-danger-text">{c.blockedReason}</span>}
+                  </span>
+                  <span className="shrink-0 self-center text-[13px] font-semibold text-danger-text">Pick anyway</span>
+                </button>
+                {subs.map((s) => {
+                  const sub = byId.get(s.id);
+                  return sub ? (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => pick(sub)}
+                      className="ml-10 min-h-11 text-left text-[13px] text-info"
+                    >
+                      Safer: {s.name} →
+                    </button>
+                  ) : null;
+                })}
               </div>
             );
           })}
-          <button
-            type="button"
-            aria-pressed={overrideMode}
-            onClick={() => setOverrideMode((v) => !v)}
-            className={cn(
-              "mt-1 h-11 rounded-[10px] border border-dashed bg-transparent text-sm",
-              overrideMode ? "border-danger-line text-danger-text" : "border-line-strong text-muted"
-            )}
-          >
-            {overrideMode ? "Pick the blocked exercise above, or tap to cancel" : "Log it anyway, I'll take the flag"}
-          </button>
+        </section>
+      )}
+
+      {canCreate && (
+        <section aria-labelledby="swap-create" className="px-4 pt-6 flex flex-col gap-2">
+          <h2 id="swap-create" className="eyebrow mb-0.5">
+            Not in your library
+          </h2>
+          {creating === null ? (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setCreating("pick-category")}
+              className="h-12 rounded-[14px] border border-dashed border-line-strong text-[15px] font-semibold text-fg-2 disabled:opacity-60"
+            >
+              + Create &ldquo;{name}&rdquo;
+            </button>
+          ) : (
+            <div role="group" aria-label={`Muscle group for ${name}`} className="flex flex-col gap-2">
+              <span className="text-[13px] text-muted">Which muscle group is &ldquo;{name}&rdquo;?</span>
+              <div className="flex gap-2 flex-wrap">
+                {EXERCISE_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    disabled={disabled || creating === "saving"}
+                    onClick={() => void create(cat)}
+                    className="min-h-11 px-3.5 rounded-full bg-surface border border-line text-[14px] text-fg-2 disabled:opacity-60"
+                  >
+                    {formatCategory(cat)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>

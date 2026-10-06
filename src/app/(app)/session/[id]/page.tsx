@@ -1,11 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
-import { exerciseIndex, getSessionView } from "@/server/sessions";
-import { listOpenFlags } from "@/server/flags";
-import { describeExercise, getConstraints } from "@/server/exercises";
-import { workingWeights } from "@/server/history";
+import { exercisePicker, getSessionView } from "@/server/sessions";
 import { LiveSession } from "@/components/session/live-session";
-import type { SwapCandidate } from "@/components/session/swap-sheet";
 
 export const metadata = { title: "Live session" };
 
@@ -16,26 +12,12 @@ export default async function LiveSessionPage({ params }: { params: Promise<{ id
   if (!UUID_RE.test(id)) notFound();
   const userId = await requireUserEmail();
 
-  const [view, { domain: all }, cons, openFlags] = await Promise.all([
+  const [view, picker] = await Promise.all([
     getSessionView(userId, id).catch(() => null),
-    exerciseIndex(userId),
-    getConstraints(userId),
-    listOpenFlags(userId),
+    exercisePicker(userId, id),
   ]);
   if (!view) notFound();
   if (view.status === "DONE") redirect(`/session/${id}/finish`);
 
-  const weights = await workingWeights(userId, all, { excludeSessionId: id });
-  const candidates: SwapCandidate[] = all.map((e) => ({
-    ...describeExercise(e, all, cons),
-    lastKg: weights.get(e.id)?.kg ?? null,
-    isCompound: e.isCompound,
-    bodyRegion: e.bodyRegion,
-    formCueId: e.formCueId,
-    equipment: e.equipment ?? null,
-    coachFlags: openFlags.filter((f) => f.scope === "exerciseId" && f.scopeValue === e.id).map((f) => f.text),
-  }));
-  const constraintRegions = Array.from(new Set(cons.map((c) => c.region)));
-
-  return <LiveSession view={view} swap={{ candidates, constraintRegions }} />;
+  return <LiveSession view={view} swap={picker} />;
 }

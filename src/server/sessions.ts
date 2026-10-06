@@ -23,11 +23,13 @@ import {
   type UnderloadNudge,
 } from "@/domain";
 import {
+  describeExercise,
   exerciseRef,
   getConstraints,
   listExerciseRows,
   resolveRef,
   toDomainExercise,
+  type ExerciseSearchHit,
 } from "./exercises";
 import { aggregateColumns, previousSessions, resolveSets, workingWeights } from "./history";
 import { getCheckIn } from "./checkins";
@@ -108,6 +110,16 @@ export interface SessionView {
   targets: Pick<Targets, "proteinG" | "waterMl">;
 }
 
+/** A library exercise as the live screen's picker shows it. */
+export interface ExerciseCandidate
+  extends ExerciseSearchHit,
+    Pick<ExerciseMeta, "isCompound" | "bodyRegion" | "formCueId" | "equipment"> {
+  /** Current working weight (last top set or override), true kg. */
+  lastKg: number | null;
+  /** Open PT flags scoped to this exercise. */
+  coachFlags: string[];
+}
+
 function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: string | null }): ExerciseMeta {
   return {
     id: row.id,
@@ -123,7 +135,7 @@ function exerciseMeta(row: ReturnType<typeof toDomainExercise> & { formCueId?: s
   };
 }
 
-export async function exerciseIndex(userId: string) {
+async function exerciseIndex(userId: string) {
   const rows = await listExerciseRows(userId);
   const domain = rows.map((r) => ({ ...toDomainExercise(r), formCueId: r.formCueId }));
   return { domain, byId: new Map(domain.map((e) => [e.id, e])) };
@@ -332,6 +344,33 @@ export async function getSessionView(userId: string, sessionId: string): Promise
       ? { sleepMin: checkIn.sleepMin, proteinG: checkIn.proteinG, waterMl: checkIn.waterMl }
       : null,
     targets: { proteinG: profile.targets.proteinG, waterMl: profile.targets.waterMl },
+  };
+}
+
+/** The live screen's add/swap picker: every library exercise, blocked ones included. */
+export async function exercisePicker(
+  userId: string,
+  sessionId: string
+): Promise<{ candidates: ExerciseCandidate[]; constraintRegions: string[] }> {
+  const [{ domain }, cons, openFlags] = await Promise.all([
+    exerciseIndex(userId),
+    getConstraints(userId),
+    listOpenFlags(userId),
+  ]);
+  const weights = await workingWeights(userId, domain, { excludeSessionId: sessionId });
+  return {
+    candidates: domain.map((e) => ({
+      ...describeExercise(e, domain, cons),
+      lastKg: weights.get(e.id)?.kg ?? null,
+      isCompound: e.isCompound,
+      bodyRegion: e.bodyRegion,
+      formCueId: e.formCueId,
+      equipment: e.equipment ?? null,
+      coachFlags: flagsFor(openFlags, { exerciseId: e.id })
+        .filter((f) => f.scope === "exerciseId")
+        .map((f) => f.text),
+    })),
+    constraintRegions: Array.from(new Set(cons.map((c) => c.region))),
   };
 }
 
