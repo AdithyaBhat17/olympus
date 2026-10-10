@@ -40,6 +40,8 @@ export interface CheckInPatch {
   sleepMin?: number | null;
   proteinG?: number | null;
   waterMl?: number | null;
+  hrvMs?: number | null;
+  restingHr?: number | null;
 }
 
 /**
@@ -68,11 +70,19 @@ export async function upsertCheckIn(
     if (human(sources.water) && (patch.waterMl ?? -1) <= (existing?.waterMl ?? -1)) {
       delete patch.waterMl;
     }
+    // HRV and resting HR: Apple Health first, Whoop only fills the gaps it
+    // leaves (a Whoop wearer often has no Watch writing these to Health).
+    const outranked = (s: CheckInSource | undefined) =>
+      human(s) || (source === "whoop" && s === "apple_health");
+    if (outranked(sources.hrv)) delete patch.hrvMs;
+    if (outranked(sources.rhr)) delete patch.restingHr;
   }
   const next = {
     sleepMin: existing?.sleepMin ?? null,
     proteinG: existing?.proteinG ?? null,
     waterMl: existing?.waterMl ?? null,
+    hrvMs: existing?.hrvMs ?? null,
+    restingHr: existing?.restingHr ?? null,
   };
   if (patch.sleepMin !== undefined) {
     next.sleepMin = patch.sleepMin == null ? null : Math.round(patch.sleepMin);
@@ -85,6 +95,14 @@ export async function upsertCheckIn(
   if (patch.waterMl !== undefined) {
     next.waterMl = patch.waterMl == null ? null : Math.round(patch.waterMl);
     sources.water = source;
+  }
+  if (patch.hrvMs !== undefined) {
+    next.hrvMs = patch.hrvMs == null ? null : Math.round(patch.hrvMs);
+    sources.hrv = source;
+  }
+  if (patch.restingHr !== undefined) {
+    next.restingHr = patch.restingHr == null ? null : Math.round(patch.restingHr);
+    sources.rhr = source;
   }
   const [row] = await db
     .insert(dailyCheckIns)

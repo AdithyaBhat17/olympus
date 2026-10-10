@@ -219,7 +219,7 @@ export default async function SettingsPage({
             <span className="flex-1 flex flex-col gap-0.5 min-w-0">
               <span>Whoop</span>
               <span className="text-xs text-muted">
-                {whoop?.accessToken ? `Sleep, synced ${syncedAt(whoop.lastSyncAt, tz)}` : "Sleep, not connected"}
+                {whoop?.accessToken ? `Sleep, HRV, resting HR, synced ${syncedAt(whoop.lastSyncAt, tz)}` : "Sleep, HRV, resting HR, not connected"}
                 {sleepSource === "whoop" && recovery.today?.sleepMin != null && `, ${formatSleep(recovery.today.sleepMin)}`}
               </span>
               {whoop?.lastError && <span className="text-xs text-danger-text">Last error: {whoop.lastError}</span>}
@@ -240,15 +240,20 @@ export default async function SettingsPage({
               <span className="flex-1 flex flex-col gap-0.5 min-w-0">
                 <span>Apple Health</span>
                 <span className="text-xs text-muted">
-                  Protein, water via Shortcut
+                  Protein, water, sleep, HRV via the iPhone app or a Shortcut
                   {health?.ingestTokenHash ? `, last push ${ago(health.lastSyncAt)}` : ""}
                   {nutritionSource === "apple_health" && recovery.today?.proteinG != null && `, ${recovery.today.proteinG} g today`}
                 </span>
               </span>
-              <span className="h-11 px-3 rounded-[10px] bg-surface-3 text-fg-2 text-[13px] flex items-center">Get Shortcut</span>
+              <span className="h-11 px-3 rounded-[10px] bg-surface-3 text-fg-2 text-[13px] flex items-center">Set up</span>
             </summary>
             <div className="px-4 pb-4 flex flex-col gap-3">
               <HealthTokenControls hasToken={!!health?.ingestTokenHash} endpoint={`${origin}/api/ingest/health`} />
+              <p className="m-0 text-[13px] text-muted leading-relaxed">
+                <span className="text-fg-2">Olympus for iPhone:</span> sign in, then Settings › Apple Health › Allow
+                Health access. It syncs protein, water, sleep, HRV and resting HR in the background, no token needed.
+                Where Health has no HRV or resting HR, Whoop&apos;s fill in. No iPhone app? Use a Shortcut with a token:
+              </p>
               <ol className="m-0 list-decimal pl-5 flex flex-col gap-2 text-[13px] text-muted leading-relaxed">
                 <li>
                   MyFitnessPal › More › Settings › Sharing &amp; Privacy › Apple Health: allow it to write{" "}

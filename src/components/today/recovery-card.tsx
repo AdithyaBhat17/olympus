@@ -11,6 +11,7 @@ import { Sheet } from "@/components/session/sheet";
 import { WarnIcon } from "@/components/session/icons";
 
 type Field = "sleep" | "protein" | "water";
+type Vital = "hrv" | "rhr";
 type Source = "manual" | "claude" | "whoop" | "apple_health";
 
 interface Values {
@@ -21,9 +22,12 @@ interface Values {
 
 export interface RecoveryCardProps extends Values {
   date: string;
+  /** Read-only: they only arrive from syncs. */
+  hrvMs: number | null;
+  restingHr: number | null;
   /** sleepMin fills the bubble; minSleepMin is the floor. A null target isn't tracked. */
   targets: { sleepMin: number; minSleepMin: number; proteinG: number | null; waterMl: number | null };
-  sources: Partial<Record<Field, Source>>;
+  sources: Partial<Record<Field | Vital, Source>>;
   holdMessage: string | null;
 }
 
@@ -167,6 +171,24 @@ export function RecoveryCard(props: RecoveryCardProps) {
           <span className="text-[13px] font-bold text-muted">Water, tap +250</span>
         </button>
       </div>
+
+      {(props.hrvMs != null || props.restingHr != null) && (
+        <p className="m-0 -mt-1 text-center text-[13px] text-muted">
+          {props.hrvMs != null && (
+            <>
+              HRV <span className="num text-fg-2">{props.hrvMs}</span> ms
+              {sources.hrv === "whoop" ? " (Whoop)" : ""}
+            </>
+          )}
+          {props.hrvMs != null && props.restingHr != null && " · "}
+          {props.restingHr != null && (
+            <>
+              Resting HR <span className="num text-fg-2">{props.restingHr}</span>
+              {sources.rhr === "whoop" ? " (Whoop)" : ""}
+            </>
+          )}
+        </p>
+      )}
 
       {holdMessage && (
         <div className="flex gap-2.5 items-start p-3.5 rounded-3xl bg-bg">

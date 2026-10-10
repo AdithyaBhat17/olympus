@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
-import { exercisePicker, getSessionView } from "@/server/sessions";
+import { liveSessionScreen } from "@/server/screens/session";
 import { LiveSession } from "@/components/session/live-session";
 
 export const metadata = { title: "Live session" };
@@ -12,12 +12,9 @@ export default async function LiveSessionPage({ params }: { params: Promise<{ id
   if (!UUID_RE.test(id)) notFound();
   const userId = await requireUserEmail();
 
-  const [view, picker] = await Promise.all([
-    getSessionView(userId, id).catch(() => null),
-    exercisePicker(userId, id),
-  ]);
-  if (!view) notFound();
-  if (view.status === "DONE") redirect(`/session/${id}/finish`);
+  const screen = await liveSessionScreen(userId, id).catch(() => null);
+  if (!screen) notFound();
+  if (screen.view.status === "DONE") redirect(`/session/${id}/finish`);
 
-  return <LiveSession view={view} swap={picker} />;
+  return <LiveSession view={screen.view} swap={screen.swap} />;
 }

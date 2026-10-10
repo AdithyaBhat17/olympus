@@ -8,6 +8,8 @@ import { DEFAULT_ROTATION, DEFAULT_TARGETS, parseRotation, type Targets } from "
 import { DomainError } from "./errors";
 
 export interface AthleteProfile {
+  /** The Google account's name, once they've signed in since it was stored. */
+  displayName: string | null;
   timezone: string;
   /** False until the browser (or the athlete) has set a timezone. */
   timezoneSet: boolean;
@@ -20,6 +22,7 @@ export const getProfile = cache(async (userId: string): Promise<AthleteProfile> 
   const [row] = await db.select().from(athleteProfiles).where(eq(athleteProfiles.userId, userId));
   const tz = row?.timezone && isValidTimeZone(row.timezone) ? row.timezone : null;
   return {
+    displayName: row?.displayName ?? null,
     timezone: tz ?? DEFAULT_TIMEZONE,
     timezoneSet: tz != null,
     targets: row
@@ -81,6 +84,16 @@ export async function updateProfile(userId: string, patch: ProfilePatch): Promis
 }
 
 /** First visit from a browser: adopt its timezone, never overwrite a chosen one. */
+/** Keep the Google name current (signing in is when we see it). */
+export async function rememberDisplayName(userId: string, name: string | null | undefined): Promise<void> {
+  const displayName = name?.trim().slice(0, 100);
+  if (!displayName) return;
+  await db
+    .insert(athleteProfiles)
+    .values({ userId, displayName })
+    .onConflictDoUpdate({ target: athleteProfiles.userId, set: { displayName } });
+}
+
 export async function adoptTimezone(userId: string, timezone: string): Promise<boolean> {
   if (!isValidTimeZone(timezone)) return false;
   const now = new Date();

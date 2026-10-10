@@ -19,11 +19,17 @@ export default function FormViewer({
   cue,
   title,
   eyebrow,
+  embedded = false,
 }: {
   cue: FormCueId;
   title: string;
   /** "3D form, 100 kg, straps" */
   eyebrow: string;
+  /**
+   * Inside the iOS app's web view (/embed/form): the app draws the title bar,
+   * and "Got it" asks the app to close instead of navigating.
+   */
+  embedded?: boolean;
 }) {
   const { make, copy } = FORM_DEFS[cue];
   const stageRef = useRef<HTMLDivElement>(null);
@@ -87,7 +93,7 @@ export default function FormViewer({
 
   return (
     <div className="flex flex-col pb-[calc(env(safe-area-inset-bottom)+120px)]">
-      <header className="page-top px-3 flex items-center gap-3">
+      <header className={cn("page-top px-3 flex items-center gap-3", embedded && "hidden")}>
         <BackLink aria-label="Back" className="btn-round">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
@@ -253,14 +259,33 @@ export default function FormViewer({
 
       <div className="fixed inset-x-0 bottom-0 z-30 px-3 pt-5 pb-[calc(env(safe-area-inset-bottom)+16px)] bg-gradient-to-b from-bg/0 via-bg to-bg">
         <div className="max-w-lg mx-auto">
-          <BackLink className="btn-primary">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 12.5l4.5 4.5L19 7.5" />
-            </svg>
-            Got it, back to set
-          </BackLink>
+          {embedded ? (
+            <button type="button" className="btn-primary" onClick={closeEmbedded}>
+              <DoneIcon />
+              Got it, back to set
+            </button>
+          ) : (
+            <BackLink className="btn-primary">
+              <DoneIcon />
+              Got it, back to set
+            </BackLink>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function DoneIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+/** The iOS app registers a WKScriptMessageHandler named "olympus". */
+function closeEmbedded() {
+  const w = window as unknown as { webkit?: { messageHandlers?: { olympus?: { postMessage(m: string): void } } } };
+  w.webkit?.messageHandlers?.olympus?.postMessage("close");
 }
