@@ -244,7 +244,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				OLYMPUS_SERVER_URL = "";
+				OLYMPUS_SERVER_URL = "https:/$()/olympus.adithyabhat.com";
 				PRODUCT_BUNDLE_IDENTIFIER = com.adithyabhat.olympus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -21,7 +21,10 @@
 			</array>
 		</dict>
 	</array>
-	<!-- Default server. Debug points at `next dev`; set it for Release builds. -->
+	<!-- Only standard HTTPS: exempt from export compliance, so TestFlight doesn't ask per build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Default server: `next dev` for Debug, production for Release (build setting). -->
 	<key>OlympusServerURL</key>
 	<string>$(OLYMPUS_SERVER_URL)</string>
 </dict>
