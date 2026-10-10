@@ -3,10 +3,11 @@ import { db } from "@/lib/db";
 import { integrations } from "@/lib/db/schema";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { upsertCheckIn } from "../checkins";
-import { mainSleepByDate, type WhoopSleep } from "./whoop-parse";
+import { mainSleepByDate, recoveryByDate, type WhoopRecovery, type WhoopSleep } from "./whoop-parse";
 
 /**
- * WHOOP Developer API v2 — sleep → daily check-in sleep minutes.
+ * WHOOP Developer API v2 — sleep → daily check-in sleep minutes, recovery →
+ * HRV + resting HR (used only where Apple Health has none, see upsertCheckIn).
  * Docs: https://developer.whoop.com/api/ (OAuth 2.0, scope read:sleep + offline).
  */
 
@@ -109,29 +110,46 @@ async function accessToken(userId: string): Promise<string | null> {
   return t.access_token;
 }
 
+/** Up to 5 pages of a v2 collection, newest first, since `start`. */
+async function fetchAll<T>(token: string, path: string, start: string): Promise<T[]> {
+  const records: T[] = [];
+  let next: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const u = new URL(`${API}${path}`);
+    u.searchParams.set("start", start);
+    u.searchParams.set("limit", "25");
+    if (next) u.searchParams.set("nextToken", next);
+    const res = await fetch(u, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!res.ok) throw new Error(`WHOOP ${path} ${res.status}`);
+    const body = (await res.json()) as { records: T[]; next_token?: string | null };
+    records.push(...body.records);
+    next = body.next_token ?? undefined;
+    if (!next) break;
+  }
+  return records;
+}
+
 export async function syncWhoop(userId: string, days = 3): Promise<number> {
   try {
     const token = await accessToken(userId);
     if (!token) return 0;
     const start = new Date(Date.now() - days * 86_400_000).toISOString();
-    const records: WhoopSleep[] = [];
-    let next: string | undefined;
-    for (let page = 0; page < 5; page++) {
-      const u = new URL(`${API}/activity/sleep`);
-      u.searchParams.set("start", start);
-      u.searchParams.set("limit", "25");
-      if (next) u.searchParams.set("nextToken", next);
-      const res = await fetch(u, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-      if (!res.ok) throw new Error(`WHOOP sleep ${res.status}`);
-      const body = (await res.json()) as { records: WhoopSleep[]; next_token?: string | null };
-      records.push(...body.records);
-      next = body.next_token ?? undefined;
-      if (!next) break;
-    }
+    const [sleeps, recoveries] = await Promise.all([
+      fetchAll<WhoopSleep>(token, "/activity/sleep", start),
+      fetchAll<WhoopRecovery>(token, "/recovery", start),
+    ]);
 
-    const byDate = mainSleepByDate(records);
-    for (const [date, sleepMin] of Array.from(byDate.entries())) {
-      await upsertCheckIn(userId, date, { sleepMin }, "whoop");
+    const byDate = mainSleepByDate(sleeps);
+    const vitals = recoveryByDate(recoveries, sleeps);
+    const dates = new Set([...Array.from(byDate.keys()), ...Array.from(vitals.keys())]);
+    for (const date of Array.from(dates)) {
+      const v = vitals.get(date);
+      await upsertCheckIn(
+        userId,
+        date,
+        { sleepMin: byDate.get(date), hrvMs: v?.hrvMs, restingHr: v?.restingHr },
+        "whoop"
+      );
     }
     await db
       .update(integrations)

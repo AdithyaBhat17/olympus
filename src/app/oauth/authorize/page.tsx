@@ -4,6 +4,7 @@ import {
   getClient,
   isAcceptableRedirectUri,
   isAllowedUser,
+  isAppClient,
   isClaudeRedirect,
 } from "@/server/oauth";
 import { decideAction, type AuthorizeParams } from "./actions";
@@ -72,6 +73,8 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     scope: one(sp.scope),
     resource: one(sp.resource),
   };
+  if (isAppClient(client.clientId)) return <AppSignIn email={email} params={params} />;
+
   const host = new URL(redirectUri).host;
   // The client's name is self-declared at registration, so the heading is
   // driven by where the code goes, never by what the client calls itself.
@@ -115,6 +118,36 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         <p className="text-xs text-muted text-center">
           You can disconnect any time in Settings › Connections.
         </p>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * The iPhone app signing in. Still a tap, not automatic: any app can claim a
+ * URL scheme, so this screen is where the athlete sees it's their own app asking.
+ */
+function AppSignIn({ email, params }: { email: string; params: AuthorizeParams }) {
+  return (
+    <main className="min-h-dvh flex items-center justify-center px-5 bg-bg">
+      <div className="w-full max-w-sm flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <span className="eyebrow">Sign in</span>
+          <h1 className="font-display text-[40px] font-bold leading-none">Sign in to Olympus on your iPhone?</h1>
+          <p className="text-sm text-muted">
+            Signed in as <span className="text-fg-2">{email}</span>. The Olympus iPhone app gets the same access as
+            this site. Only continue if you just tapped Sign in in the app.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <form action={decideAction.bind(null, params, true)}>
+            <button type="submit" className="btn-primary">Continue</button>
+          </form>
+          <form action={decideAction.bind(null, params, false)}>
+            <button type="submit" className="btn-secondary">Cancel</button>
+          </form>
+        </div>
+        <p className="text-xs text-muted text-center">Sign out any time from the app&apos;s Settings.</p>
       </div>
     </main>
   );

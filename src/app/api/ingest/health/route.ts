@@ -1,43 +1,16 @@
-import { z } from "zod";
-import { upsertCheckIn } from "@/server/checkins";
-import { markIngested, userForIngestToken } from "@/server/integrations/apple-health";
-import { todayFor } from "@/server/profile";
+import { healthIngestBody, ingestHealthDays, userForIngestToken } from "@/server/integrations/apple-health";
 
 /**
  * Apple Health bridge for an iOS Shortcut (MyFitnessPal → Apple Health →
- * Shortcut → here). Body, one day or several:
+ * here). The iOS app posts the same body to /api/v1/health with its own
+ * sign-in instead. Body, one day or several:
  *   { "date": "2026-10-02", "proteinG": 112, "waterMl": 2400 }
- *   { "days": [ { "date": "…", "proteinG": …, "waterL": 2.4, "sleepH": 6.5 } ] }
+ *   { "days": [ { "date": "…", "proteinG": …, "waterL": 2.4, "sleepH": 6.5, "hrvMs": 48, "restingHr": 55 } ] }
+ * hrvMs is Apple Health's SDNN.
  * Auth: Authorization: Bearer olh_… (Settings › Connections › Apple Health).
  */
 
 export const runtime = "nodejs";
-
-const day = z
-  .object({
-    date: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}/)
-      .refine((d) => {
-        const iso = d.slice(0, 10);
-        const t = new Date(`${iso}T00:00:00Z`);
-        return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === iso;
-      }, "Not a real date")
-      .optional(),
-    proteinG: z.coerce.number().min(0).max(1000).optional(),
-    waterMl: z.coerce.number().min(0).max(20000).optional(),
-    waterL: z.coerce.number().min(0).max(20).optional(),
-    sleepMin: z.coerce.number().min(0).max(1440).optional(),
-    sleepH: z.coerce.number().min(0).max(24).optional(),
-  })
-  .transform((d) => ({
-    date: d.date?.slice(0, 10),
-    proteinG: d.proteinG,
-    waterMl: d.waterMl ?? (d.waterL != null ? d.waterL * 1000 : undefined),
-    sleepMin: d.sleepMin ?? (d.sleepH != null ? d.sleepH * 60 : undefined),
-  }));
-
-const body = z.union([z.object({ days: z.array(day).min(1).max(31) }), day]);
 
 export async function POST(req: Request) {
   const header = req.headers.get("authorization") ?? "";
@@ -51,24 +24,9 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ ok: false, error: "Body must be JSON" }, { status: 400 });
   }
-  const parsed = body.safeParse(json);
+  const parsed = healthIngestBody.safeParse(json);
   if (!parsed.success) {
-    return Response.json({ ok: false, error: "Expected proteinG / waterMl / waterL / sleepMin / sleepH" }, { status: 400 });
+    return Response.json({ ok: false, error: "Expected proteinG / waterMl / waterL / sleepMin / sleepH / hrvMs / restingHr" }, { status: 400 });
   }
-  const days = "days" in parsed.data ? parsed.data.days : [parsed.data];
-
-  const saved: Array<{ date: string; proteinG: number | null; waterMl: number | null; sleepMin: number | null }> = [];
-  const today = await todayFor(userId);
-  for (const d of days) {
-    const date = d.date ?? today;
-    const patch: Record<string, number> = {};
-    if (d.proteinG != null) patch.proteinG = d.proteinG;
-    if (d.waterMl != null) patch.waterMl = d.waterMl;
-    if (d.sleepMin != null) patch.sleepMin = d.sleepMin;
-    if (Object.keys(patch).length === 0) continue;
-    const row = await upsertCheckIn(userId, date, patch, "apple_health");
-    saved.push({ date, proteinG: row.proteinG, waterMl: row.waterMl, sleepMin: row.sleepMin });
-  }
-  await markIngested(userId);
-  return Response.json({ ok: true, saved });
+  return Response.json({ ok: true, saved: await ingestHealthDays(userId, parsed.data) });
 }

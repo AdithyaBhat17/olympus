@@ -34,7 +34,7 @@ export interface NextSessionData {
   warnings: string[];
   items: NextSessionItem[];
   more: string[];
-  live: { href: string; startedAt: string | null; type: string | null } | null;
+  live: { id: string; href: string; startedAt: string | null; type: string | null } | null;
 }
 
 function PlayIcon() {

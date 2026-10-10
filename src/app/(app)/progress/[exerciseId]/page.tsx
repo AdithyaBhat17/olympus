@@ -1,40 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
-import { formatDayShort, formatDdMm, todayInTz } from "@/lib/dates";
-import { listExerciseRows, toDomainExercise } from "@/server/exercises";
-import { exerciseHistory, workingWeights } from "@/server/history";
-import { getCheckIn } from "@/server/checkins";
-import { getProfile } from "@/server/profile";
-import {
-  estimatedOneRepMax,
-  formatHours,
-  formatKg,
-  isHarder,
-  progressDelta,
-  progressionStatus,
-  topSet,
-  type SetLogEntry,
-} from "@/domain";
-import { cn, formatCategory } from "@/lib/utils";
+import { formatDdMm } from "@/lib/dates";
+import { listExerciseRows } from "@/server/exercises";
+import { exerciseProgressScreen } from "@/server/screens/exercise-progress";
+import { formatHours, formatKg } from "@/domain";
+import { cn } from "@/lib/utils";
 import { BackIcon } from "@/components/page-header";
-import ExerciseChart, { type ChartPoint } from "@/components/progress/exercise-chart";
+import ExerciseChart from "@/components/progress/exercise-chart";
 import WorkingWeightForm from "@/components/progress/working-weight-form";
-import { isFormCueId } from "@/components/form-cues/cue-ids";
 import BlockToggle from "@/components/progress/block-toggle";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** "A" → "Session A"; legacy free-text names pass through. */
-function sessionLabel(t: string | null | undefined): string | null {
-  if (!t) return null;
-  return /^[A-Z0-9]{1,2}$/.test(t) ? `Session ${t}` : t;
-}
-
-function working(sets: SetLogEntry[]): SetLogEntry[] {
-  const w = sets.filter((s) => s.type !== "warmup");
-  return w.length ? w : sets;
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ exerciseId: string }> }) {
   const { exerciseId } = await params;
@@ -51,83 +28,8 @@ export default async function ExerciseProgressPage({
 }) {
   const { exerciseId } = await params;
   if (!UUID_RE.test(exerciseId)) notFound();
-  const userId = await requireUserEmail();
-
-  // Only global rows and the user's own custom rows are visible.
-  const rows = await listExerciseRows(userId);
-  const row = rows.find((r) => r.id === exerciseId);
-  if (!row) notFound();
-  const ex = toDomainExercise(row);
-
-  const profile = await getProfile(userId);
-  const today = todayInTz(profile.timezone);
-  const { minSleepMin } = profile.targets;
-  const [fullHistory, ww, checkIn] = await Promise.all([
-    exerciseHistory(userId, ex.id, 40),
-    workingWeights(userId, [ex], { exerciseIds: [ex.id] }),
-    getCheckIn(userId, today),
-  ]);
-  const sleepGateFails = checkIn?.sleepMin != null && checkIn.sleepMin < minSleepMin;
-  const status = progressionStatus(ex, fullHistory, { sleepGateFails });
-  // The list shows the most recent sessions; the chart and delta span all fetched.
-  const history = fullHistory.slice(0, 12);
-  const current = ww.get(ex.id) ?? null;
-  const workingKg = current?.kg ?? status.workingKg;
-
-  // Delta: oldest vs newest logged session, "↑ 10 kg, 12 wk".
-  let deltaLine: { text: string; tone: "up" | "down" | "flat" } | null = null;
-  const newestTop = fullHistory[0] ? topSet(ex.loadMode, fullHistory[0].sets) : null;
-  if (fullHistory.length >= 2) {
-    const oldestLog = fullHistory[fullHistory.length - 1];
-    const oldest = topSet(ex.loadMode, oldestLog.sets);
-    if (newestTop && oldest) {
-      const d = progressDelta(ex.loadMode, oldest.weight, newestTop.weight);
-      const wk = Math.max(
-        1,
-        Math.round(
-          (Date.parse(`${fullHistory[0].date}T12:00:00Z`) - Date.parse(`${oldestLog.date}T12:00:00Z`)) /
-            (7 * 86_400_000)
-        )
-      );
-      deltaLine =
-        d > 0
-          ? { text: `↑ ${formatKg(d)} kg, ${wk} wk`, tone: "up" }
-          : d < 0
-            ? { text: `↓ ${formatKg(-d)} kg, ${wk} wk`, tone: "down" }
-            : { text: `Holding, ${wk} wk`, tone: "flat" };
-    }
-  }
-
-  // Chart series, oldest → newest (all fetched sessions; the chart picks the range).
-  const points: ChartPoint[] = [...fullHistory].reverse().map((h) => ({
-    date: h.date,
-    top: topSet(ex.loadMode, h.sets)?.weight ?? null,
-  }));
-
-  // PR = a top set the domain flagged, else the hardest top set listed (newest wins ties).
-  let bestIdx = -1;
-  history.forEach((h, i) => {
-    const t = topSet(ex.loadMode, h.sets);
-    if (!t) return;
-    const b = bestIdx >= 0 ? topSet(ex.loadMode, history[bestIdx].sets) : null;
-    if (!b || isHarder(ex.loadMode, t.weight, b.weight)) bestIdx = i;
-  });
-
-  const incrementLabel = ex.isCompound
-    ? `${ex.bodyRegion === "lower" ? "Lower compound" : ex.bodyRegion === "upper" ? "Upper compound" : "Compound"}, +${formatKg(status.increment)} kg`
-    : "Accessory, reps first";
-
-  const unit =
-    ex.loadMode === "PER_SIDE" ? "kg/side" : ex.loadMode === "COUNTERWEIGHT" ? "kg cw" : ex.loadMode === "TIME" ? "min" : "kg";
-  const e1rm = newestTop ? estimatedOneRepMax(ex.loadMode, newestTop.weight, newestTop.reps) : null;
-
-  const eyebrow = [formatCategory(row.category), sessionLabel(history[0]?.sessionType)]
-    .filter(Boolean)
-    .join(", ");
-  const formCue = isFormCueId(row.formCueId) ? row.formCueId : null;
-  const [before, after] = status.summary.includes(status.label)
-    ? status.summary.split(status.label, 2)
-    : [status.summary, null];
+  const s = await exerciseProgressScreen(await requireUserEmail(), exerciseId);
+  if (!s) notFound();
 
   const tile = "px-4 py-3.5 rounded-[26px] bg-surface flex flex-col gap-0.5 min-w-0";
 
@@ -138,69 +40,69 @@ export default async function ExerciseProgressPage({
           <BackIcon />
           Progress
         </Link>
-        <WorkingWeightForm exerciseId={row.id} exerciseName={row.name} currentKg={workingKg} />
+        <WorkingWeightForm exerciseId={s.id} exerciseName={s.name} currentKg={s.workingKg} />
       </header>
 
       <div className="arrive px-5 pt-5 flex flex-col gap-1.5">
-        <span className="eyebrow">{eyebrow}</span>
-        <h1 className="m-0 text-[40px] font-extrabold leading-[44px] tracking-[-0.5px]">{row.name}</h1>
+        <span className="eyebrow">{s.eyebrow}</span>
+        <h1 className="m-0 text-[40px] font-extrabold leading-[44px] tracking-[-0.5px]">{s.name}</h1>
       </div>
 
       <div className="arrive arrive-1 flex items-end gap-3 px-5 pt-[18px]">
         <span className="num text-[72px] leading-[0.85] whitespace-nowrap">
-          {workingKg != null ? formatKg(workingKg) : "—"}
-          <span className="font-sans text-[22px] font-bold text-muted"> {unit}</span>
+          {s.workingKg != null ? formatKg(s.workingKg) : "—"}
+          <span className="font-sans text-[22px] font-bold text-muted"> {s.unit}</span>
         </span>
         <span className="flex flex-col gap-0.5 pb-1.5 min-w-0">
-          {deltaLine && (
+          {s.deltaLine && (
             <span
               className={cn(
                 "w-fit text-[15px] font-extrabold",
-                deltaLine.tone === "up"
+                s.deltaLine.tone === "up"
                   ? "tag tag-apricot text-[15px]"
-                  : deltaLine.tone === "down"
+                  : s.deltaLine.tone === "down"
                     ? "text-danger-text"
                     : "text-muted"
               )}
             >
-              {deltaLine.text}
+              {s.deltaLine.text}
             </span>
           )}
-          {newestTop && (
+          {s.newestTop && (
             <span className="text-[13px] text-muted">
-              Top set, {formatKg(newestTop.weight)} × {newestTop.reps}
+              Top set, {formatKg(s.newestTop.weight)} × {s.newestTop.reps}
             </span>
           )}
-          {current?.source === "override" && (
-            <span className="text-[13px] text-muted">Set by hand {formatDdMm(current.date)}</span>
+          {s.overrideDate && (
+            <span className="text-[13px] text-muted">Set by hand {formatDdMm(s.overrideDate)}</span>
           )}
         </span>
       </div>
 
-      {points.some((p) => p.top != null) ? (
-        <ExerciseChart points={points} today={today} loadMode={ex.loadMode} />
+      {s.points.some((p) => p.top != null) ? (
+        <ExerciseChart points={s.points} today={s.today} loadMode={s.loadMode} />
       ) : (
         <section className="kind-accent mx-4 mt-4 px-6 py-8 rounded-[36px] bg-k text-k-on flex flex-col gap-1">
           <span className="text-[28px] font-extrabold">Nothing to chart yet</span>
-          <span className="text-[17px] opacity-90">Log {row.name} once and the chart starts here.</span>
+          <span className="text-[17px] opacity-90">Log {s.name} once and the chart starts here.</span>
         </section>
       )}
 
       <div className="arrive arrive-2 grid grid-cols-3 gap-2 mx-4 mt-3">
         <div className={tile}>
           <span className="tile-label">Est. 1RM</span>
-          <span className="num text-[24px]">{e1rm != null ? formatKg(Math.round(e1rm)) : "—"}</span>
+          <span className="num text-[24px]">{s.e1rm != null ? formatKg(s.e1rm) : "—"}</span>
         </div>
         <div className={tile}>
           <span className="tile-label">Sessions</span>
           <span className="num text-[24px]">
-            {fullHistory.length}
-            {fullHistory.length >= 40 ? "+" : ""}
+            {s.sessionCount}
+            {s.sessionCountCapped ? "+" : ""}
           </span>
         </div>
         <div className={tile}>
           <span className="tile-label">Next open</span>
-          <span className="num text-[24px] text-accent">{status.nextKg != null ? formatKg(status.nextKg) : "—"}</span>
+          <span className="num text-[24px] text-accent">{s.nextKg != null ? formatKg(s.nextKg) : "—"}</span>
         </div>
       </div>
 
@@ -212,62 +114,58 @@ export default async function ExerciseProgressPage({
           <h2 id="bump-title" className="section-label m-0">
             Next bump
           </h2>
-          <span className="text-[13px] text-muted text-right">{incrementLabel}</span>
+          <span className="text-[13px] text-muted text-right">{s.bump.incrementLabel}</span>
         </div>
         <div
           className="grid gap-1.5"
-          style={{ gridTemplateColumns: `repeat(${status.needed}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${s.bump.needed}, minmax(0, 1fr))` }}
           role="progressbar"
           aria-label="Clean sessions toward the next bump"
           aria-valuemin={0}
-          aria-valuemax={status.needed}
-          aria-valuenow={Math.min(status.hits, status.needed)}
-          aria-valuetext={`${status.label} sessions`}
+          aria-valuemax={s.bump.needed}
+          aria-valuenow={Math.min(s.bump.hits, s.bump.needed)}
+          aria-valuetext={`${s.bump.label} sessions`}
         >
-          {Array.from({ length: status.needed }, (_, i) => (
+          {Array.from({ length: s.bump.needed }, (_, i) => (
             <div
               key={i}
-              className={cn("h-3 rounded-full animate-pop-in", i < status.hits ? "bg-apricot" : "bg-surface-3")}
+              className={cn("h-3 rounded-full animate-pop-in", i < s.bump.hits ? "bg-apricot" : "bg-surface-3")}
               style={{ animationDelay: `${200 + i * 80}ms` }}
             />
           ))}
         </div>
         <p className="m-0 text-[15px] leading-5 text-fg-2">
-          {before}
-          {after != null && (
+          {s.bump.before}
+          {s.bump.after != null && (
             <>
-              <strong className="font-semibold text-fg">{status.label}</strong>
-              {after}
+              <strong className="font-semibold text-fg">{s.bump.label}</strong>
+              {s.bump.after}
             </>
           )}{" "}
-          <span className="text-muted">Held if sleep &lt; {formatHours(minSleepMin)} h on the day.</span>
+          <span className="text-muted">Held if sleep &lt; {formatHours(s.bump.minSleepMin)} h on the day.</span>
         </p>
       </section>
 
-      {history.length > 0 && (
+      {s.recent.length > 0 && (
         <section aria-labelledby="rs-h" className="mx-4 mt-6">
           <h2 id="rs-h" className="section-label mx-1.5 mb-2.5">
             Recent sessions
           </h2>
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
-            {history.map((h, i) => {
-              const under = h.sets.some((s) => s.flags?.includes("underloaded"));
-              const pr = h.sets.some((s) => s.flags?.includes("top_set_pr")) || i === bestIdx;
+            {s.recent.map((h, i) => {
               return (
                 <li
                   key={h.sessionId}
                   className="flex items-center gap-3 px-4 py-3.5 rounded-[22px] bg-surface animate-rise"
                   style={{ animationDelay: `${300 + Math.min(i, 8) * 45}ms` }}
                 >
-                  <span className="w-[86px] shrink-0 text-[15px] font-semibold text-muted">{formatDayShort(h.date)}</span>
+                  <span className="w-[86px] shrink-0 text-[15px] font-semibold text-muted">{h.dateLabel}</span>
                   <span className="flex-1 min-w-0 num text-[15px] text-fg-2">
-                    {working(h.sets)
-                      .map((s) => `${formatKg(s.weight)}×${s.reps}`)
-                      .join(", ")}
+                    {h.sets}
                   </span>
-                  {pr ? (
+                  {h.record ? (
                     <span className="tag tag-apricot">Record</span>
-                  ) : under ? (
+                  ) : h.underloaded ? (
                     <span className="num text-[17px] text-accent">
                       !<span className="sr-only"> Underloaded</span>
                     </span>
@@ -279,9 +177,9 @@ export default async function ExerciseProgressPage({
         </section>
       )}
 
-      {formCue && (
+      {s.formCue && (
         <Link
-          href={`/form/${formCue}?ex=${row.id}`}
+          href={`/form/${s.formCue}?ex=${s.id}`}
           className="press-soft mx-4 mt-3 h-16 px-4 rounded-[26px] bg-info text-white flex items-center gap-3"
         >
           <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
@@ -296,7 +194,7 @@ export default async function ExerciseProgressPage({
         </Link>
       )}
 
-      <BlockToggle exerciseId={row.id} name={row.name} blocked={row.userBlock != null} reason={row.userBlock?.reason ?? null} />
+      <BlockToggle exerciseId={s.id} name={s.name} blocked={s.blocked} reason={s.blockReason} />
     </div>
   );
 }

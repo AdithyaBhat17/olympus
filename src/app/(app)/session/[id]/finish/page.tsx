@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUserEmail } from "@/lib/auth";
-import { formatDayShort } from "@/lib/dates";
-import { DomainError, getSessionView, sessionExport } from "@/server/sessions";
-import type { SessionCatch, SetLogEntry } from "@/domain";
+import { DomainError } from "@/server/sessions";
+import { finishScreen, type FinishScreenData } from "@/server/screens/session";
 import FinishScreen from "@/components/finish/finish-screen";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,62 +17,14 @@ export default async function FinishPage({
   if (!UUID_RE.test(id)) notFound();
   const userId = await requireUserEmail();
 
-  let view: Awaited<ReturnType<typeof getSessionView>>;
+  let screen: FinishScreenData;
   try {
-    view = await getSessionView(userId, id);
+    screen = await finishScreen(userId, id);
   } catch (err) {
     if (err instanceof DomainError) notFound();
     throw err;
   }
-  const exp = sessionExport(view);
-
-  const logged = view.items.flatMap((i) =>
-    i.sets.map((s) => s.logged).filter((s): s is SetLogEntry => !!s)
-  );
-  const working = logged.filter((s) => s.type !== "warmup");
-  const rpes = working.map((s) => s.rpe).filter((r): r is number => r != null);
-  const avgRpe = rpes.length
-    ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10
-    : null;
-
-  const catches: SessionCatch[] = [...exp.catches];
-  const protein = view.checkIn?.proteinG;
-  const floor = view.targets.proteinG;
-  if (protein != null && floor != null && protein < floor) {
-    catches.push({
-      kind: "recovery",
-      text: `Protein ${protein} of ${floor} g, still ${floor - protein} g short of the floor.`,
-    });
-  }
-
-  const durationSec =
-    view.startedAt && view.finishedAt
-      ? Math.max(
-          0,
-          Math.round(
-            (new Date(view.finishedAt).getTime() - new Date(view.startedAt).getTime()) / 1000
-          )
-        )
-      : null;
-
-  const label = view.sessionType ? `Session ${view.sessionType}` : view.title;
-
-  return (
-    <FinishScreen
-      sessionId={view.id}
-      status={view.status}
-      sentAt={view.sentAt}
-      eyebrow={`${formatDayShort(view.date)}, ${label}`}
-      label={label}
-      sessionType={view.sessionType}
-      startedAt={view.startedAt}
-      durationSec={durationSec}
-      workingSets={working.length}
-      avgRpe={avgRpe}
-      catches={catches}
-      initialNotes={view.notes ?? ""}
-      fileName={exp.fileName}
-      exportSession={exp.export}
-    />
-  );
+  // The web re-renders the markdown live from exportSession as notes change.
+  const { markdown: _markdown, ...props } = screen;
+  return <FinishScreen {...props} />;
 }

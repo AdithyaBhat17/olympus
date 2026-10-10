@@ -12,9 +12,13 @@ export async function GET(req: NextRequest) {
   const state = req.nextUrl.searchParams.get("state");
   const code = req.nextUrl.searchParams.get("code");
   const expected = req.cookies.get("whoop_state")?.value;
+  const toApp = req.cookies.get("whoop_return")?.value === "app";
   const done = (status: string) => {
-    const res = NextResponse.redirect(`${origin}/settings?whoop=${status}`);
+    const res = NextResponse.redirect(
+      toApp ? `olympus://integrations/whoop?result=${status}` : `${origin}/settings?whoop=${status}`
+    );
     res.cookies.delete({ name: "whoop_state", path: "/api/integrations/whoop" });
+    res.cookies.delete({ name: "whoop_return", path: "/api/integrations/whoop" });
     return res;
   };
 

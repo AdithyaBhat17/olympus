@@ -2,12 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { rememberDisplayName } from "@/server/profile";
 import {
   createAuthCode,
   getClient,
   isAcceptableRedirectUri,
   isAllowedUser,
-  MCP_SCOPE,
+  scopeForClient,
 } from "@/server/oauth";
 
 export interface AuthorizeParams {
@@ -49,12 +50,15 @@ export async function decideAction(params: AuthorizeParams, allow: boolean) {
     );
   }
 
+  // The iOS app can't read the session, so its name comes from here.
+  await rememberDisplayName(email, session?.user?.name).catch(() => {});
+
   const code = await createAuthCode({
     clientId: client.clientId,
     userId: email,
     redirectUri: params.redirectUri,
     codeChallenge: params.codeChallenge,
-    scope: params.scope ?? MCP_SCOPE,
+    scope: scopeForClient(client.clientId),
     resource: params.resource,
   });
   redirect(withParams(params.redirectUri, { code, state: params.state }));

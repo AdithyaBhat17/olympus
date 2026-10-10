@@ -165,6 +165,8 @@ export const athleteProfiles = pgTable("athlete_profiles", {
   userId: text("user_id").primaryKey(),
   /** IANA zone. NULL until the browser reports one (or the athlete picks it). */
   timezone: text("timezone"),
+  /** From the Google sign-in, for the iOS app (the web reads the session). */
+  displayName: text("display_name"),
   /** Nutrition targets. NULL = not tracked; nothing is judged against it. */
   kcal: integer("kcal"),
   proteinG: integer("protein_g"),
@@ -183,6 +185,7 @@ export const athleteProfiles = pgTable("athlete_profiles", {
 // ---------------------------------------------------------------------------
 
 export type CheckInSource = "manual" | "claude" | "whoop" | "apple_health";
+export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
 
 export const dailyCheckIns = pgTable(
   "daily_check_ins",
@@ -192,8 +195,11 @@ export const dailyCheckIns = pgTable(
     sleepMin: integer("sleep_min"),
     proteinG: integer("protein_g"),
     waterMl: integer("water_ml"),
+    /** Apple Health = SDNN, Whoop = RMSSD; sources.hrv says which. */
+    hrvMs: integer("hrv_ms"),
+    restingHr: integer("resting_hr"),
     sources: jsonb("sources")
-      .$type<Partial<Record<"sleep" | "protein" | "water", CheckInSource>>>()
+      .$type<Partial<Record<CheckInField, CheckInSource>>>()
       .notNull()
       .default({}),
     updatedAt: timestamp("updated_at", { withTimezone: true })

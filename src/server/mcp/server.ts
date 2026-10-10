@@ -244,7 +244,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Get recovery",
       description:
-        "Daily check-ins (sleep, protein, water) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks against the athlete's own sleep floor and protein target. Refreshes Whoop sleep first if it's connected and stale.",
+        "Daily check-ins (sleep, protein, water, HRV, resting HR) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks against the athlete's own sleep floor and protein target. HRV is SDNN when sources.hrv is apple_health and RMSSD when it's whoop; don't compare across the two. Refreshes Whoop first if it's connected and stale.",
       inputSchema: {
         date: isoDate.optional().describe("Defaults to today in the athlete's timezone"),
         days: z.number().int().min(1).max(60).default(7),
@@ -264,6 +264,8 @@ export function buildMcpServer(caller: McpCaller): McpServer {
             sleepMin: c.sleepMin,
             proteinG: c.proteinG,
             waterMl: c.waterMl,
+            hrvMs: c.hrvMs,
+            restingHr: c.restingHr,
             sources: c.sources,
           })),
           recovery: r.summary,

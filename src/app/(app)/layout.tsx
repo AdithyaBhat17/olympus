@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import BottomNav from "@/components/bottom-nav";
 import { syncWhoopIfStale } from "@/server/integrations/whoop";
-import { getProfile } from "@/server/profile";
+import { getProfile, rememberDisplayName } from "@/server/profile";
 import { TimezoneSync } from "@/components/timezone-sync";
 
 export default async function AppLayout({
@@ -24,6 +24,11 @@ export default async function AppLayout({
     after(() => syncWhoopIfStale(email).catch((err) => console.error("whoop sync", err)));
   }
   const profile = email ? await getProfile(email) : null;
+  // The iOS app shows the name too, and it only has the database to go on.
+  const name = session.user.name?.trim();
+  if (email && profile && name && profile.displayName !== name) {
+    after(() => rememberDisplayName(email, name).catch((err) => console.error("display name", err)));
+  }
 
   return (
     <Providers>

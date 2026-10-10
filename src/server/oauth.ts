@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { oauthClients, oauthCodes, oauthTokens } from "@/lib/db/schema";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import { isAllowedUser } from "@/lib/allowlist";
 
 export { isAllowedUser };
@@ -15,6 +15,29 @@ export { isAllowedUser };
  */
 
 export const MCP_SCOPE = "liftlog";
+
+/**
+ * The native iOS app: a built-in public client (no registration, no DB row)
+ * whose tokens carry APP_SCOPE. Only APP_SCOPE opens /api/v1, which can do
+ * what Claude never may (delete sessions, change settings). PKCE guards the
+ * code; the custom scheme is fine for that under RFC 8252.
+ */
+export const APP_SCOPE = "app";
+export const APP_CLIENT = {
+  clientId: "olympus-ios",
+  clientName: "Olympus for iPhone",
+  redirectUris: ["olympus://oauth/callback"],
+  createdAt: new Date(0),
+};
+
+export function isAppClient(clientId: string): boolean {
+  return clientId === APP_CLIENT.clientId;
+}
+
+/** Scope is decided by the client, never by what it asks for. */
+export function scopeForClient(clientId: string): string {
+  return isAppClient(clientId) ? APP_SCOPE : MCP_SCOPE;
+}
 const ACCESS_TTL_SEC = 60 * 60; // 1 h
 const REFRESH_TTL_SEC = 60 * 60 * 24 * 30; // 30 d
 const CODE_TTL_SEC = 5 * 60;
@@ -86,6 +109,7 @@ export function redirectHostAllowed(host: string): boolean {
 }
 
 export function isAcceptableRedirectUri(uri: string): boolean {
+  if (APP_CLIENT.redirectUris.includes(uri)) return true;
   try {
     const u = new URL(uri);
     if (u.hash || u.username || u.password) return false;
@@ -117,6 +141,7 @@ export async function registerClient(input: { redirectUris: string[]; clientName
 }
 
 export async function getClient(clientId: string) {
+  if (isAppClient(clientId)) return APP_CLIENT;
   const [row] = await db.select().from(oauthClients).where(eq(oauthClients.clientId, clientId));
   return row ?? null;
 }
@@ -268,12 +293,21 @@ export async function revokeToken(raw: string) {
     .where(eq(oauthTokens.tokenHash, sha256(raw)));
 }
 
-/** Revoke every token a user has granted (Settings › Connections › Disconnect). */
+/**
+ * Revoke every token a user has granted to Claude (Settings › Connections ›
+ * Disconnect). The iPhone app's sign-in is left alone; it signs out itself.
+ */
 export async function revokeAllForUser(userId: string) {
   await db
     .update(oauthTokens)
     .set({ revokedAt: new Date() })
-    .where(and(eq(oauthTokens.userId, userId), isNull(oauthTokens.revokedAt)));
+    .where(
+      and(
+        eq(oauthTokens.userId, userId),
+        isNull(oauthTokens.revokedAt),
+        ne(oauthTokens.clientId, APP_CLIENT.clientId)
+      )
+    );
 }
 
 export interface VerifiedToken {
@@ -340,7 +374,8 @@ export async function connectionStatus(userId: string) {
     })
     .from(oauthTokens)
     .leftJoin(oauthClients, eq(oauthClients.clientId, oauthTokens.clientId))
-    .where(eq(oauthTokens.userId, userId));
+    // Claude's connections only; the iPhone app isn't a connector.
+    .where(and(eq(oauthTokens.userId, userId), ne(oauthTokens.clientId, APP_CLIENT.clientId)));
   const live = rows.filter(
     (r) => !r.revokedAt && r.kind === "refresh" && r.expiresAt.getTime() > Date.now()
   );
