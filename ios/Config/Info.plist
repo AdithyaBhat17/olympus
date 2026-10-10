@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged with the generated Info.plist. -->
+	<!-- Plain http only to localhost / .local, so the Simulator can reach `next dev`. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- olympus://oauth/callback (sign-in) and olympus://integrations/whoop (Whoop connect). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.adithyabhat.olympus</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>olympus</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Default server. Debug points at `next dev`; set it for Release builds. -->
+	<key>OlympusServerURL</key>
+	<string>$(OLYMPUS_SERVER_URL)</string>
+</dict>
+</plist>
