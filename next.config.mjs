@@ -31,6 +31,8 @@ const nextConfig = {
       // Public setup guide: a standalone page (public/docs.html) with its own
       // global CSS, so it can't live inside the app's React tree.
       { source: "/docs", destination: "/docs.html" },
+      // Privacy policy (TestFlight and Apple Health require one); same standalone setup.
+      { source: "/privacy", destination: "/privacy.html" },
       {
         source: "/.well-known/oauth-authorization-server/:path*",
         destination: "/api/oauth/metadata",
