@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="What Olympus collects, including Apple Health data, how it's used, and how to have it deleted.">
+<meta name="theme-color" content="#FBF6F4">
+<title>Privacy Policy | Olympus</title>
+<link rel="icon" href="/icons/icon-192x192.png">
+<link rel="apple-touch-icon" href="/icons/icon-180x180.png">
+<style>
+/* Layout: Olympus "Coral", matching /docs. One reading column on warm off-white; each topic is a surface card. */
+:root{
+  --coral:#C63D22; --ink:#1E1412; --ink-2:#3F302C;
+  --bg:#FBF6F4; --surface:#F3E8E4; --surface-2:#EEE2DD; --muted:#74625D;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif;
+  --round:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  color-scheme:light;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-direction:column;gap:8px;padding:0 4px 8px}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--coral)}
+h1{font-family:var(--round);font-size:clamp(34px,8vw,46px);font-weight:800;line-height:1.02;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.meta{color:var(--muted);font-size:14px;margin:0}
+.lede{color:var(--ink-2);margin:0;max-width:62ch}
+section{background:var(--surface);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:10px}
+section.key{background:var(--coral);color:#fff}
+section.key p,section.key li{color:rgba(255,255,255,.92)}
+h2{font-family:var(--round);font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.01em;margin:0;text-wrap:balance}
+p{margin:0;color:var(--ink-2);max-width:65ch}
+ul{margin:0;padding-left:20px;color:var(--ink-2);display:flex;flex-direction:column;gap:5px;max-width:65ch}
+b{color:inherit;font-weight:650}
+a{color:var(--coral);text-underline-offset:2px}
+section.key a{color:#fff}
+footer{color:var(--muted);font-size:14px;padding:8px 4px 0}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <span class="eyebrow">Olympus</span>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective 11 October 2026</p>
+    <p class="lede">Olympus is a personal training log for a small group of invited people, used on the web at olympus.adithyabhat.com and through the Olympus iPhone app. This page explains what it stores, why, and how to have it removed.</p>
+  </header>
+
+  <section class="key">
+    <h2>The short version</h2>
+    <ul>
+      <li>Your data is used only to run your training log and the coaching features you turn on.</li>
+      <li>Nothing is sold, and nothing is used for advertising. There are no analytics or ad trackers.</li>
+      <li>Apple Health data is only read, never written, and is used only to show your recovery and plan your training.</li>
+      <li>You can have everything deleted by emailing <a href="mailto:privacy@adithyabhat.com">privacy@adithyabhat.com</a>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What Olympus stores</h2>
+    <ul>
+      <li><b>Account:</b> your name and email address from Google sign-in.</li>
+      <li><b>Training:</b> sessions, exercises, sets, loads, reps, effort ratings, notes, working weights, custom exercises, and your training plans.</li>
+      <li><b>Recovery check-ins:</b> sleep, protein, water, heart rate variability (HRV) and resting heart rate for each day, and where each value came from.</li>
+      <li><b>Profile:</b> your timezone, rotation, targets, and any injuries or limits you enter.</li>
+      <li><b>Connections:</b> the sign-in tokens for services you connect (described below), stored so syncing can continue.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Apple Health</h2>
+    <p>If you allow it, the iPhone app reads these types from Apple Health: dietary protein, dietary water, sleep analysis, heart rate variability and resting heart rate. It never writes to Apple Health.</p>
+    <p>The app sends daily totals (for example, "140 g protein on 10 October") to the Olympus server, including in the background when new Health data arrives. Health data is used only to show your recovery and to plan and adjust your training. It is not used for advertising or marketing, not sold, and not shared with anyone except as described under "Where your data lives" and "Claude", when you choose to connect Claude.</p>
+    <p>You can turn access off at any time in the iPhone's Settings › Health › Data Access &amp; Devices › Olympus.</p>
+  </section>
+
+  <section>
+    <h2>Whoop</h2>
+    <p>If you connect Whoop, Olympus stores the access tokens Whoop issues and reads your sleep and recovery (HRV and resting heart rate) to fill in your daily check-ins. Disconnecting Whoop in Settings deletes the tokens and asks Whoop to revoke access. Check-ins already synced stay in your log unless you ask for deletion.</p>
+  </section>
+
+  <section>
+    <h2>Claude</h2>
+    <p>Olympus can connect to Claude, Anthropic's AI assistant, so it can act as your coach. Only you can set this up, from your own Claude account. Once connected, Claude can read your training data and add plans, sessions, working weights, check-ins and coach notes to your log. It can't delete anything.</p>
+    <p>What Claude reads is handled under your agreement with Anthropic. Olympus keeps a log of each action Claude takes, which you can see in Settings. You can disconnect Claude at any time in Settings.</p>
+  </section>
+
+  <section>
+    <h2>Where your data lives</h2>
+    <p>Olympus uses two service providers, only to run the service:</p>
+    <ul>
+      <li><b>Vercel</b> hosts the website and server.</li>
+      <li><b>Neon</b> hosts the database (PostgreSQL, Singapore region).</li>
+    </ul>
+    <p>Google handles sign-in. The site sets one cookie to keep you signed in, plus a short-lived one while you connect Whoop. The iPhone app keeps its sign-in in the iOS Keychain, and a copy of recently viewed screens so it works offline. Signing out clears both.</p>
+  </section>
+
+  <section>
+    <h2>Keeping and deleting your data</h2>
+    <p>Your data is kept for as long as you use Olympus. You can delete individual sessions in the app at any time. To delete your whole account and everything in it, email <a href="mailto:privacy@adithyabhat.com">privacy@adithyabhat.com</a> from the address you sign in with; it will be removed within 30 days. You can also ask for a copy of your data at the same address.</p>
+  </section>
+
+  <section>
+    <h2>Children</h2>
+    <p>Olympus isn't intended for children under 16, and they shouldn't use it.</p>
+  </section>
+
+  <section>
+    <h2>Changes and contact</h2>
+    <p>If this policy changes, the new version will be posted here with a new effective date. Questions or requests: <a href="mailto:privacy@adithyabhat.com">privacy@adithyabhat.com</a>.</p>
+  </section>
+
+  <footer>Olympus, olympus.adithyabhat.com</footer>
+</main>
+</body>
+</html>
