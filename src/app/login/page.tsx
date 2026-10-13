@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { PlateStack } from "@/components/ui/plate-stack";
+import { Oly } from "@/components/ui/oly";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
@@ -46,7 +46,6 @@ function SignIn() {
 export default function LoginPage() {
   return (
     <main className="kind-accent relative overflow-hidden min-h-dvh flex flex-col justify-between bg-k text-k-on px-6 pt-[max(96px,calc(env(safe-area-inset-top)+64px))] pb-[max(34px,calc(env(safe-area-inset-bottom)+16px))]">
-      <PlateStack className="-right-24 top-14" size={300} />
       <div className="relative flex flex-col gap-5">
         <h1 className="m-0 text-[clamp(64px,22vw,96px)] font-extrabold leading-[0.92] tracking-[-1.5px]">
           <span className="block animate-word-up">Train.</span>
@@ -58,6 +57,10 @@ export default function LoginPage() {
         <p className="m-0 max-w-[300px] text-[19px] font-semibold leading-[1.4] opacity-90 animate-rise [animation-delay:400ms]">
           Your PT programs it through Claude. You lift. Olympus keeps the score.
         </p>
+      </div>
+      {/* Takes the space between the headline and the buttons; Oly shrinks to fit it. */}
+      <div className="relative my-4 min-h-0 flex-1">
+        <Oly pose="lift" tone="chalk" size={216} className="absolute inset-y-0 right-0 my-auto h-[min(100%,227px)] w-auto animate-oly-lift [@media(max-height:700px)]:hidden" />
       </div>
       <div className="relative flex flex-col gap-3 w-full max-w-sm mx-auto animate-rise [animation-delay:400ms]">
         <Suspense fallback={<div className="h-[58px]" />}>

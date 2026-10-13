@@ -13,6 +13,9 @@ struct SignInView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
+            Oly(width: 190, bob: true)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.bottom, 8)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(["Train.", "Log.", "Lift."].enumerated()), id: \.offset) { i, word in
                     Text(word)

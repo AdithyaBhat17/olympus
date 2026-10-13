@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, kindClass } from "@/lib/utils";
+import { Oly } from "@/components/ui/oly";
 
 /** A session letter (A, B, C…), "cardio", or "other" (manual / unlabelled). */
 export type SessionKind = string;
@@ -165,9 +166,12 @@ export default function HistoryList({
       </div>
 
       {sessions.length === 0 ? (
-        <div className="mx-4 mt-6 card flex flex-col gap-2 px-5 py-5">
-          <p className="m-0 text-[22px] font-extrabold">Nothing logged yet</p>
-          <p className="m-0 text-[15px] text-muted leading-5">Start today&apos;s session from Today, or add an old one by hand.</p>
+        <div className="mx-4 mt-6 card flex items-center gap-2 pl-5 pr-3 py-5">
+          <div className="flex flex-col gap-2">
+            <p className="m-0 text-[22px] font-extrabold">Nothing logged yet</p>
+            <p className="m-0 text-[15px] text-muted leading-5">Start today&apos;s session from Today, or add an old one by hand.</p>
+          </div>
+          <Oly pose="rest" size={104} />
         </div>
       ) : groups.length === 0 ? (
         <p className="px-5 py-10 text-[15px] text-muted text-center">No sessions of that type in the last few weeks.</p>

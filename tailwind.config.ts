@@ -88,6 +88,7 @@ const config: Config = {
         "word-up": "word-up .7s cubic-bezier(.2,.8,.2,1) both",
         // Ambient motion plays a few times, then settles: no idle battery drain.
         bob: "bob 3.2s ease-in-out 3",
+        "oly-lift": "oly-lift 2.4s ease-in-out 3",
         wave: "wave 4s linear 3",
         "plate-in": "plate-in .4s cubic-bezier(.3,.7,.4,1.3) both",
         fall: "fall 4.5s cubic-bezier(.3,.1,.6,1) both",
@@ -150,6 +151,10 @@ const config: Config = {
         bob: {
           "0%,100%": { transform: "translateY(0) rotate(-8deg)" },
           "50%": { transform: "translateY(-6px) rotate(-6deg)" },
+        },
+        "oly-lift": {
+          "0%,100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
         },
         wave: { to: { transform: "translateX(-50%)" } },
         // Ends at the plate's own shade (--o), so no wrapper element is needed for it.

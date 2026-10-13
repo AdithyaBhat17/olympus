@@ -1,4 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0c0a09"/>
-  <path d="M280 48L160 272h80L200 464l192-256h-96L344 48z" fill="#f59e0b" stroke="#fbbf24" stroke-width="8" stroke-linejoin="round"/>
+  <defs>
+    <clipPath id="c"><circle cx="256" cy="256" r="191"/></clipPath>
+    <linearGradient id="f" x1="0" y1="0" x2="0" y2="1">
+      <stop offset=".35" stop-color="#E9D9D3" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#E9D9D3" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="#FBF6F4"/>
+  <circle cx="256" cy="256" r="190" fill="#C63D22"/>
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#8F2914" stroke-opacity=".3" stroke-width="8"/>
+  <circle cx="352" cy="176" r="38" fill="#F2A65A"/>
+  <g clip-path="url(#c)">
+    <path d="M30 470 L180 222 Q204 184 228 222 L268 290 L296 252 Q320 218 344 252 L490 470 Z" fill="#FBF6F4" stroke="#FBF6F4" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M204 198 L262 292 L250 470 L206 470 Z" fill="url(#f)"/>
+    <path d="M320 246 L412 470 L326 470 Z" fill="url(#f)"/>
+  </g>
 </svg>
