@@ -25,6 +25,8 @@ struct SessionFlow: View {
                 Loadable(load: { try await model.api.get("sessions/\(route.id)", as: LiveSessionScreen.self) }) { screen, reload in
                     if screen.view.status == .done {
                         SessionFinishView(sessionId: route.id, onBackToSession: {})
+                            // Finished elsewhere (the web, another phone).
+                            .onAppear { RestTimer.sessionEnded(route.id) }
                     } else {
                         SessionLiveView(screen: screen, reload: reload, onFinish: openSummary)
                     }

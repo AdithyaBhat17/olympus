@@ -425,7 +425,7 @@ private struct SessionFinishContent: View {
             if send { sent = wasSent }
         })
         if case .rejected = res { return }
-        RestTimer.clear(id)
+        RestTimer.sessionEnded(id)
         savedNotes = notes
         if case .ok = res { model.show(send ? "Sent to your PT" : "Session finished") }
         router.tab = .today
@@ -441,7 +441,7 @@ private struct SessionFinishContent: View {
     private func deleteSession() async {
         do {
             try await model.api.delete("sessions/\(screen.sessionId)")
-            RestTimer.clear(screen.sessionId)
+            RestTimer.sessionEnded(screen.sessionId)
             model.show("Session deleted")
             dismiss()
             model.dataChanged()
