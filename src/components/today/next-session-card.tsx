@@ -7,6 +7,7 @@ import { cn, kindClass } from "@/lib/utils";
 import { PlateStack } from "@/components/ui/plate-stack";
 import { hapticTick } from "@/lib/haptics";
 import { clock } from "@/components/session/format";
+import { WorkoutSheet } from "./workout-sheet";
 
 export interface NextSessionItem {
   key: string;
@@ -18,6 +19,28 @@ export interface NextSessionItem {
   /** "↑5" when the open load is heavier than the last top set. */
   up: string | null;
   straps: boolean;
+}
+
+/** One row of the full plan behind "View workout". */
+export interface WorkoutItem {
+  key: string;
+  name: string;
+  /** "1 warm-up, 3 × 8–10, RPE 8", or "5 + 35 min" for cardio. */
+  sets: string;
+  /** "47 kg", "47 cw", "21.1/side". */
+  load: string | null;
+  /** "2:00 rest" */
+  rest: string | null;
+  /** Items sharing a pair group are a superset. */
+  pair: string | null;
+  straps: boolean;
+  cues: string[];
+}
+
+export interface Workout {
+  title: string;
+  coachNotes: string | null;
+  items: WorkoutItem[];
 }
 
 export interface NextSessionData {
@@ -34,6 +57,8 @@ export interface NextSessionData {
   warnings: string[];
   items: NextSessionItem[];
   more: string[];
+  /** The whole planned session, viewable before starting it. */
+  workout: Workout | null;
   live: { id: string; href: string; startedAt: string | null; type: string | null } | null;
 }
 
@@ -73,10 +98,12 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
   const [pick, setPick] = useState(data.live?.type ?? data.plannedType);
   // Optimistic "Live" the instant Start is tapped; navigation is already underway.
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [viewing, setViewing] = useState(false);
 
   const onPlan = pick === data.plannedType;
   const sel = data.sessions.find((s) => s.type === pick) ?? data.sessions[0];
   const showItems = onPlan && data.items.length > 0;
+  const workout = onPlan ? data.workout : null;
   const startHref =
     onPlan && data.planId
       ? `/session/start?plan=${data.planId}`
@@ -249,14 +276,21 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
       ) : startedAt != null ? (
         <LiveCta href={startHref} startedAt={startedAt} opening />
       ) : (
-        <button
-          type="button"
-          onClick={start}
-          className="btn-on-k w-fit"
-        >
-          <PlayIcon />
-          Let&apos;s go
-        </button>
+        <div className="relative flex items-center gap-2">
+          <button
+            type="button"
+            onClick={start}
+            className="btn-on-k w-fit"
+          >
+            <PlayIcon />
+            Let&apos;s go
+          </button>
+          {workout && (
+            <button type="button" onClick={() => setViewing(true)} className="btn-pill on-k h-[60px] px-6">
+              View workout
+            </button>
+          )}
+        </div>
       )}
 
       {!data.live && !sel.lastDone && !(onPlan && data.planId) && (
@@ -264,6 +298,8 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
           Log a past session manually
         </Link>
       )}
+
+      {workout && <WorkoutSheet open={viewing} onClose={() => setViewing(false)} type={pick} workout={workout} />}
     </section>
   );
 }

@@ -251,8 +251,9 @@ struct SessionExerciseCard<Table: View>: View {
 }
 
 struct SessionStrapsChip: View {
+    var text = "straps"
     var body: some View {
-        Text("straps")
+        Text(text)
             .font(.system(size: 13, weight: .semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 2)

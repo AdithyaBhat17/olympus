@@ -71,6 +71,24 @@ public struct NextSession: Codable, Sendable {
         public var straps: Bool
         public var id: String { key }
     }
+    /// The whole planned session, viewable before starting it.
+    public struct Workout: Codable, Hashable, Sendable {
+        public struct Item: Codable, Hashable, Identifiable, Sendable {
+            public var key: String
+            public var name: String
+            /// "1 warm-up, 3 × 8–10, RPE 8", or "5 + 35 min" for cardio.
+            public var sets: String
+            public var load: String?
+            public var rest: String?
+            public var pair: String?
+            public var straps: Bool
+            public var cues: [String]
+            public var id: String { key }
+        }
+        public var title: String
+        public var coachNotes: String?
+        public var items: [Item]
+    }
     public struct Live: Codable, Hashable, Sendable {
         public var id: String
         public var startedAt: String?
@@ -86,6 +104,8 @@ public struct NextSession: Codable, Sendable {
     public var warnings: [String]
     public var items: [Item]
     public var more: [String]
+    /// Optional so older servers still decode.
+    public var workout: Workout?
     public var live: Live?
 }
 

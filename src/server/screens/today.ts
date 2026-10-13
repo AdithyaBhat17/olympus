@@ -10,7 +10,8 @@ import { listOpenFlags } from "@/server/flags";
 import { listExercises } from "@/server/exercises";
 import { workingWeights } from "@/server/history";
 import { getProfile } from "@/server/profile";
-import type { NextSessionData, NextSessionItem } from "@/components/today/next-session-card";
+import { loadWithUnit, openKg, plannedMinutes, shortClock, targetLabel, targetRpe } from "@/components/session/format";
+import type { NextSessionData, NextSessionItem, Workout, WorkoutItem } from "@/components/today/next-session-card";
 
 const PREVIEW_COUNT = 4;
 /** Average time under the bar per set, on top of the planned rest. */
@@ -40,14 +41,19 @@ export async function todayScreen(userId: string) {
 
   let items: NextSessionItem[] = [];
   let more: string[] = [];
+  let workout: Workout | null = null;
   let estMin = 0;
   if (showPlan) {
     const ids = showPlan.items.map((i) => i.exerciseId);
     const tops = await workingWeights(userId, all, { exerciseIds: ids });
-    items = showPlan.items.slice(0, PREVIEW_COUNT).map((it) => {
+    // One pass: each plan item as the live screen's shape, so format.ts reads it the same way.
+    const rows = showPlan.items.map((it) => {
       const ex = byId.get(it.exerciseId);
       const mode = ex?.loadMode ?? "TOTAL";
-      const open = it.sets.find((s) => s.type === "working" && s.openKg != null)?.openKg ?? null;
+      const view = { sets: it.sets.map((planned) => ({ planned })), exercise: { loadMode: mode } };
+      return { it, mode, view, name: ex?.name ?? "Unknown exercise", open: openKg(view) };
+    });
+    items = rows.slice(0, PREVIEW_COUNT).map(({ it, mode, name, open }) => {
       const lastTop = tops.get(it.exerciseId)?.kg ?? null;
       const up =
         open != null && lastTop != null && isHarder(mode, open, lastTop)
@@ -55,7 +61,7 @@ export async function todayScreen(userId: string) {
           : null;
       return {
         key: it.id,
-        name: ex?.name ?? "Unknown exercise",
+        name,
         load:
           mode === "TIME"
             ? String(it.sets.reduce((a, s) => a + s.reps[1], 0))
@@ -67,12 +73,35 @@ export async function todayScreen(userId: string) {
         straps: it.straps,
       };
     });
-    more = showPlan.items.slice(PREVIEW_COUNT).map((it) => byId.get(it.exerciseId)?.name ?? "—");
-    const totalSec = showPlan.items.reduce((acc, it) => {
+    // Kept alongside `workout` for iOS builds that predate it.
+    more = rows.slice(PREVIEW_COUNT).map((r) => r.name);
+    workout = {
+      title: showPlan.title,
+      coachNotes: showPlan.coachNotes,
+      items: rows.map(({ it, mode, view, name, open }): WorkoutItem => {
+        const timed = mode === "TIME";
+        const warmups = it.sets.filter((s) => s.type === "warmup").length;
+        const rpe = targetRpe(view);
+        const sets = timed
+          ? plannedMinutes(view)?.label ?? ""
+          : [warmups > 0 ? `${warmups} warm-up` : null, targetLabel(view), rpe != null ? `RPE ${rpe}` : null]
+              .filter(Boolean)
+              .join(", ");
+        return {
+          key: it.id,
+          name,
+          sets,
+          load: !timed && open != null ? loadWithUnit(mode, open) : null,
+          rest: !timed && it.restSec > 0 ? `${shortClock(it.restSec)} rest` : null,
+          pair: it.pairGroup,
+          straps: it.straps,
+          cues: it.cues,
+        };
+      }),
+    };
+    const totalSec = rows.reduce((acc, { it, mode }) => {
       // Cardio blocks are their minutes; lifting sets are work + rest.
-      if (byId.get(it.exerciseId)?.loadMode === "TIME") {
-        return acc + it.sets.reduce((a, s) => a + s.reps[1] * 60, 0);
-      }
+      if (mode === "TIME") return acc + it.sets.reduce((a, s) => a + s.reps[1] * 60, 0);
       return acc + it.sets.length * (it.restSec + SET_WORK_SEC);
     }, 0);
     estMin = totalSec > 0 ? Math.max(5, Math.round(totalSec / 60 / 5) * 5) : 0;
@@ -109,6 +138,7 @@ export async function todayScreen(userId: string) {
     warnings: showPlan?.warnings ?? [],
     items,
     more,
+    workout,
     live: live
       ? {
           id: live.id,
