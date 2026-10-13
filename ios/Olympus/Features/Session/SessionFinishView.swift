@@ -207,12 +207,17 @@ private struct SessionFinishContent: View {
                 .padding(.horizontal, 8)
                 .accessibilityAddTraits(.isHeader)
             if screen.catches.isEmpty {
-                Text("Nothing flagged. Clean session.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.muted)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text("Nothing flagged. Clean session.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.muted)
+                    Spacer(minLength: 0)
+                    Oly(pose: .cheer, width: 88)
+                }
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             } else {
                 VStack(spacing: 6) {

@@ -12,6 +12,7 @@ import { hapticTick } from "@/lib/haptics";
 import { saveRest } from "@/components/session/timers";
 import { cn, kindClass } from "@/lib/utils";
 import { Confetti } from "@/components/ui/confetti";
+import { Oly } from "@/components/ui/oly";
 
 interface FinishScreenProps {
   sessionId: string;
@@ -256,9 +257,10 @@ export default function FinishScreen({
           What your PT will see
         </h2>
         {catches.length === 0 ? (
-          <p className="m-0 px-5 py-4 rounded-3xl bg-surface text-[15px] text-muted">
-            Nothing flagged. Clean session.
-          </p>
+          <div className="flex items-center justify-between gap-2 pl-5 pr-3 py-3 rounded-3xl bg-surface">
+            <p className="m-0 text-[15px] text-muted">Nothing flagged. Clean session.</p>
+            <Oly pose="cheer" size={88} />
+          </div>
         ) : (
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
             {catches.map((c, i) => {

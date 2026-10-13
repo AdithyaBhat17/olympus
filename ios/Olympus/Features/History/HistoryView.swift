@@ -79,10 +79,14 @@ private struct HistoryContent: View {
                 .accessibilityLabel("Filter")
 
                 if screen.sessions.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Nothing logged yet").font(.system(size: 22, weight: .heavy)).foregroundStyle(Color.fg)
-                        Text("Start today's session from Today, or add an old one by hand.")
-                            .font(.system(size: 15)).foregroundStyle(Color.muted)
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Nothing logged yet").font(.system(size: 22, weight: .heavy)).foregroundStyle(Color.fg)
+                            Text("Start today's session from Today, or add an old one by hand.")
+                                .font(.system(size: 15)).foregroundStyle(Color.muted)
+                        }
+                        Spacer(minLength: 0)
+                        Oly(pose: .rest, width: 104)
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
