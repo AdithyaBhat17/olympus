@@ -2,26 +2,29 @@ import { formatKg, formatLoad, topSet } from "@/domain/load";
 import type { LoadMode, PlanSet, SetLogEntry } from "@/domain/types";
 import type { LiveItemView } from "@/server/sessions";
 
+/** Anything carrying planned sets: a live item, or a plan item mapped to `{ planned }`. */
+type Planned = { sets: ReadonlyArray<{ planned: PlanSet | null }> };
+
 /** "8–10" or "10". */
 export function repRange(reps: [number, number]): string {
   return reps[0] === reps[1] ? String(reps[0]) : `${reps[0]}–${reps[1]}`;
 }
 
-export function workingPlanned(item: Pick<LiveItemView, "sets">): PlanSet[] {
+export function workingPlanned(item: Planned): PlanSet[] {
   return item.sets
     .map((s) => s.planned)
     .filter((p): p is PlanSet => !!p && p.type === "working");
 }
 
 /** Planned cardio minutes: "5 + 35 min". */
-export function plannedMinutes(item: Pick<LiveItemView, "sets">): { label: string; total: number } | null {
+export function plannedMinutes(item: Planned): { label: string; total: number } | null {
   const mins = item.sets.map((s) => s.planned?.reps[1]).filter((m): m is number => m != null);
   if (mins.length === 0) return null;
   return { label: `${mins.join(" + ")} min`, total: mins.reduce((a, b) => a + b, 0) };
 }
 
 /** "3 × 8–10" from the planned working sets ("35 min" for cardio's main block). */
-export function targetLabel(item: Pick<LiveItemView, "sets" | "exercise">): string | null {
+export function targetLabel(item: Planned & { exercise: { loadMode: LoadMode } }): string | null {
   if (item.exercise.loadMode === "TIME") {
     const main = workingPlanned(item).map((s) => s.reps[1]);
     return main.length ? `${main.join(" + ")} min` : plannedMinutes(item)?.label ?? null;
@@ -33,11 +36,11 @@ export function targetLabel(item: Pick<LiveItemView, "sets" | "exercise">): stri
   return `${working.length} × ${repRange([lo, hi])}`;
 }
 
-export function targetRpe(item: Pick<LiveItemView, "sets">): number | null {
+export function targetRpe(item: Planned): number | null {
   return workingPlanned(item).find((s) => s.rpe != null)?.rpe ?? null;
 }
 
-export function openKg(item: Pick<LiveItemView, "sets">): number | null {
+export function openKg(item: Planned): number | null {
   return workingPlanned(item).find((s) => s.openKg != null)?.openKg ?? null;
 }
 

@@ -12,6 +12,7 @@ struct TodayNextSessionCard: View {
     /// Optimistic "Opening your session" the instant Let's go is tapped.
     @State private var opening = false
     @State private var warningsOpen = false
+    @State private var viewing = false
 
     init(data: NextSession) {
         self.data = data
@@ -24,6 +25,7 @@ struct TodayNextSessionCard: View {
     }
     private var colors: KindColors { KindColors(type: pick) }
     private var showItems: Bool { onPlan && !data.items.isEmpty }
+    private var workout: NextSession.Workout? { onPlan ? data.workout : nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -301,13 +303,22 @@ struct TodayNextSessionCard: View {
             TodayLiveLabel(startedAt: nil, opening: true, k: colors.k)
                 .modifier(TodayOnKLabel(text: colors.text, fullWidth: true))
         } else {
-            Button(action: start) {
-                HStack(spacing: 10) {
-                    Image(systemName: "play.fill").font(.system(size: 16))
-                    Text("Let's go")
+            HStack(spacing: 8) {
+                Button(action: start) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "play.fill").font(.system(size: 16))
+                        Text("Let's go")
+                    }
+                }
+                .buttonStyle(TodayOnKButtonStyle(text: colors.text, fullWidth: false))
+                if let workout {
+                    Button("View workout") { viewing = true }
+                        .buttonStyle(TodayOnKButtonStyle(text: colors.on, fullWidth: false, translucent: true))
+                        .sheet(isPresented: $viewing) {
+                            TodayWorkoutSheet(type: pick, workout: workout)
+                        }
                 }
             }
-            .buttonStyle(TodayOnKButtonStyle(text: colors.text, fullWidth: false))
         }
     }
 
@@ -385,26 +396,29 @@ struct TodayLiveDot: View {
 }
 
 /// White capsule CTA on a colour block (.btn-on-k).
+/// `translucent` is the secondary white/20 capsule beside it (.btn-pill.on-k).
 private struct TodayOnKLabel: ViewModifier {
     let text: Color
     let fullWidth: Bool
+    var translucent = false
     func body(content: Content) -> some View {
         content
-            .font(.system(size: 19, weight: .heavy))
-            .padding(.horizontal, 32)
+            .font(.system(size: translucent ? 17 : 19, weight: translucent ? .bold : .heavy))
+            .padding(.horizontal, translucent ? 24 : 32)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: 60)
-            .background(.white, in: Capsule())
+            .background(.white.opacity(translucent ? 0.2 : 1), in: Capsule())
             .foregroundStyle(text)
-            .shadow(color: .black.opacity(0.18), radius: 10, y: 8)
+            .shadow(color: .black.opacity(translucent ? 0 : 0.18), radius: 10, y: 8)
     }
 }
 
 private struct TodayOnKButtonStyle: ButtonStyle {
     let text: Color
     let fullWidth: Bool
+    var translucent = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .modifier(TodayOnKLabel(text: text, fullWidth: fullWidth))
+            .modifier(TodayOnKLabel(text: text, fullWidth: fullWidth, translucent: translucent))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.spring(duration: 0.2), value: configuration.isPressed)
     }
