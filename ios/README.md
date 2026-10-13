@@ -33,6 +33,12 @@ days of samples into the Simulator's Health so there's something to sync.
   picked up automatically; Swift file names must be unique across the target.
 - `Olympus/Health`: HealthKit reads and background sync. For HRV and resting HR
   the server prefers Apple Health and lets Whoop fill gaps (`upsertCheckIn`).
+- `OlympusWidgets`: the widget extension, which draws the workout Live Activity
+  (Lock Screen and Dynamic Island). The app starts and updates it from the live
+  session (`SessionActivity.swift`); Debug builds launched with
+  `-demoLiveActivity` show a sample one without a server.
+- `Shared`: files built into both the app and the extension (the palette, the
+  activity's attributes).
 - `Packages/OlympusCore`: pure logic with no UIKit or HealthKit (API models,
   ports of the web's load and format helpers, the offline outbox, sleep
   merging). `swift test` in that folder runs it on a Mac.

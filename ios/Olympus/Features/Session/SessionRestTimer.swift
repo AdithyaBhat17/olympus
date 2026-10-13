@@ -7,6 +7,14 @@ struct RestState: Codable, Equatable {
     var endAt: Date
     var totalSec: Double
     var label: String
+
+    /// "+30": extend a running rest, or start a fresh one.
+    static func adding(_ sec: Double, to rest: RestState?, now: Date = Date()) -> RestState {
+        if let rest, rest.endAt > now {
+            return RestState(endAt: rest.endAt.addingTimeInterval(sec), totalSec: rest.totalSec + sec, label: rest.label)
+        }
+        return RestState(endAt: now.addingTimeInterval(sec), totalSec: sec, label: rest?.label ?? "Rest")
+    }
 }
 
 /// The rest timer's persistence and its "Rest's up" local notification.
@@ -33,10 +41,13 @@ enum RestTimer {
         }
     }
 
-    /// Clear everything about a session's rest: the saved timer and any pending notification.
-    static func clear(_ sessionId: String) {
+    /// The session is over (finished, discarded, deleted): clear its saved
+    /// rest and pending notification, and end its Live Activity.
+    @MainActor
+    static func sessionEnded(_ sessionId: String) {
         save(sessionId, nil)
         cancelNotification()
+        WorkoutActivity.end(sessionId)
     }
 
     /// Schedule "Rest's up" at `endAt` (asks for permission the first time).

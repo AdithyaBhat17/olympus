@@ -115,6 +115,41 @@ struct SessionLiveView: View {
         return view.title.hasPrefix("Session ") ? view.title : "Session \(t), \(view.title)"
     }
 
+    // MARK: Live Activity
+
+    private var activityAttributes: WorkoutAttributes {
+        WorkoutAttributes(
+            sessionId: sessionId,
+            title: headerTitle,
+            sessionType: view.sessionType,
+            startedAt: Dates.instant(view.startedAt) ?? Date()
+        )
+    }
+
+    private func activityState(_ d: Derived, _ next: String?) -> WorkoutAttributes.ContentState {
+        let activeRest = rest.flatMap { $0.endAt > Date() ? $0 : nil }
+        return WorkoutAttributes.ContentState(
+            exercise: d.current?.exercise.name,
+            detail: d.current.map(Self.setDetail) ?? (d.items.isEmpty ? "No exercises" : "All exercises done"),
+            doneCount: d.items.filter(\.done).count,
+            total: d.items.count,
+            restStart: activeRest.map { $0.endAt.addingTimeInterval(-$0.totalSec) },
+            restEnd: activeRest?.endAt,
+            nextLabel: next
+        )
+    }
+
+    /// "Set 2 of 4", "Warm-up W1", or "4 sets done" once they're all logged.
+    private static func setDetail(_ item: LiveItem) -> String {
+        let labels = sessionSetLabels(item.sets)
+        let working = labels.filter { !$0.hasPrefix("W") }.count
+        guard let idx = item.sets.firstIndex(where: { $0.logged == nil }) else {
+            return "\(item.sets.count) set\(item.sets.count == 1 ? "" : "s") done"
+        }
+        let label = labels[idx]
+        return label.hasPrefix("W") ? "Warm-up \(label)" : "Set \(label) of \(working)"
+    }
+
     private static func lastLoggedIndex(_ item: LiveItem) -> Int {
         item.sets.last { $0.logged != nil }?.index ?? -1
     }
@@ -166,6 +201,14 @@ struct SessionLiveView: View {
         .onChange(of: next) { _, label in
             // Keep the notification's "Next up" in step with what's actually next.
             if let rest, rest.endAt > Date() { RestTimer.scheduleNotification(endAt: rest.endAt, nextLabel: label) }
+        }
+        .onChange(of: activityState(d, next), initial: true) { _, state in
+            WorkoutActivity.update(activityAttributes, state)
+        }
+        // "+30" or "Skip" tapped on the Live Activity.
+        .onReceive(NotificationCenter.default.publisher(for: WorkoutRestActions.restChanged)) { note in
+            guard note.object as? String == sessionId else { return }
+            rest = RestTimer.load(sessionId)
         }
         .sheet(isPresented: Binding(get: { swapKey != nil }, set: { if !$0 { swapKey = nil } })) {
             if let item = d.items.first(where: { $0.key == swapKey }) {
@@ -503,7 +546,7 @@ struct SessionLiveView: View {
         do {
             try await model.api.post("sessions/\(sessionId)/discard")
             setRest(nil)
-            RestTimer.clear(sessionId)
+            RestTimer.sessionEnded(sessionId)
             dismiss()
             model.dataChanged()
         } catch {
@@ -528,12 +571,7 @@ struct SessionLiveView: View {
     }
 
     private func addRest(_ sec: Double) {
-        let now = Date()
-        if let rest, rest.endAt > now {
-            setRest(RestState(endAt: rest.endAt.addingTimeInterval(sec), totalSec: rest.totalSec + sec, label: rest.label))
-        } else {
-            setRest(RestState(endAt: now.addingTimeInterval(sec), totalSec: sec, label: rest?.label ?? "Rest"))
-        }
+        setRest(RestState.adding(sec, to: rest))
     }
 }
 

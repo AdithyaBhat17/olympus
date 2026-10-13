@@ -16,10 +16,14 @@ struct OlympusApp: App {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            #if DEBUG
+            WorkoutActivity.startDemoIfAsked()
+            #endif
             let model = AppDelegate.model
             Task {
                 await model.flush()
                 model.dataChanged()
+                await WorkoutActivity.reconcile(model.api)
                 await model.health.sync(quietly: true)
             }
         }

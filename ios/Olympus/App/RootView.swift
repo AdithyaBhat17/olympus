@@ -55,6 +55,11 @@ struct RootView: View {
                 MainTabs()
                     .environment(router)
                     .task { await model.signedIn() }
+                    // olympus://session/<id>, from the workout Live Activity.
+                    .onOpenURL { url in
+                        guard url.scheme == "olympus", url.host() == "session", let id = url.pathComponents.dropFirst().first else { return }
+                        if router.session?.id != id { router.session = .init(id: id) }
+                    }
             } else {
                 SignInView()
             }
