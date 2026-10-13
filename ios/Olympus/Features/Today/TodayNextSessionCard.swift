@@ -311,9 +311,12 @@ struct TodayNextSessionCard: View {
                     }
                 }
                 .buttonStyle(TodayOnKButtonStyle(text: colors.text, fullWidth: false))
+                .fixedSize()
                 if let workout {
                     Button("View workout") { viewing = true }
-                        .buttonStyle(TodayOnKButtonStyle(text: colors.on, fullWidth: false, translucent: true))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .buttonStyle(TodayOnKButtonStyle(text: colors.on, fullWidth: true, translucent: true))
                         .sheet(isPresented: $viewing) {
                             TodayWorkoutSheet(type: pick, workout: workout)
                         }
@@ -404,7 +407,7 @@ private struct TodayOnKLabel: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.system(size: translucent ? 17 : 19, weight: translucent ? .bold : .heavy))
-            .padding(.horizontal, translucent ? 24 : 32)
+            .padding(.horizontal, translucent ? 16 : 32)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: 60)
             .background(.white.opacity(translucent ? 0.2 : 1), in: Capsule())
             .foregroundStyle(text)

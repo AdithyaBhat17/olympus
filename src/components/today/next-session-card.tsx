@@ -280,13 +280,17 @@ export function NextSessionCard({ data }: { data: NextSessionData }) {
           <button
             type="button"
             onClick={start}
-            className="btn-on-k w-fit"
+            className="btn-on-k w-fit shrink-0 whitespace-nowrap"
           >
             <PlayIcon />
             Let&apos;s go
           </button>
           {workout && (
-            <button type="button" onClick={() => setViewing(true)} className="btn-pill on-k h-[60px] px-6">
+            <button
+              type="button"
+              onClick={() => setViewing(true)}
+              className="btn-pill on-k flex-1 min-w-0 h-[60px] px-4 justify-center whitespace-nowrap text-[15px] min-[400px]:text-[17px]"
+            >
               View workout
             </button>
           )}
