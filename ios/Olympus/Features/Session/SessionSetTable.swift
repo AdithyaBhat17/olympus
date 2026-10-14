@@ -228,8 +228,9 @@ struct SessionSetTable: View {
             .accessibilityLabel(timed
                 ? "Block \(label): \(v.reps.map(String.init) ?? "no") minutes. Change"
                 : "Set \(label): \(v.reps.map(String.init) ?? "no") reps. Tap to add one, hold to remove one")
-            .accessibilityAction(named: "Add one rep") { bumpReps(i) }
-            .accessibilityAction(named: "Remove one rep") { dropReps(i) },
+            .accessibilityActions {
+                if !timed { Button("Remove one rep") { dropReps(i) } }
+            },
             checkButton(i, label: label, done: done, active: active, v: v)
         )
         .padding(4)
@@ -370,9 +371,9 @@ struct SessionSetTable: View {
     /// Long-press: one rep fewer (stops at 1). Timed blocks edit through the sheet a tap already opens.
     private func dropReps(_ i: Int) {
         guard !timed else { return }
-        if !repsHoldSeen { withAnimation { repsHoldSeen = true } }
-        guard let cur = values[i].reps, cur > 1 else { return }
+        guard let cur = values[i].reps, cur > 1 else { return Haptics.warning() }
         Haptics.tick()
+        if !repsHoldSeen { withAnimation { repsHoldSeen = true } }
         setReps(i, cur - 1)
     }
 
