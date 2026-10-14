@@ -54,6 +54,8 @@ struct SessionSetTable: View {
     @State private var nudge: NudgeState?
     @State private var just: Int?
     @State private var rpeFor: Int
+    /// Set the first time the athlete removes a rep; the hint never shows again.
+    @AppStorage("hint.repsHoldSeen") private var repsHoldSeen = false
 
     init(
         item: LiveItem,
@@ -125,6 +127,14 @@ struct SessionSetTable: View {
                     .padding(.bottom, 4)
             }
             headerRow
+            if !timed && !repsHoldSeen {
+                Label("Tap reps to add one. Hold to remove one.", systemImage: "hand.tap")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.fg2)
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 2)
+                    .transition(.opacity)
+            }
             let v = values
             ForEach(Array(sets.enumerated()), id: \.offset) { i, s in
                 row(i, s, v[i])
@@ -207,16 +217,20 @@ struct SessionSetTable: View {
                     .accessibilityLabel("Set \(label) load \(v.kg.map(formatKg) ?? "not set"). Change load")
                 }
             },
-            Button { bumpReps(i) } label: {
-                cell(
-                    v.reps.map { Text("\($0)").foregroundStyle(cellText) } ?? Text("—").foregroundStyle(Color.faint),
-                    active: active
-                )
-            }
-            .buttonStyle(.plain)
+            cell(
+                v.reps.map { Text("\($0)").foregroundStyle(cellText) } ?? Text("—").foregroundStyle(Color.faint),
+                active: active
+            )
+            .onTapGesture { bumpReps(i) }
+            .onLongPressGesture(minimumDuration: 0.4) { dropReps(i) }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
             .accessibilityLabel(timed
                 ? "Block \(label): \(v.reps.map(String.init) ?? "no") minutes. Change"
-                : "Set \(label): \(v.reps.map(String.init) ?? "no") reps. Tap to add one"),
+                : "Set \(label): \(v.reps.map(String.init) ?? "no") reps. Tap to add one, hold to remove one")
+            .accessibilityActions {
+                if !timed { Button("Remove one rep") { dropReps(i) } }
+            },
             checkButton(i, label: label, done: done, active: active, v: v)
         )
         .padding(4)
@@ -351,7 +365,19 @@ struct SessionSetTable: View {
             return
         }
         let cur = values[i].reps ?? 0
-        let reps = cur >= Self.maxReps ? 1 : cur + 1
+        setReps(i, cur >= Self.maxReps ? 1 : cur + 1)
+    }
+
+    /// Long-press: one rep fewer (stops at 1). Timed blocks edit through the sheet a tap already opens.
+    private func dropReps(_ i: Int) {
+        guard !timed else { return }
+        guard let cur = values[i].reps, cur > 1 else { return Haptics.warning() }
+        Haptics.tick()
+        if !repsHoldSeen { withAnimation { repsHoldSeen = true } }
+        setReps(i, cur - 1)
+    }
+
+    private func setReps(_ i: Int, _ reps: Int) {
         if let l = sets[i].logged {
             send(i, LogInputValue(weight: l.weight, platesKg: l.platesKg, reps: reps, rpe: l.rpe), .edit)
         } else {
