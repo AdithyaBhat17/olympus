@@ -12,6 +12,7 @@ struct LogInputValue {
 enum LogKind { case new, edit, rpe }
 
 let sessionRpeValues: [Double] = [6, 7, 7.5, 8, 8.5, 9, 10]
+let sessionMaxReps = 15
 
 /**
  * The set table (set-table.tsx): Set / Last / load / reps / ✓ rows with
@@ -47,14 +48,13 @@ struct SessionSetTable: View {
         let platesKg: Double?
     }
 
-    private static let maxReps = 15
-
     @State private var drafts: [Int: Draft] = [:]
     @State private var sheet: LoadSheetRequest?
+    @State private var repsSheet: RepsSheetRequest?
     @State private var nudge: NudgeState?
     @State private var just: Int?
     @State private var rpeFor: Int
-    /// Set the first time the athlete removes a rep; the hint never shows again.
+    /// Set the first time the athlete long-presses reps; the hint never shows again.
     @AppStorage("hint.repsHoldSeen") private var repsHoldSeen = false
 
     init(
@@ -128,7 +128,7 @@ struct SessionSetTable: View {
             }
             headerRow
             if !timed && !repsHoldSeen {
-                Label("Tap reps to add one. Hold to remove one.", systemImage: "hand.tap")
+                Label("Tap reps to add one. Hold to edit.", systemImage: "hand.tap")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.fg2)
                     .padding(.horizontal, 4)
@@ -157,6 +157,12 @@ struct SessionSetTable: View {
         }
         .sheet(item: $sheet) { req in
             SessionLoadSheet(request: req) { v in submitSheet(req.index, v) }
+        }
+        .sheet(item: $repsSheet) { req in
+            SessionRepsSheet(request: req, kind: kind) { reps in
+                repsSheet = nil
+                if req.index < sets.count { setReps(req.index, reps) }
+            }
         }
     }
 
@@ -222,14 +228,14 @@ struct SessionSetTable: View {
                 active: active
             )
             .onTapGesture { bumpReps(i) }
-            .onLongPressGesture(minimumDuration: 0.4) { dropReps(i) }
+            .onLongPressGesture(minimumDuration: 0.45) { openRepsSheet(i) }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(timed
                 ? "Block \(label): \(v.reps.map(String.init) ?? "no") minutes. Change"
-                : "Set \(label): \(v.reps.map(String.init) ?? "no") reps. Tap to add one, hold to remove one")
+                : "Set \(label): \(v.reps.map(String.init) ?? "no") reps. Tap to add one, hold to edit")
             .accessibilityActions {
-                if !timed { Button("Remove one rep") { dropReps(i) } }
+                if !timed { Button("Edit reps") { openRepsSheet(i) } }
             },
             checkButton(i, label: label, done: done, active: active, v: v)
         )
@@ -365,16 +371,15 @@ struct SessionSetTable: View {
             return
         }
         let cur = values[i].reps ?? 0
-        setReps(i, cur >= Self.maxReps ? 1 : cur + 1)
+        setReps(i, cur >= sessionMaxReps ? 1 : cur + 1)
     }
 
-    /// Long-press: one rep fewer (stops at 1). Timed blocks edit through the sheet a tap already opens.
-    private func dropReps(_ i: Int) {
+    /// Long-press: the reps stepper sheet. Timed blocks edit through the sheet a tap already opens.
+    private func openRepsSheet(_ i: Int) {
         guard !timed else { return }
-        guard let cur = values[i].reps, cur > 1 else { return Haptics.warning() }
         Haptics.tick()
         if !repsHoldSeen { withAnimation { repsHoldSeen = true } }
-        setReps(i, cur - 1)
+        repsSheet = RepsSheetRequest(index: i, setLabel: labels[i], exerciseName: item.exercise.name, initial: values[i].reps)
     }
 
     private func setReps(_ i: Int, _ reps: Int) {
