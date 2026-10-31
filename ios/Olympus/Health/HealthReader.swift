@@ -32,12 +32,12 @@ final class HealthReader {
         async let hrv = daily(Self.hrv, .discreteAverage, unit: .secondUnit(with: .milli), from: start, to: end, calendar: calendar)
         async let rhr = daily(Self.restingHr, .discreteAverage, unit: .count().unitDivided(by: .minute()), from: start, to: end, calendar: calendar)
         // The first night starts the evening before the first date.
-        async let sleep = sleepIntervals(from: start.addingTimeInterval(-18 * 3600), to: end)
+        async let sleep = sleepSamples(from: start.addingTimeInterval(-18 * 3600), to: end)
 
         return try await HealthReadings(
             protein: protein,
             water: water,
-            sleep: mainSleepByDate(sleep, calendar: calendar),
+            nights: sleepNightsByDate(sleep, calendar: calendar),
             hrv: hrv,
             restingHr: rhr
         )
@@ -68,17 +68,25 @@ final class HealthReader {
         return out
     }
 
-    /// Every "asleep" sample (core, deep, REM, unspecified); "in bed" and
-    /// "awake" are left out. Overlaps between sources are merged in SyncCore.
-    private func sleepIntervals(from start: Date, to end: Date) async throws -> [SleepInterval] {
+    /// Every sleep sample with its stage and the app that wrote it; "in bed"
+    /// is left out. Overlaps between sources are handled in OlympusCore.
+    private func sleepSamples(from start: Date, to end: Date) async throws -> [SleepSample] {
         let query = HKSampleQueryDescriptor(
             predicates: [.categorySample(type: Self.sleep, predicate: HKQuery.predicateForSamples(withStart: start, end: end))],
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
-        let asleep = HKCategoryValueSleepAnalysis.allAsleepValues.map(\.rawValue)
-        return try await query.result(for: store)
-            .filter { asleep.contains($0.value) }
-            .map { SleepInterval(start: $0.startDate, end: $0.endDate) }
+        return try await query.result(for: store).compactMap { s in
+            let stage: SleepStage
+            switch HKCategoryValueSleepAnalysis(rawValue: s.value) {
+            case .asleepCore: stage = .light
+            case .asleepDeep: stage = .deep
+            case .asleepREM: stage = .rem
+            case .asleepUnspecified: stage = .unspecified
+            case .awake: stage = .awake
+            default: return nil
+            }
+            return SleepSample(start: s.startDate, end: s.endDate, stage: stage, source: s.sourceRevision.source.name)
+        }
     }
 
     private static func date(_ key: String, calendar: Calendar) -> Date? {

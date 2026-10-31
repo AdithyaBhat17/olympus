@@ -6,7 +6,7 @@ import { integrations } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAllowedUser } from "@/lib/allowlist";
 import { sha256 } from "../oauth";
-import { upsertCheckIn } from "../checkins";
+import { upsertCheckIn, type CheckInPatch } from "../checkins";
 import { todayFor } from "../profile";
 
 /**
@@ -67,6 +67,21 @@ export async function markIngested(userId: string) {
 // (olh_ token, /api/ingest/health) both land here.
 // ---------------------------------------------------------------------------
 
+const minutes = z.coerce.number().int().min(0).max(1440).optional();
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional();
+
+/** Stages from the one device HealthSync picked for the night. */
+const sleepDetail = z.object({
+  device: z.string().trim().min(1).max(80).optional(),
+  bedtime: clock,
+  wakeTime: clock,
+  deepMin: minutes,
+  remMin: minutes,
+  lightMin: minutes,
+  awakeMin: minutes,
+  awakenings: z.coerce.number().int().min(0).max(200).optional(),
+});
+
 const day = z
   .object({
     date: z
@@ -85,6 +100,7 @@ const day = z
     sleepH: z.coerce.number().min(0).max(24).optional(),
     hrvMs: z.coerce.number().min(1).max(500).optional(),
     restingHr: z.coerce.number().min(20).max(200).optional(),
+    sleepDetail: sleepDetail.optional(),
   })
   .transform((d) => ({
     date: d.date?.slice(0, 10),
@@ -93,6 +109,7 @@ const day = z
     sleepMin: d.sleepMin ?? (d.sleepH != null ? d.sleepH * 60 : undefined),
     hrvMs: d.hrvMs,
     restingHr: d.restingHr,
+    sleepDetail: d.sleepDetail,
   }));
 
 export const healthIngestBody = z.union([z.object({ days: z.array(day).min(1).max(31) }), day]);
@@ -113,12 +130,13 @@ export async function ingestHealthDays(userId: string, parsed: HealthIngestBody)
   const today = await todayFor(userId);
   for (const d of days) {
     const date = d.date ?? today;
-    const patch: Record<string, number> = {};
+    const patch: CheckInPatch = {};
     if (d.proteinG != null) patch.proteinG = d.proteinG;
     if (d.waterMl != null) patch.waterMl = d.waterMl;
     if (d.sleepMin != null) patch.sleepMin = d.sleepMin;
     if (d.hrvMs != null) patch.hrvMs = d.hrvMs;
     if (d.restingHr != null) patch.restingHr = d.restingHr;
+    if (d.sleepDetail) patch.sleepDetail = d.sleepDetail;
     if (Object.keys(patch).length === 0) continue;
     const row = await upsertCheckIn(userId, date, patch, "apple_health");
     saved.push({

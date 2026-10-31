@@ -104,6 +104,7 @@ export async function getAthleteContext(userId: string) {
           sleepMin: recovery.today.sleepMin,
           proteinG: recovery.today.proteinG,
           waterMl: recovery.today.waterMl,
+          sleepDetail: recovery.today.sleepDetail,
           sources: recovery.today.sources,
         }
       : null,
