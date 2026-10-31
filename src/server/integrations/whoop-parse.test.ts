@@ -3,6 +3,7 @@ import {
   asleepMinutes,
   mainSleepByDate,
   recoveryByDate,
+  sleepDetailByDate,
   wakeDate,
   type WhoopRecovery,
   type WhoopSleep,
@@ -42,6 +43,31 @@ describe("whoop sleep parsing", () => {
       sleep({ inBed: 300, awake: 20, score_state: "PENDING_SCORE" }),
     ]);
     expect(Array.from(m.entries())).toEqual([["2026-10-02", 340]]);
+  });
+  it("describes the main sleep's stages in its own timezone", () => {
+    const night = sleep({ inBed: 400, awake: 60 });
+    Object.assign(night.score!, { respiratory_rate: 15.27, sleep_efficiency_percentage: 84.6 });
+    Object.assign(night.score!.stage_summary, {
+      total_light_sleep_time_milli: 190 * 60_000,
+      total_slow_wave_sleep_time_milli: 70 * 60_000,
+      total_rem_sleep_time_milli: 80 * 60_000,
+      disturbance_count: 9,
+    });
+    const nap = sleep({ id: "nap", inBed: 90, awake: 5, nap: true });
+    expect(Object.fromEntries(sleepDetailByDate([night, nap]))).toEqual({
+      "2026-10-02": {
+        device: "WHOOP",
+        bedtime: "23:30",
+        wakeTime: "06:10",
+        deepMin: 70,
+        remMin: 80,
+        lightMin: 190,
+        awakeMin: 60,
+        awakenings: 9,
+        efficiencyPct: 85,
+        respiratoryRate: 15.3,
+      },
+    });
   });
 });
 

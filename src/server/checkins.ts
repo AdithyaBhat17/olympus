@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { dailyCheckIns, type CheckInSource } from "@/lib/db/schema";
+import { dailyCheckIns, type CheckInSource, type SleepDetail } from "@/lib/db/schema";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { addDays } from "@/lib/dates";
 import { summarizeRecovery, type CheckIn, type RecoverySummary } from "@/domain";
@@ -42,6 +42,8 @@ export interface CheckInPatch {
   waterMl?: number | null;
   hrvMs?: number | null;
   restingHr?: number | null;
+  /** Syncs only; `source` is filled in from the upsert's source. */
+  sleepDetail?: Omit<SleepDetail, "source"> | null;
 }
 
 /**
@@ -63,7 +65,15 @@ export async function upsertCheckIn(
   //   human value (they kept logging in MyFitnessPal) but never lower it.
   if (source === "whoop" || source === "apple_health") {
     const human = (s: CheckInSource | undefined) => s === "manual" || s === "claude";
-    if (human(sources.sleep)) delete patch.sleepMin;
+    // Sleep: Whoop first, Apple Health only fills the nights it leaves (a
+    // Watch or Garmin wearer without a Whoop). The detail follows the same
+    // order but ignores human values: nobody types their REM minutes.
+    if (human(sources.sleep) || (source === "apple_health" && sources.sleep === "whoop")) {
+      delete patch.sleepMin;
+    }
+    if (source === "apple_health" && existing?.sleepDetail?.source === "whoop") {
+      delete patch.sleepDetail;
+    }
     if (human(sources.protein) && (patch.proteinG ?? -1) <= (existing?.proteinG ?? -1)) {
       delete patch.proteinG;
     }
@@ -83,6 +93,7 @@ export async function upsertCheckIn(
     waterMl: existing?.waterMl ?? null,
     hrvMs: existing?.hrvMs ?? null,
     restingHr: existing?.restingHr ?? null,
+    sleepDetail: existing?.sleepDetail ?? null,
   };
   if (patch.sleepMin !== undefined) {
     next.sleepMin = patch.sleepMin == null ? null : Math.round(patch.sleepMin);
@@ -103,6 +114,9 @@ export async function upsertCheckIn(
   if (patch.restingHr !== undefined) {
     next.restingHr = patch.restingHr == null ? null : Math.round(patch.restingHr);
     sources.rhr = source;
+  }
+  if (patch.sleepDetail !== undefined && (source === "whoop" || source === "apple_health")) {
+    next.sleepDetail = patch.sleepDetail == null ? null : { ...patch.sleepDetail, source };
   }
   const [row] = await db
     .insert(dailyCheckIns)

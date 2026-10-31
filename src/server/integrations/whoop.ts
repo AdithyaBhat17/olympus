@@ -3,7 +3,13 @@ import { db } from "@/lib/db";
 import { integrations } from "@/lib/db/schema";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { upsertCheckIn } from "../checkins";
-import { mainSleepByDate, recoveryByDate, type WhoopRecovery, type WhoopSleep } from "./whoop-parse";
+import {
+  mainSleepByDate,
+  recoveryByDate,
+  sleepDetailByDate,
+  type WhoopRecovery,
+  type WhoopSleep,
+} from "./whoop-parse";
 
 /**
  * WHOOP Developer API v2 — sleep → daily check-in sleep minutes, recovery →
@@ -140,6 +146,7 @@ export async function syncWhoop(userId: string, days = 3): Promise<number> {
     ]);
 
     const byDate = mainSleepByDate(sleeps);
+    const details = sleepDetailByDate(sleeps);
     const vitals = recoveryByDate(recoveries, sleeps);
     const dates = new Set([...Array.from(byDate.keys()), ...Array.from(vitals.keys())]);
     for (const date of Array.from(dates)) {
@@ -147,7 +154,12 @@ export async function syncWhoop(userId: string, days = 3): Promise<number> {
       await upsertCheckIn(
         userId,
         date,
-        { sleepMin: byDate.get(date), hrvMs: v?.hrvMs, restingHr: v?.restingHr },
+        {
+          sleepMin: byDate.get(date),
+          sleepDetail: details.get(date),
+          hrvMs: v?.hrvMs,
+          restingHr: v?.restingHr,
+        },
         "whoop"
       );
     }

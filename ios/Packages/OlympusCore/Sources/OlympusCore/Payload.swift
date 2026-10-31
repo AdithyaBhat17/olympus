@@ -10,18 +10,21 @@ public struct DayValues: Codable, Equatable, Sendable {
     /// SDNN, the only HRV Apple Health stores.
     public var hrvMs: Int?
     public var restingHr: Int?
+    /// Stages and bed/wake times, for Claude; the app only shows sleepMin.
+    public var sleepDetail: SleepDetail?
 
-    public init(date: String, proteinG: Int? = nil, waterMl: Int? = nil, sleepMin: Int? = nil, hrvMs: Int? = nil, restingHr: Int? = nil) {
+    public init(date: String, proteinG: Int? = nil, waterMl: Int? = nil, sleepMin: Int? = nil, hrvMs: Int? = nil, restingHr: Int? = nil, sleepDetail: SleepDetail? = nil) {
         self.date = date
         self.proteinG = proteinG
         self.waterMl = waterMl
         self.sleepMin = sleepMin
         self.hrvMs = hrvMs
         self.restingHr = restingHr
+        self.sleepDetail = sleepDetail
     }
 
     public var isEmpty: Bool {
-        proteinG == nil && waterMl == nil && sleepMin == nil && hrvMs == nil && restingHr == nil
+        proteinG == nil && waterMl == nil && sleepMin == nil && hrvMs == nil && restingHr == nil && sleepDetail == nil
     }
 }
 
@@ -35,15 +38,22 @@ public struct HealthReadings: Sendable {
     public var protein: [String: Double] = [:]
     public var water: [String: Double] = [:]
     public var sleep: [String: Int] = [:]
+    public var sleepDetail: [String: SleepDetail] = [:]
     public var hrv: [String: Double] = [:]
     public var restingHr: [String: Double] = [:]
 
-    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:]) {
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], sleepDetail: [String: SleepDetail] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:]) {
         self.protein = protein
         self.water = water
         self.sleep = sleep
+        self.sleepDetail = sleepDetail
         self.hrv = hrv
         self.restingHr = restingHr
+    }
+
+    /// Minutes and detail per night from Health's sleep samples.
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], nights: [String: SleepNight], hrv: [String: Double] = [:], restingHr: [String: Double] = [:]) {
+        self.init(protein: protein, water: water, sleep: nights.mapValues(\.minutes), sleepDetail: nights.mapValues(\.detail), hrv: hrv, restingHr: restingHr)
     }
 }
 
@@ -61,13 +71,16 @@ func inRange(_ v: Double?, _ range: ClosedRange<Double>) -> Int? {
 /// so it's left out rather than overwriting what the athlete typed.
 public func buildDays(dates: [String], readings r: HealthReadings) -> [DayValues] {
     dates.compactMap { d in
+        let sleepMin = inRange(r.sleep[d].map(Double.init), 1...1440)
         let day = DayValues(
             date: d,
             proteinG: inRange(r.protein[d], 1...1000),
             waterMl: inRange(r.water[d], 1...20000),
-            sleepMin: inRange(r.sleep[d].map(Double.init), 1...1440),
+            sleepMin: sleepMin,
             hrvMs: inRange(r.hrv[d], 1...500),
-            restingHr: inRange(r.restingHr[d], 20...200)
+            restingHr: inRange(r.restingHr[d], 20...200),
+            // Only alongside a night the server will take; minutes cap at a day.
+            sleepDetail: sleepMin == nil ? nil : r.sleepDetail[d]
         )
         return day.isEmpty ? nil : day
     }

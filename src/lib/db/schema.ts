@@ -187,6 +187,26 @@ export const athleteProfiles = pgTable("athlete_profiles", {
 export type CheckInSource = "manual" | "claude" | "whoop" | "apple_health";
 export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
 
+/**
+ * How a night went, from one device. Stage minutes are absent when the device
+ * doesn't stage sleep (older Watches, phone-only tracking). Times are local
+ * "HH:mm". Whoop adds efficiency and respiratory rate.
+ */
+export interface SleepDetail {
+  source: "whoop" | "apple_health";
+  /** Health's name for the app or device that recorded it, e.g. "Garmin Connect". */
+  device?: string;
+  bedtime?: string;
+  wakeTime?: string;
+  deepMin?: number;
+  remMin?: number;
+  lightMin?: number;
+  awakeMin?: number;
+  awakenings?: number;
+  efficiencyPct?: number;
+  respiratoryRate?: number;
+}
+
 export const dailyCheckIns = pgTable(
   "daily_check_ins",
   {
@@ -198,6 +218,7 @@ export const dailyCheckIns = pgTable(
     /** Apple Health = SDNN, Whoop = RMSSD; sources.hrv says which. */
     hrvMs: integer("hrv_ms"),
     restingHr: integer("resting_hr"),
+    sleepDetail: jsonb("sleep_detail").$type<SleepDetail | null>(),
     sources: jsonb("sources")
       .$type<Partial<Record<CheckInField, CheckInSource>>>()
       .notNull()

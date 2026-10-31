@@ -46,6 +46,8 @@ Run these in order in the Neon SQL editor (or `psql`). They're idempotent.
    targets, rotation) and per-user exercise blocks; hands the seeded
    injuries and blocks to the owner. The owner's email is at the top of the
    file (and in the seeds): change it if you deploy for someone else.
+9. `supabase/migration-007-ios-app.sql` — HRV and resting HR, display name
+10. `supabase/migration-008-sleep-detail.sql` — sleep stages for Claude
 
 A Neon URL uses Neon's HTTP driver. Any other URL uses node-postgres, so
 local Postgres works for development.
