@@ -792,6 +792,7 @@ export async function getSessionsDetailed(userId: string, f: SessionFilters) {
           s.startedAt && s.finishedAt
             ? Math.round((s.finishedAt.getTime() - s.startedAt.getTime()) / 60000)
             : null,
+        heartRate: s.heartRate,
         notes: s.notes,
         checkIn: v.checkIn,
         items,

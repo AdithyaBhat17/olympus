@@ -57,6 +57,20 @@ export const exercises = pgTable("exercises", {
   formCueId: text("form_cue_id"),
 });
 
+/**
+ * Heart rate over a session's started→finished window, from the one Health
+ * source (Watch, Garmin Connect, ...) that recorded the most of it. Averages
+ * are per-minute means; coveredMin is how many minutes had a reading, so a
+ * passive wrist reading every few minutes shows up as thin coverage.
+ */
+export interface SessionHeartRate {
+  source: "apple_health";
+  device?: string;
+  avgHr: number;
+  maxHr: number;
+  coveredMin: number;
+}
+
 export const sessions = pgTable("sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id").notNull(),
@@ -81,6 +95,7 @@ export const sessions = pgTable("sessions", {
     .$type<Record<string, { exerciseId: string; reason?: string | null }>>()
     .notNull()
     .default({}),
+  heartRate: jsonb("heart_rate").$type<SessionHeartRate | null>(),
 });
 
 /** Legacy alias kept so older components keep compiling. */
@@ -389,6 +404,43 @@ export const integrations = pgTable(
     uniqueIndex("idx_integrations_ingest_token").on(t.ingestTokenHash),
   ]
 );
+
+// ---------------------------------------------------------------------------
+// Training done outside Olympus (runs, rides, classes), from Apple Health
+// ---------------------------------------------------------------------------
+
+export const externalActivities = pgTable(
+  "external_activities",
+  {
+    userId: text("user_id").notNull(),
+    source: text("source").$type<"apple_health">().notNull(),
+    /** HKWorkout UUID. */
+    externalId: text("external_id").notNull(),
+    /** Local date the activity started, in the athlete's timezone. */
+    date: date("date").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
+    /** Health's activity type, e.g. "running", "cycling", "hiit". */
+    activityType: text("activity_type").notNull(),
+    /** Health's name for the app or device that recorded it, e.g. "Garmin Connect". */
+    device: text("device"),
+    durationMin: integer("duration_min").notNull(),
+    distanceM: integer("distance_m"),
+    activeKcal: integer("active_kcal"),
+    avgHr: integer("avg_hr"),
+    maxHr: integer("max_hr"),
+    hrCoveredMin: integer("hr_covered_min"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.source, t.externalId] }),
+    index("idx_external_activities_user_start").on(t.userId, t.startedAt),
+  ]
+);
+
+export type ExternalActivityRow = typeof externalActivities.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Relations

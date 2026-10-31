@@ -49,6 +49,13 @@ final class HealthSync {
         }
     }
 
+    /// After an update adds a Health type (heart rate, for sessions), show the
+    /// sheet once more. Foreground only: the sheet can't appear in the background.
+    func askForNewTypes() async {
+        guard requested, reader.isAvailable, await reader.hasUnaskedTypes() else { return }
+        try? await reader.requestAuthorization()
+    }
+
     /// Register background delivery. Must run on every launch, background ones
     /// included, for HealthKit to keep waking the app.
     func start() {
@@ -89,6 +96,10 @@ final class HealthSync {
             let dates = recentDates(count: days, calendar: cal)
             let payload = buildDays(dates: dates, readings: try await reader.readings(for: dates, calendar: cal))
             if !payload.isEmpty { try await api.post("health", IngestPayload(days: payload)) }
+            // Extra, not the point of the sync: a failure here (an older server
+            // without the route) mustn't hide that the days went through.
+            try? await syncSessionHeartRate(days: days)
+            try? await syncActivities(from: dates.first, calendar: cal)
             lastSync = Date()
             lastError = nil
             lastNotice = payload.isEmpty ? "Nothing in Health for the last \(days) days yet." : nil
@@ -99,6 +110,32 @@ final class HealthSync {
         } catch {
             if !quietly { lastError = error.localizedDescription }
         }
+    }
+
+    /// Heart rate for each recent finished session, read from Health over its
+    /// window. Re-sent every sync: a Garmin can land its HR hours later.
+    private func syncSessionHeartRate(days: Int) async throws {
+        let windows: SessionWindows = try await api.get("sessions/heart-rate", query: ["days": String(days)])
+        var out: [SessionHeartRate] = []
+        for w in windows.sessions {
+            let minutes = try await reader.heartRateMinutes(from: w.start, to: w.end)
+            if let hr = sessionHeartRate(id: w.id, minutes: minutes) { out.append(hr) }
+        }
+        if !out.isEmpty { try await api.post("sessions/heart-rate", SessionHeartRates(sessions: out)) }
+    }
+
+    /// Every Health workout since the first synced day, one copy per piece of
+    /// training, each with HR from its window. The server replaces that range,
+    /// so a workout deleted in Health goes away here too.
+    private func syncActivities(from first: String?, calendar: Calendar) async throws {
+        guard let first, let start = HealthReader.date(first, calendar: calendar) else { return }
+        let workouts = distinctWorkouts(try await reader.workouts(from: start, to: Date()))
+        var out: [ActivityPayload] = []
+        for w in workouts {
+            let hr = sessionHeartRate(id: w.id, minutes: try await reader.heartRateMinutes(from: w.start, to: w.end))
+            out.append(ActivityPayload(w, heartRate: hr))
+        }
+        try await api.post("activities", ActivitiesPayload(from: start, activities: out))
     }
 
     #if DEBUG

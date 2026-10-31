@@ -7,3 +7,4 @@ export * from "./rotation";
 export * from "./flags";
 export * from "./export";
 export * from "./targets";
+export * from "./training-load";
