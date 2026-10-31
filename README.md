@@ -48,6 +48,8 @@ Run these in order in the Neon SQL editor (or `psql`). They're idempotent.
    file (and in the seeds): change it if you deploy for someone else.
 9. `supabase/migration-007-ios-app.sql` — HRV and resting HR, display name
 10. `supabase/migration-008-sleep-detail.sql` — sleep stages for Claude
+11. `supabase/migration-009-session-heart-rate.sql` — heart rate per session for Claude
+12. `supabase/migration-010-external-activities.sql` — workouts from Apple Health for Claude
 
 A Neon URL uses Neon's HTTP driver. Any other URL uses node-postgres, so
 local Postgres works for development.

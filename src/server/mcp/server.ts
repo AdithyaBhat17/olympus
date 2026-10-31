@@ -15,6 +15,8 @@ import {
 } from "@/domain";
 import { getAthleteContext } from "../athlete";
 import { getRecovery, upsertCheckIn } from "../checkins";
+import { listActivities } from "../external-activities";
+import { getTrainingLoad } from "../training-load";
 import { exerciseRef, getConstraints, listExercises, resolveRef, searchExercises } from "../exercises";
 import { addFlag, resolveFlag } from "../flags";
 import { exerciseHistory } from "../history";
@@ -217,7 +219,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Get sessions",
       description:
-        "Logged sessions with planned vs actual per set (kg, reps, RPE), auto-flags (underloaded, top_set_pr, blocked_override), swaps, whether it was sent to PT, and that day's check-in. Newest first.",
+        "Logged sessions with planned vs actual per set (kg, reps, RPE), auto-flags (underloaded, top_set_pr, blocked_override), swaps, whether it was sent to PT, and that day's check-in. heartRate is avg/max HR over the session from one Health device (heartRate.device) with coveredMin, the minutes that had a reading: low coverage against durationMin means a passive wrist reading, not a recorded workout, so lean on it less. It's null when nothing was recorded. The athlete's RPE is the effort signal for lifting; use HR for session-level load and conditioning, compared with their own past sessions and resting HR (get_recovery). Newest first.",
       inputSchema: {
         from: isoDate.optional(),
         to: isoDate.optional(),
@@ -244,7 +246,7 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     {
       title: "Get recovery",
       description:
-        "Daily check-ins (sleep, protein, water, HRV, resting HR) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks against the athlete's own sleep floor and protein target. HRV is SDNN when sources.hrv is apple_health and RMSSD when it's whoop; don't compare across the two. sleepDetail says how the night went, from one device (sleepDetail.device): deep/REM/light/awake minutes, awakenings, bedtime and wake time (local HH:mm), and from Whoop efficiency and respiratory rate. It can be null, and stage minutes are absent when the device doesn't stage sleep. Use it to read the quality behind sleepMin (little deep or REM, many awakenings, a late bedtime) when deciding how hard today should be. Device stage numbers differ between brands, so compare a night with the athlete's own recent nights, not with textbook norms. Refreshes Whoop first if it's connected and stale.",
+        "Daily check-ins (sleep, protein, water, HRV, resting HR) with where each value came from (manual, Whoop, Apple Health, Claude), plus derived streaks against the athlete's own sleep floor and protein target. HRV is SDNN when sources.hrv is apple_health and RMSSD when it's whoop; don't compare across the two. sleepDetail says how the night went, from one device (sleepDetail.device): deep/REM/light/awake minutes, awakenings, bedtime and wake time (local HH:mm), and from Whoop efficiency and respiratory rate. It can be null, and stage minutes are absent when the device doesn't stage sleep. Use it to read the quality behind sleepMin (little deep or REM, many awakenings, a late bedtime) when deciding how hard today should be. Device stage numbers differ between brands, so compare a night with the athlete's own recent nights, not with textbook norms. activities is training done outside Olympus (runs, rides, classes, sport) from Apple Health workouts, oldest first: activityType, local start time, duration, distance, active kcal, and avg/max HR from the recording device. Workouts that overlap an Olympus session are left out (same training, already in get_sessions). Weigh them when programming: hard legs or intervals yesterday change what today's lower session should be. trainingLoad (always the 28 days ending date, whatever days is) has two scales that must never be added or compared with each other: rpeLoad is the athlete's own working-set RPE × session minutes for Olympus sessions (the effort signal to trust), hrLoad is heart-rate TRIMP for everything with HR, sessions and outside activities alike (null until there's an HR basis: resting HR from check-ins, max HR as the highest seen, which may sit below a true max). Each has acute (last 7 days), chronicWeekly (28-day weekly average) and ratio = acute/chronicWeekly (null for under 3 weeks of history). A ratio well above ~1.3 is a jump in load: hold progression or trim volume; well below ~0.8 is a lighter week. unratedSessions7d counts sessions missing from rpeLoad (no RPE or no times), so a low rpeLoad may be under-counted. Refreshes Whoop first if it's connected and stale.",
       inputSchema: {
         date: isoDate.optional().describe("Defaults to today in the athlete's timezone"),
         days: z.number().int().min(1).max(60).default(7),
@@ -253,9 +255,13 @@ export function buildMcpServer(caller: McpCaller): McpServer {
     async (a) => {
       await syncWhoopIfStale(userId).catch(() => {});
       const date = a.date ?? (await todayFor(userId));
-      const r = await getRecovery(userId, date, a.days);
+      const [r, activities, trainingLoad] = await Promise.all([
+        getRecovery(userId, date, a.days),
+        listActivities(userId, date, a.days),
+        getTrainingLoad(userId, date),
+      ]);
       return ok(
-        `${r.checkIns.length} check-in(s) in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate}. ${gateMessage(r.summary)}`,
+        `${r.checkIns.length} check-in(s) and ${activities.length} activit${activities.length === 1 ? "y" : "ies"} outside Olympus in ${a.days} days.${r.summary.streaks.length ? ` ${r.summary.streaks.join("; ")}.` : ""} Progression gate: ${r.summary.gate}. ${gateMessage(r.summary)}`,
         {
           date,
           today: r.today,
@@ -270,6 +276,8 @@ export function buildMcpServer(caller: McpCaller): McpServer {
             sources: c.sources,
           })),
           recovery: r.summary,
+          activities,
+          trainingLoad,
         }
       );
     }

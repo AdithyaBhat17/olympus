@@ -24,6 +24,7 @@ struct OlympusApp: App {
                 await model.flush()
                 model.dataChanged()
                 await WorkoutActivity.reconcile(model.api)
+                await model.health.askForNewTypes()
                 await model.health.sync(quietly: true)
             }
         }
