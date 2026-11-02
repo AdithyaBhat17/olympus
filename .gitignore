@@ -45,3 +45,6 @@ public/swe-worker-*.js.map
 public/worker-*.js
 public/worker-*.js.map
 .env*
+
+# Garmin discovery raw responses (health data)
+/.garmin-discovery/
