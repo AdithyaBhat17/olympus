@@ -8,11 +8,12 @@ import { mutate } from "@/lib/offline/mutate";
 import { hapticTick } from "@/lib/haptics";
 import { cn, kindClass } from "@/lib/utils";
 import { Sheet } from "@/components/session/sheet";
+import { isSyncSource, SOURCE_LABEL, type CheckInSource } from "@/domain/check-in-sources";
 import { WarnIcon } from "@/components/session/icons";
 
 type Field = "sleep" | "protein" | "water";
 type Vital = "hrv" | "rhr";
-type Source = "manual" | "claude" | "whoop" | "apple_health";
+type Source = CheckInSource;
 
 interface Values {
   sleepMin: number | null;
@@ -31,12 +32,10 @@ export interface RecoveryCardProps extends Values {
   holdMessage: string | null;
 }
 
-const SOURCE_LABEL: Record<Source, string> = {
-  whoop: "Whoop",
-  apple_health: "Apple Health",
-  claude: "Claude",
-  manual: "Manual",
-};
+/** " (Garmin)" for a value a device synced; nothing for one the athlete typed. */
+function deviceSuffix(s: Source | undefined): string {
+  return isSyncSource(s) ? ` (${SOURCE_LABEL[s]})` : "";
+}
 
 const WATER_STEP = 250;
 
@@ -177,14 +176,14 @@ export function RecoveryCard(props: RecoveryCardProps) {
           {props.hrvMs != null && (
             <>
               HRV <span className="num text-fg-2">{props.hrvMs}</span> ms
-              {sources.hrv === "whoop" ? " (Whoop)" : ""}
+              {deviceSuffix(sources.hrv)}
             </>
           )}
           {props.hrvMs != null && props.restingHr != null && " · "}
           {props.restingHr != null && (
             <>
               Resting HR <span className="num text-fg-2">{props.restingHr}</span>
-              {sources.rhr === "whoop" ? " (Whoop)" : ""}
+              {deviceSuffix(sources.rhr)}
             </>
           )}
         </p>

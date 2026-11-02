@@ -199,8 +199,8 @@ export const athleteProfiles = pgTable("athlete_profiles", {
 // Recovery, flags, constraints
 // ---------------------------------------------------------------------------
 
-export type CheckInSource = "manual" | "claude" | "whoop" | "apple_health";
-export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
+export type { CheckInSource, CheckInField } from "@/domain/check-in-sources";
+import type { CheckInSource, CheckInField, SyncSource } from "@/domain/check-in-sources";
 
 /**
  * How a night went, from one device. Stage minutes are absent when the device
@@ -208,7 +208,7 @@ export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
  * "HH:mm". Whoop adds efficiency and respiratory rate.
  */
 export interface SleepDetail {
-  source: "whoop" | "apple_health";
+  source: SyncSource;
   /** Health's name for the app or device that recorded it, e.g. "Garmin Connect". */
   device?: string;
   bedtime?: string;
@@ -230,7 +230,7 @@ export const dailyCheckIns = pgTable(
     sleepMin: integer("sleep_min"),
     proteinG: integer("protein_g"),
     waterMl: integer("water_ml"),
-    /** Apple Health = SDNN, Whoop = RMSSD; sources.hrv says which. */
+    /** Garmin and Whoop = RMSSD, Apple Health = SDNN; sources.hrv says which (hrvMethod). */
     hrvMs: integer("hrv_ms"),
     restingHr: integer("resting_hr"),
     sleepDetail: jsonb("sleep_detail").$type<SleepDetail | null>(),
@@ -387,7 +387,7 @@ export const integrations = pgTable(
   "integrations",
   {
     userId: text("user_id").notNull(),
-    provider: text("provider").$type<"whoop" | "apple_health">().notNull(),
+    provider: text("provider").$type<"whoop" | "apple_health" | "garmin">().notNull(),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),

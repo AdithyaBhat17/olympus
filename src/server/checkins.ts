@@ -3,7 +3,13 @@ import { db } from "@/lib/db";
 import { dailyCheckIns, type CheckInSource, type SleepDetail } from "@/lib/db/schema";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { addDays } from "@/lib/dates";
-import { summarizeRecovery, type CheckIn, type RecoverySummary } from "@/domain";
+import {
+  filterSyncPatch,
+  isSyncSource,
+  summarizeRecovery,
+  type CheckIn,
+  type RecoverySummary,
+} from "@/domain";
 import { getProfile, todayFor } from "./profile";
 
 export type CheckInRow = typeof dailyCheckIns.$inferSelect;
@@ -48,7 +54,7 @@ export interface CheckInPatch {
 
 /**
  * Merge a partial check-in. Only fields present in `patch` change; each
- * changed field records where it came from. `patch` may be mutated.
+ * changed field records where it came from.
  */
 export async function upsertCheckIn(
   userId: string,
@@ -59,33 +65,19 @@ export async function upsertCheckIn(
   const existing = await getCheckIn(userId, date);
   const sources = { ...(existing?.sources ?? {}) };
 
-  // Syncs (Whoop, Apple Health) vs values the athlete typed or told Claude:
-  // - sleep is one fact per night, so a human value always wins;
-  // - protein and water accumulate through the day, so a sync may raise a
-  //   human value (they kept logging in MyFitnessPal) but never lower it.
-  if (source === "whoop" || source === "apple_health") {
-    const human = (s: CheckInSource | undefined) => s === "manual" || s === "claude";
-    // Sleep: Whoop first, Apple Health only fills the nights it leaves (a
-    // Watch or Garmin wearer without a Whoop). The detail follows the same
-    // order but ignores human values: nobody types their REM minutes.
-    if (human(sources.sleep) || (source === "apple_health" && sources.sleep === "whoop")) {
-      delete patch.sleepMin;
-    }
-    if (source === "apple_health" && existing?.sleepDetail?.source === "whoop") {
-      delete patch.sleepDetail;
-    }
-    if (human(sources.protein) && (patch.proteinG ?? -1) <= (existing?.proteinG ?? -1)) {
-      delete patch.proteinG;
-    }
-    if (human(sources.water) && (patch.waterMl ?? -1) <= (existing?.waterMl ?? -1)) {
-      delete patch.waterMl;
-    }
-    // HRV and resting HR: Apple Health first, Whoop only fills the gaps it
-    // leaves (a Whoop wearer often has no Watch writing these to Health).
-    const outranked = (s: CheckInSource | undefined) =>
-      human(s) || (source === "whoop" && s === "apple_health");
-    if (outranked(sources.hrv)) delete patch.hrvMs;
-    if (outranked(sources.rhr)) delete patch.restingHr;
+  // Syncs only write what they outrank (see filterSyncPatch): a human value
+  // beats every device, then Garmin > Whoop > Apple Health.
+  if (isSyncSource(source)) {
+    patch = filterSyncPatch(
+      patch,
+      existing && {
+        sources,
+        proteinG: existing.proteinG,
+        waterMl: existing.waterMl,
+        sleepDetailSource: existing.sleepDetail?.source ?? null,
+      },
+      source
+    );
   }
   const next = {
     sleepMin: existing?.sleepMin ?? null,
@@ -115,7 +107,7 @@ export async function upsertCheckIn(
     next.restingHr = patch.restingHr == null ? null : Math.round(patch.restingHr);
     sources.rhr = source;
   }
-  if (patch.sleepDetail !== undefined && (source === "whoop" || source === "apple_health")) {
+  if (patch.sleepDetail !== undefined && isSyncSource(source)) {
     next.sleepDetail = patch.sleepDetail == null ? null : { ...patch.sleepDetail, source };
   }
   const [row] = await db

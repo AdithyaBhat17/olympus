@@ -32,7 +32,14 @@ struct TodayRecoveryCard: View {
     private var targets: RecoveryCardData.CardTargets { data.targets }
     private var short: Bool { vals.sleepMin.map { $0 < targets.minSleepMin } ?? false }
 
-    private static let sourceLabel = ["whoop": "Whoop", "apple_health": "Apple Health", "claude": "Claude", "manual": "Manual"]
+    private static let sourceLabel = ["garmin": "Garmin", "whoop": "Whoop", "apple_health": "Apple Health", "claude": "Claude", "manual": "Manual"]
+    private static let deviceSources: Set<String> = ["garmin", "whoop", "apple_health"]
+
+    /// " (Garmin)" for a value a device synced; nothing for one the athlete typed.
+    private static func deviceSuffix(_ source: String?) -> String {
+        guard let source, deviceSources.contains(source), let label = sourceLabel[source] else { return "" }
+        return " (\(label))"
+    }
 
     /// "Whoop, Apple Health": the non-manual sources, deduplicated, in field order.
     private var sourceLine: String {
@@ -147,12 +154,12 @@ struct TodayRecoveryCard: View {
         var t = Text("")
         if let hrv = data.hrvMs {
             t = t + Text("HRV ") + Text("\(hrv)").font(.num(13)).foregroundStyle(Color.fg2) + Text(" ms")
-                + Text(data.sources["hrv"] == "whoop" ? " (Whoop)" : "")
+                + Text(Self.deviceSuffix(data.sources["hrv"]))
         }
         if data.hrvMs != nil, data.restingHr != nil { t = t + Text(" · ") }
         if let rhr = data.restingHr {
             t = t + Text("Resting HR ") + Text("\(rhr)").font(.num(13)).foregroundStyle(Color.fg2)
-                + Text(data.sources["rhr"] == "whoop" ? " (Whoop)" : "")
+                + Text(Self.deviceSuffix(data.sources["rhr"]))
         }
         return t
     }
