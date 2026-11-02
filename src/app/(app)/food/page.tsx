@@ -21,7 +21,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
   const localMin = Math.floor((((now.getTime() / 60_000 + tzOffsetMin(now, profile.timezone)) % 1440) + 1440) % 1440);
 
   return (
-    <div className="pb-6">
+    <div className="pb-24">
       <PageHeader
         eyebrow={
           <span className="flex items-center gap-3">

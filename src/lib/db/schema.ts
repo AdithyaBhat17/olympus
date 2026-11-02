@@ -731,12 +731,16 @@ export const foodFavourites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.foodId] })]
 );
 
-export const savedMeals = pgTable("saved_meals", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const savedMeals = pgTable(
+  "saved_meals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("saved_meals_user_id_name_key").on(t.userId, t.name)]
+);
 
 export const savedMealItems = pgTable(
   "saved_meal_items",

@@ -1,5 +1,7 @@
 /**
- * Indian names for USDA raw ingredients, applied at import by matching the
+ * Indian names for USDA raw ingredients, and canonical single-word names
+ * ("egg", "milk", "roti") for the plain version of a staple. Applied to USDA
+ * and INDB rows, applied at import by matching the
  * USDA description. Nutrient values stay USDA's; this only makes "toor dal"
  * or "atta" find them. Every pattern is checked by the import report.
  */
@@ -20,17 +22,18 @@ export const USDA_ALIASES: Array<{ match: RegExp; aliases: string[] }> = [
   { match: /^Semolina, enriched$/, aliases: ["sooji", "suji", "rava"] },
   { match: /^Chickpea flour \(besan\)$/, aliases: ["gram flour"] },
   { match: /^Rice, white, long-grain, regular, raw, enriched$/, aliases: ["basmati rice raw", "chawal raw"] },
-  { match: /^Rice, white, long-grain, regular, enriched, cooked$/, aliases: ["basmati rice cooked", "chawal cooked", "steamed rice"] },
+  { match: /^Rice, white, long-grain, regular, enriched, cooked$/, aliases: ["rice", "white rice", "basmati rice cooked", "chawal cooked", "steamed rice"] },
   { match: /^Rice, brown, long-grain, cooked( \(Includes foods for USDA's Food Distribution Program\))?$/, aliases: ["brown rice cooked"] },
   { match: /^Yogurt, plain, whole milk$/, aliases: ["dahi", "curd"] },
   { match: /^Yogurt, plain, low fat$/, aliases: ["low fat dahi", "low fat curd"] },
   { match: /^Butter, Clarified butter \(ghee\)$/, aliases: ["desi ghee"] },
-  { match: /^Milk, whole, 3\.25% milkfat, with added vitamin D$/, aliases: ["full cream milk", "doodh"] },
+  { match: /^Milk, whole, 3\.25% milkfat, with added vitamin D$/, aliases: ["milk", "full cream milk", "doodh"] },
   { match: /^Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D$/, aliases: ["toned milk"] },
   { match: /^Oats, whole grain, rolled, old fashioned$/, aliases: ["rolled oats raw"] },
-  { match: /^Egg, whole, raw, fresh$/, aliases: ["anda", "whole egg"] },
+  { match: /^Egg, whole, raw, fresh$/, aliases: ["egg", "eggs", "anda", "whole egg"] },
+  { match: /^Egg, whole, cooked, hard-boiled$/, aliases: ["boiled egg", "boiled eggs"] },
   { match: /^Egg, white, raw, fresh$/, aliases: ["egg white"] },
-  { match: /^Chicken, broilers or fryers, breast, meat only, cooked, roasted$/, aliases: ["chicken breast cooked", "grilled chicken breast"] },
+  { match: /^Chicken, broilers or fryers, breast, meat only, cooked, roasted$/, aliases: ["chicken breast", "chicken breast cooked", "grilled chicken breast"] },
   { match: /^Chicken, breast, boneless, skinless, raw$/, aliases: ["chicken breast raw"] },
   { match: /^Peanuts, all types, raw$/, aliases: ["moongphali", "groundnut"] },
   { match: /^Spices, turmeric, ground$/, aliases: ["haldi"] },
@@ -42,11 +45,16 @@ export const USDA_ALIASES: Array<{ match: RegExp; aliases: string[] }> = [
   { match: /^Spinach, raw$/, aliases: ["palak"] },
   { match: /^Cauliflower, raw$/, aliases: ["gobi"] },
   { match: /^Okra, raw$/, aliases: ["bhindi"] },
-  { match: /^Bananas, raw$/, aliases: ["kela"] },
-  { match: /^Beverages, coffee, brewed, prepared with tap water$/, aliases: ["black coffee", "filter coffee decoction"] },
+  { match: /^Bananas, raw$/, aliases: ["banana", "bananas", "kela"] },
+  { match: /^Apples, raw, with skin/, aliases: ["apple", "apples"] },
+  { match: /^Beverages, coffee, brewed, prepared with tap water$/, aliases: ["coffee", "black coffee", "filter coffee decoction"] },
+  // INDB dishes: the plain staple for a bare word.
+  { match: /^Chapati\/Roti$/, aliases: ["roti", "chapati", "phulka", "rotis", "chapatis"] },
+  { match: /^Plain dosa/i, aliases: ["dosa"] },
+  { match: /^Plain parantha\/paratha/i, aliases: ["paratha", "parantha"] },
 ];
 
-/** Aliases for a USDA description, plus which patterns were used (for the report). */
+/** Aliases for a USDA or INDB description, plus which patterns were used (for the report). */
 export function aliasesFor(description: string): { aliases: string[]; matched: number[] } {
   const aliases: string[] = [];
   const matched: number[] = [];

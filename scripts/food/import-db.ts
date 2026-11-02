@@ -75,18 +75,18 @@ async function main() {
       const files = unzipSync(bytes);
       const json = JSON.parse(strFromU8(Object.values(files)[0]))[src.key] as Record<string, unknown>[];
       rows = json.map((x) => usdaFood(x, name)).filter((x): x is Mapped => !!x);
-      for (const r of rows) {
-        const { aliases, matched } = aliasesFor(r.food.name);
-        if (!aliases.length) continue;
-        matched.forEach((i) => usedAliases.add(i));
-        r.food.aliases = aliases;
-        r.food.searchText = searchText(r.food.name, r.food.brand, aliases);
-      }
+    }
+    for (const r of rows) {
+      const { aliases, matched } = aliasesFor(r.food.name);
+      if (!aliases.length) continue;
+      matched.forEach((i) => usedAliases.add(i));
+      r.food.aliases = [...new Set([...(r.food.aliases ?? []), ...aliases])];
+      r.food.searchText = searchText(r.food.name, r.food.brand, r.food.aliases);
     }
     console.error(`${name}: ${rows.length} foods`);
     mapped.push(...rows);
   }
-  if (only.some((s) => s.startsWith("usda"))) {
+  if (only.length === Object.keys(SOURCES).length) {
     const unused = USDA_ALIASES.filter((_, i) => !usedAliases.has(i)).map((a) => a.match.source);
     console.error(`Aliases applied: ${usedAliases.size}/${USDA_ALIASES.length}${unused.length ? `; unmatched: ${unused.join(" | ")}` : ""}`);
   }

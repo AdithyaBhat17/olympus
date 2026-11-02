@@ -163,9 +163,9 @@ export async function syncProteinCheckIn(userId: string, date: string): Promise<
     .where(and(eq(foodLogs.userId, userId), eq(foodLogs.localDate, date)));
   // Imported MyFitnessPal history stays history: it doesn't rewrite old check-ins.
   const live = rows.filter((r) => r.mode !== "mfp_import");
-  if (!live.length && !rows.length) return;
   if (!live.length) return;
-  const protein = live.reduce((s, r) => s + (r.counts ? r.protein : 0), 0);
+  // Same rounding as the Food page (1 decimal, then whole grams), so they agree.
+  const protein = Math.round(live.reduce((s, r) => s + (r.counts ? r.protein : 0), 0) * 10) / 10;
   await upsertCheckIn(userId, date, { proteinG: Math.round(protein) }, "food_log");
 }
 

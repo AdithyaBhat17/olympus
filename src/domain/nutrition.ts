@@ -167,6 +167,18 @@ export interface SearchCandidate {
   /** Times the athlete logged it in the last 90 days. */
   timesLogged: number;
   favourite: boolean;
+  /** The query is exactly one of the food's aliases ("curd", "atta"). */
+  aliasExact?: boolean;
+  /** Database category ("Fruits and Fruit Juices"), when known. */
+  category?: string | null;
+}
+
+/** Foods usually eaten raw: "raw" in their name is how they're eaten, not a warning. */
+const EATEN_RAW = /fruit|vegetable|nut|seed|dairy|egg|spices|herbs|beverage/i;
+
+export interface RankOptions {
+  /** Logging what was eaten: cooked beats raw unless the query says raw. */
+  preferCooked?: boolean;
 }
 
 /**
@@ -174,13 +186,22 @@ export interface SearchCandidate {
  * match of your own food can't beat a strong USDA match: the bonuses are
  * smaller than the gap between a good and a poor match.
  */
-export function rankScore(c: SearchCandidate, query: string): number {
+export function rankScore(c: SearchCandidate, query: string, opts: RankOptions = {}): number {
   const q = query.trim().toLowerCase();
   const name = c.name.toLowerCase();
   let s = c.similarity;
   if (c.allWords) s += 0.25;
-  if (name === q) s += 0.5;
+  if (name === q || c.aliasExact) s += 0.5;
   else if (name.startsWith(q)) s += 0.1;
+  if (
+    opts.preferCooked &&
+    !c.aliasExact &&
+    !EATEN_RAW.test(c.category ?? "") &&
+    /\braw\b/.test(name) &&
+    !/\braw\b/.test(q)
+  ) {
+    s -= 0.3;
+  }
   s += SOURCE_BONUS[c.source];
   s += Math.min(0.3, Math.log1p(c.timesLogged) * 0.1);
   if (c.favourite) s += 0.15;
@@ -189,9 +210,9 @@ export function rankScore(c: SearchCandidate, query: string): number {
   return Math.round(s * 1000) / 1000;
 }
 
-export function rankCandidates<T extends SearchCandidate>(cands: T[], query: string, limit = 25): T[] {
+export function rankCandidates<T extends SearchCandidate>(cands: T[], query: string, limit = 25, opts: RankOptions = {}): T[] {
   return [...cands]
-    .map((c) => ({ c, s: rankScore(c, query) }))
+    .map((c) => ({ c, s: rankScore(c, query, opts) }))
     .sort((a, b) => b.s - a.s || a.c.name.length - b.c.name.length)
     .slice(0, limit)
     .map((x) => x.c);

@@ -7,7 +7,10 @@ import { LlmError, openRouterConfigured } from "@/server/llm/openrouter";
 import {
   archiveFood,
   createUserFood,
+  deleteSavedMeal,
   favouriteFoods,
+  listSavedMeals,
+  saveMeal,
   foodByBarcode,
   getFood,
   recentFoods,
@@ -55,8 +58,8 @@ export async function searchFoodsAction(query: string) {
 
 export async function quickFoodsAction() {
   return run(async (userId) => {
-    const [recent, favourites] = await Promise.all([recentFoods(userId, 15), favouriteFoods(userId)]);
-    return { recent, favourites };
+    const [recent, favourites, meals] = await Promise.all([recentFoods(userId, 15), favouriteFoods(userId), listSavedMeals(userId)]);
+    return { recent, favourites, meals };
   }, false);
 }
 
@@ -161,4 +164,20 @@ export async function createUserFoodAction(input: UserFoodInput) {
 
 export async function archiveFoodAction(id: string) {
   return run((userId) => archiveFood(userId, str(id, 40)));
+}
+
+export async function saveMealAction(name: string, items: Array<{ foodId: string; grams: number }>) {
+  return run(
+    (userId) =>
+      saveMeal(
+        userId,
+        str(name, 80),
+        (items ?? []).slice(0, 30).map((i) => ({ foodId: str(i.foodId, 40), grams: Number(i.grams) }))
+      ),
+    false
+  );
+}
+
+export async function deleteSavedMealAction(id: string) {
+  return run((userId) => deleteSavedMeal(userId, str(id, 40)), false);
 }

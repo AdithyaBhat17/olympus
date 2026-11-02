@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { foodFavourites, foodPortions, foods, recipeIngredients, type FoodRow } from "@/lib/db/schema";
+import { foodFavourites, foodPortions, foods, recipeIngredients, savedMealItems, savedMeals, type FoodRow } from "@/lib/db/schema";
 import { rankCandidates, recipePer100, searchText, type FoodSource, type Per100 } from "@/domain/nutrition";
 import { DomainError } from "../errors";
 import { offFood, tagsFor } from "./sources";
@@ -58,13 +58,20 @@ function rowsOf(res: unknown): Row[] {
  * TypeScript (rankCandidates): relevance first, then your own foods,
  * Indian data, USDA, Open Food Facts, habit and favourites.
  */
-export async function searchFoods(userId: string, query: string, limit = 25): Promise<FoodSummary[]> {
+export async function searchFoods(
+  userId: string,
+  query: string,
+  limit = 25,
+  opts: { preferCooked?: boolean } = {}
+): Promise<FoodSummary[]> {
   const q = searchText(query);
   if (q.length < 2) return [];
   const res = await db.execute(sql`
     SELECT ${SUMMARY_COLS},
       word_similarity(${q}, f.search_text) AS sim,
       f.search_tsv @@ plainto_tsquery('simple', ${q}) AS all_words,
+      ${q} = ANY (f.aliases) AS alias_exact,
+      f.category,
       EXISTS (SELECT 1 FROM food_favourites v WHERE v.user_id = ${userId} AND v.food_id = f.id) AS favourite,
       (SELECT count(*) FROM food_log_items i JOIN food_logs l ON l.id = i.log_id
         WHERE l.user_id = ${userId} AND i.food_id = f.id AND l.local_date > current_date - 90)::int AS times
@@ -77,11 +84,15 @@ export async function searchFoods(userId: string, query: string, limit = 25): Pr
     ...toSummary(r),
     similarity: Number(r.sim),
     allWords: Boolean(r.all_words),
+    aliasExact: Boolean(r.alias_exact),
+    category: (r.category as string | null) ?? null,
   }));
-  return rankCandidates(rows, q, limit).map((r): FoodSummary => {
-    const { similarity, allWords, ...f } = r;
+  return rankCandidates(rows, q, limit, opts).map((r): FoodSummary => {
+    const { similarity, allWords, aliasExact, category, ...f } = r;
     void similarity;
     void allWords;
+    void aliasExact;
+    void category;
     return f;
   });
 }
@@ -363,4 +374,56 @@ export async function usualPortions(userId: string, limit = 30): Promise<Array<{
     ORDER BY count(*) DESC
     LIMIT ${limit}`);
   return rowsOf(res).map((r) => ({ foodId: String(r.food_id), name: String(r.name), grams: Number(r.grams), times: Number(r.times) }));
+}
+
+// --- Saved meals ------------------------------------------------------------------
+
+export interface SavedMeal {
+  id: string;
+  name: string;
+  items: Array<{ food: FoodSummary; grams: number }>;
+  kcal: number;
+  protein: number;
+}
+
+/** Save a set of foods + grams under a name ("Usual breakfast"). Same name replaces. */
+export async function saveMeal(userId: string, name: string, items: Array<{ foodId: string; grams: number }>): Promise<string> {
+  const n = name.trim().slice(0, 80);
+  if (!n) throw new DomainError("Give the meal a name.");
+  const valid = items.filter((i) => i.grams > 0).slice(0, 30);
+  if (!valid.length) throw new DomainError("A saved meal needs at least one food.");
+  const byId = await getFoodsByIds(userId, [...new Set(valid.map((i) => i.foodId))]);
+  if (valid.some((i) => !byId.has(i.foodId))) throw new DomainError("One of those foods doesn't exist.");
+  const [meal] = await db
+    .insert(savedMeals)
+    .values({ userId, name: n })
+    .onConflictDoUpdate({ target: [savedMeals.userId, savedMeals.name], set: { name: n } })
+    .returning({ id: savedMeals.id });
+  await db.delete(savedMealItems).where(eq(savedMealItems.mealId, meal.id));
+  await db.insert(savedMealItems).values(valid.map((i, position) => ({ mealId: meal.id, position, foodId: i.foodId, grams: i.grams })));
+  return meal.id;
+}
+
+export async function listSavedMeals(userId: string): Promise<SavedMeal[]> {
+  const res = await db.execute(sql`
+    SELECT m.id AS meal_id, m.name AS meal_name, i.grams AS item_grams, ${SUMMARY_COLS}, false AS favourite, 0 AS times
+    FROM saved_meals m JOIN saved_meal_items i ON i.meal_id = m.id JOIN foods f ON f.id = i.food_id
+    WHERE m.user_id = ${userId}
+    ORDER BY m.name, i.position`);
+  const meals = new Map<string, SavedMeal>();
+  for (const r of rowsOf(res)) {
+    const id = String(r.meal_id);
+    if (!meals.has(id)) meals.set(id, { id, name: String(r.meal_name), items: [], kcal: 0, protein: 0 });
+    const food = toSummary(r);
+    const grams = Number(r.item_grams);
+    const m = meals.get(id)!;
+    m.items.push({ food, grams });
+    m.kcal = Math.round(m.kcal + (food.kcal100g * grams) / 100);
+    m.protein = Math.round((m.protein + ((food.protein100g ?? 0) * grams) / 100) * 10) / 10;
+  }
+  return [...meals.values()];
+}
+
+export async function deleteSavedMeal(userId: string, id: string): Promise<void> {
+  await db.delete(savedMeals).where(and(eq(savedMeals.id, id), eq(savedMeals.userId, userId)));
 }

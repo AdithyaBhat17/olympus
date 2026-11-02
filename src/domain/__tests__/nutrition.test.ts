@@ -129,6 +129,29 @@ describe("search ranking", () => {
     expect(rankCandidates([mine, usda], "white rice cooked")[0]).toBe(usda);
   });
 
+  it("an exact alias wins over dishes that merely start with the word", () => {
+    const yogurt = c({ name: "Yogurt, plain, whole milk", source: "usda_sr", similarity: 1, aliasExact: true });
+    const dip = c({ name: "Curd dip", source: "indb", similarity: 1 });
+    expect(rankCandidates([dip, yogurt], "curd")[0]).toBe(yogurt);
+  });
+
+  it("logging prefers cooked over raw unless raw was said", () => {
+    const raw = c({ name: "Chicken, thigh, meat and skin, raw", similarity: 0.6 });
+    const cooked = c({ name: "Chicken, thigh, meat and skin, cooked, roasted", similarity: 0.55 });
+    expect(rankCandidates([raw, cooked], "chicken thigh", 2, { preferCooked: true })[0]).toBe(cooked);
+    expect(rankCandidates([raw, cooked], "chicken thigh raw", 2, { preferCooked: true })[0]).toBe(raw);
+    expect(rankCandidates([raw, cooked], "chicken thigh")[0]).toBe(raw);
+  });
+
+  it("but fruit stays raw: 'banana' is a banana, not banana appam", () => {
+    const banana = c({ name: "Bananas, raw", source: "usda_sr", similarity: 1, aliasExact: true, category: "Fruits and Fruit Juices" });
+    const appam = c({ name: "Banana appam", source: "indb", similarity: 1 });
+    expect(rankCandidates([appam, banana], "banana", 2, { preferCooked: true })[0]).toBe(banana);
+    const apple = c({ name: "Apples, raw, with skin", source: "usda_sr", similarity: 0.6, category: "Fruits and Fruit Juices" });
+    const pie = c({ name: "Apple pie", source: "usda_sr", similarity: 0.55 });
+    expect(rankCandidates([pie, apple], "apples", 2, { preferCooked: true })[0]).toBe(apple);
+  });
+
   it("exact names, habit and favourites lift results", () => {
     expect(rankScore(c({ name: "egg" }), "egg")).toBeGreaterThan(rankScore(c({ name: "egg, whole, raw" }), "egg"));
     expect(rankScore(c({ timesLogged: 20 }), "x")).toBeGreaterThan(rankScore(c({}), "x"));

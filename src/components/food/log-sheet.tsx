@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Sheet } from "@/components/session/sheet";
 import { cn } from "@/lib/utils";
 import { dayTotals, forGrams, MEALS, type Meal } from "@/domain/nutrition";
-import type { FoodSummary } from "@/server/food/foods";
+import type { FoodSummary, SavedMeal } from "@/server/food/foods";
 import type { TextDraft } from "@/server/food/log-text";
 import {
   barcodeAction,
@@ -14,7 +14,9 @@ import {
   foodDetailAction,
   logItemsAction,
   quickFoodsAction,
+  saveMealAction,
   searchFoodsAction,
+  toggleFavouriteAction,
 } from "@/app/(app)/food/actions";
 
 type Tab = "describe" | "search" | "barcode";
@@ -66,6 +68,8 @@ export function LogSheet({
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [time, setTime] = useState("13:00");
   const [draftMeta, setDraftMeta] = useState<{ text: string; model: string; cost: number | null } | null>(null);
+  const [fromSaved, setFromSaved] = useState(false);
+  const [mealName, setMealName] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export function LogSheet({
   const reset = () => {
     setBasket([]);
     setDraftMeta(null);
+    setFromSaved(false);
     setTab("describe");
   };
 
@@ -84,6 +89,21 @@ export function LogSheet({
     setBasket((b) => [...b, { key, food, grams: g, portions: [] }]);
     const r = await foodDetailAction(food.id);
     if (r.ok) setBasket((b) => b.map((i) => (i.key === key ? { ...i, portions: r.data.portions } : i)));
+  };
+
+  const addMeal = (m: SavedMeal) => {
+    setBasket((b) => [...b, ...m.items.map((i) => ({ key: newKey(), food: i.food, grams: i.grams, portions: [] }))]);
+    setFromSaved(true);
+  };
+
+  const saveAsMeal = async () => {
+    const name = mealName?.trim();
+    if (!name) return;
+    const r = await saveMealAction(name, basket.map((i) => ({ foodId: i.food.id, grams: i.grams })));
+    if (r.ok) {
+      toast.success(`Saved "${name}"`);
+      setMealName(null);
+    } else toast.error(r.error);
   };
 
   const fromDraft = (d: TextDraft, text: string) => {
@@ -119,7 +139,7 @@ export function LogSheet({
       const r = await logItemsAction({
         meal,
         ...(isToday ? {} : { date, time }),
-        inputMode: draftMeta ? "text" : basket.length === 1 && tab === "barcode" ? "barcode" : "search",
+        inputMode: draftMeta ? "text" : fromSaved ? "saved" : basket.length === 1 && tab === "barcode" ? "barcode" : "search",
         rawText: draftMeta?.text ?? null,
         model: draftMeta?.model ?? null,
         costUsd: draftMeta?.cost ?? null,
@@ -172,7 +192,7 @@ export function LogSheet({
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           {tab === "describe" && <DescribeTab onDraft={fromDraft} />}
-          {tab === "search" && <SearchTab onPick={(f) => add(f)} />}
+          {tab === "search" && <SearchTab onPick={(f) => add(f)} onPickMeal={addMeal} />}
           {tab === "barcode" && <BarcodeTab onFound={(f) => add(f)} />}
 
           {basket.length > 0 && (
@@ -198,6 +218,26 @@ export function LogSheet({
                   {totals.proteinExcluded} g collagen protein isn&apos;t counted toward your protein target.
                 </p>
               )}
+              {basket.length > 1 &&
+                (mealName === null ? (
+                  <button type="button" onClick={() => setMealName("")} className="mt-2 text-[13px] text-fg-2 underline underline-offset-2">
+                    Save these as a meal
+                  </button>
+                ) : (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      autoFocus
+                      value={mealName}
+                      onChange={(e) => setMealName(e.target.value)}
+                      placeholder="Usual breakfast"
+                      aria-label="Meal name"
+                      className="flex-1 h-10 px-3 rounded-[10px] bg-surface-2 text-fg"
+                    />
+                    <button type="button" onClick={saveAsMeal} disabled={!mealName.trim()} className="h-10 px-3 rounded-[10px] bg-surface-3 text-[13px] font-medium disabled:opacity-40">
+                      Save meal
+                    </button>
+                  </div>
+                ))}
               <div className="flex gap-2 mt-4 items-center">
                 <label className="text-[13px] text-muted" htmlFor="meal">
                   Meal
@@ -242,6 +282,7 @@ function BasketRow({
   onRemove: () => void;
 }) {
   const [swapping, setSwapping] = useState(false);
+  const [fav, setFav] = useState(item.food.favourite);
   const m = forGrams(per100(item.food), item.grams);
   const max = Math.max(500, Math.ceil((item.grams * 3) / 50) * 50);
   const lowConfidence = item.confidence != null && item.confidence < 0.6;
@@ -263,6 +304,18 @@ function BasketRow({
             {lowConfidence && <span className="text-danger-text">check the amount</span>}
           </div>
         </div>
+        <button
+          type="button"
+          aria-pressed={fav}
+          aria-label={fav ? `Unfavourite ${item.food.name}` : `Favourite ${item.food.name}`}
+          onClick={() => {
+            setFav(!fav);
+            toggleFavouriteAction(item.food.id, !fav).then((r) => !r.ok && (setFav(fav), toast.error(r.error)));
+          }}
+          className={cn("w-9 h-9 -mt-1 text-[18px] shrink-0", fav ? "text-accent" : "text-faint")}
+        >
+          {fav ? "★" : "☆"}
+        </button>
         <div className="text-right shrink-0">
           <div className="num text-[15px]">{Math.round(m.protein)} g</div>
           <div className="num text-[12px] text-muted">{Math.round(m.kcal)} kcal</div>
@@ -407,10 +460,10 @@ function FoodList({ foods, onPick }: { foods: FoodSummary[]; onPick: (f: FoodSum
   );
 }
 
-function SearchTab({ onPick }: { onPick: (f: FoodSummary) => void }) {
+function SearchTab({ onPick, onPickMeal }: { onPick: (f: FoodSummary) => void; onPickMeal: (m: SavedMeal) => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<FoodSummary[]>([]);
-  const [quick, setQuick] = useState<{ recent: FoodSummary[]; favourites: FoodSummary[] } | null>(null);
+  const [quick, setQuick] = useState<{ recent: FoodSummary[]; favourites: FoodSummary[]; meals: SavedMeal[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const latest = useRef(0);
 
@@ -456,6 +509,26 @@ function SearchTab({ onPick }: { onPick: (f: FoodSummary) => void }) {
         )
       ) : (
         <>
+          {quick?.meals.length ? (
+            <section>
+              <h3 className="section-label mb-1">Saved meals</h3>
+              <ul className="m-0 p-0 list-none flex flex-col">
+                {quick.meals.map((m) => (
+                  <li key={m.id}>
+                    <button type="button" onClick={() => onPickMeal(m)} className="w-full text-left py-2.5 border-b border-line flex gap-2 items-center">
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[15px]">{m.name}</span>
+                        <span className="block text-[12px] text-muted truncate">
+                          {m.items.map((i) => i.food.name).join(", ")} · {m.kcal} kcal · {m.protein} g protein
+                        </span>
+                      </span>
+                      <span className="text-[22px] text-fg-2" aria-hidden>+</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {quick?.favourites.length ? (
             <section>
               <h3 className="section-label mb-1">Favourites</h3>

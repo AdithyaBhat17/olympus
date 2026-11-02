@@ -45,7 +45,7 @@ export async function draftFromText(userId: string, text: string): Promise<TextD
 
   const items = await Promise.all(
     parsed.map(async (p): Promise<DraftItem> => {
-      const candidates = await searchFoods(userId, p.search, 6);
+      const candidates = await searchFoods(userId, p.search, 6, { preferCooked: true });
       const top = candidates[0];
       if (!top) {
         return { said: p.name, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: [], kcal: 0, protein: 0 };

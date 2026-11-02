@@ -76,8 +76,8 @@ export default function BottomNav() {
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
     >
       <div
-        className="pointer-events-auto relative h-16 rounded-full bg-fg px-1.5 grid grid-cols-4 items-center shadow-[0_12px_30px_rgba(30,20,18,.3)]"
-        style={{ width: ITEM * tabs.length + 12 }}
+        className="pointer-events-auto relative h-16 rounded-full bg-fg px-1.5 grid items-center shadow-[0_12px_30px_rgba(30,20,18,.3)]"
+        style={{ width: ITEM * tabs.length + 12, gridTemplateColumns: `repeat(${tabs.length}, ${ITEM}px)` }}
       >
         {active >= 0 && (
           <span
