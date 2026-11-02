@@ -9,13 +9,17 @@
  * a Watch, which isn't comparable with the RMSSD the other two report.
  *
  * Protein and water accumulate through the day: a sync may raise a human
- * value (they kept logging elsewhere) but never lower it.
+ * value (they kept logging elsewhere) but never lower it. Once the Olympus
+ * food log has anything for a day, its total is that day's protein and no
+ * sync (the old MyFitnessPal → Health bridge) overrides it.
  */
 
 export const SYNC_SOURCES = ["garmin", "whoop", "apple_health"] as const;
 export type SyncSource = (typeof SYNC_SOURCES)[number];
 export type HumanSource = "manual" | "claude";
-export type CheckInSource = HumanSource | SyncSource;
+/** Protein summed from the food log: once anything is logged, it's the day's protein. */
+export type FoodLogSource = "food_log";
+export type CheckInSource = HumanSource | SyncSource | FoodLogSource;
 export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
 
 export function isSyncSource(s: string | undefined | null): s is SyncSource {
@@ -34,11 +38,12 @@ function rank(s: SyncSource): number {
 /** True when a value from `incoming` may replace one from `existing`. */
 export function syncOutranks(incoming: SyncSource, existing: CheckInSource | undefined): boolean {
   if (existing == null) return true;
-  if (isHumanSource(existing)) return false;
+  if (isHumanSource(existing) || existing === "food_log") return false;
   return rank(incoming) <= rank(existing);
 }
 
 export const SOURCE_LABEL: Record<CheckInSource, string> = {
+  food_log: "Food log",
   garmin: "Garmin",
   whoop: "Whoop",
   apple_health: "Apple Health",
@@ -97,7 +102,9 @@ export function filterSyncPatch<P extends SyncPatch>(
   }
 
   // Accumulating fields: a sync may raise a human value but never lower it.
-  if (isHumanSource(sources.protein) && (out.proteinG ?? -1) <= (existing.proteinG ?? -1)) {
+  // Protein from the food log is the day's protein: no sync touches it.
+  if (sources.protein === "food_log") delete out.proteinG;
+  else if (isHumanSource(sources.protein) && (out.proteinG ?? -1) <= (existing.proteinG ?? -1)) {
     delete out.proteinG;
   }
   if (isHumanSource(sources.water) && (out.waterMl ?? -1) <= (existing.waterMl ?? -1)) {

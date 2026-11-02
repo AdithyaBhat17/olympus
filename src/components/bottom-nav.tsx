@@ -12,6 +12,17 @@ const tabs = [
     icon: <path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" />,
   },
   {
+    href: "/food",
+    label: "Food",
+    match: ["/food"],
+    icon: (
+      <>
+        <path d="M4 11h16a8 8 0 0 1-16 0z" />
+        <path d="M8 7.5c0-1.5 1-1.5 1-3M12 7.5c0-1.5 1-1.5 1-3M16 7.5c0-1.5 1-1.5 1-3" />
+      </>
+    ),
+  },
+  {
     href: "/history",
     label: "Log",
     match: ["/history", "/log"],
