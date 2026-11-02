@@ -8,3 +8,4 @@ export * from "./flags";
 export * from "./export";
 export * from "./targets";
 export * from "./training-load";
+export * from "./check-in-sources";

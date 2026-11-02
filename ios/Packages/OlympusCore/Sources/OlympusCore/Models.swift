@@ -123,7 +123,7 @@ public struct RecoveryCardData: Codable, Hashable, Sendable {
     public var hrvMs: Int?
     public var restingHr: Int?
     public var targets: CardTargets
-    /** Field ("sleep", "protein", …) → "manual" | "claude" | "whoop" | "apple_health". */
+    /** Field ("sleep", "protein", …) → "manual" | "claude" | "garmin" | "whoop" | "apple_health". */
     public var sources: [String: String]
     public var holdMessage: String?
 }
