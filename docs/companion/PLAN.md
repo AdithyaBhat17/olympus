@@ -269,13 +269,23 @@ From Phase 2 on, every scoring module ships with vitest tests, and a `scripts/se
 5. **Garmin API caveats.** Only one third-party write-up confirms the personal tier so far. It says FIT files delivered through the API may have undocumented fields stripped (VO2 max, recovery time). It also lists `PERSONAL_API_NUTRITION_READ` among the scopes. The discovery report will settle what's actually there before any feature depends on it.
 6. **Vercel cron limits.** The Hobby plan only allows daily crons. Daily cron + sync on app open + manual sync is enough for one user. If you're on Pro, I'll sync hourly.
 
-## 6. Supplement stack to confirm
+## 6. Supplement stack (confirmed 2026-11-03)
 
-| Item | Seeded as | Need from you |
-|---|---|---|
-| Thyronorm | 150 mcg, on waking | Exact wake routine (how long before coffee or food) |
-| Selenium | 200 mcg | Confirm mcg |
-| Magnesium glycinate | 300–400 mg elemental, bedtime | Taking it? Elemental mg on the label |
-| Vitamin D3 | 2,000–4,000 IU with a fat-containing meal | Taking it? Which dose? |
-| Naturelo One Daily | 1 tab, ≥4 h after thyroid med | Label photo later (iron, calcium, biotin) |
-| Whey, Collagen, Creatine | As listed | Scoop size in grams |
+| Item | Dose | Slot | Open point |
+|---|---|---|---|
+| Thyronorm | 150 mcg | On waking | Coffee comes 3–4 h later, so the 30–60 min rule is met by a wide margin |
+| Selenium | **100 mcg** (not 200) | With a meal | |
+| Magnesium glycinate | 2 tablets, 200 mg total | Bedtime | Is 200 mg elemental magnesium or the glycinate compound? The label says which |
+| Vitamin D3 | **60,000 IU once a week** | With a fat-containing meal, one weekday | Which day |
+| Naturelo One Daily | 1 tab | With a meal, ≥4 h after Thyronorm | Label photo later (iron, calcium, biotin) |
+| ON Gold Standard Whey | 1 scoop, 24 g protein (~31 g powder) | Post-workout | Assumed 24 g is the protein per scoop |
+| Sports Research Multi Collagen | 1 serving | Flexible | Nutrition from the label |
+| Creatine monohydrate | **5 g** daily | Any time | Written as "5mg"; taken to mean 5 g |
+
+## 7. Garmin Personal API (verified 2026-11-03)
+
+- Key: Garmin Connect web › Settings › Personal API token. Expires after 30, 90, 180 or 365 days. Garmin emails a week before expiry; we remind at 14 days.
+- Token: `POST https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token`, header `Authorization: ApiKey <key>`. Access tokens last 24 h. There are no refresh tokens, so the key is exchanged again each time.
+- 26 documented GET endpoints (OpenAPI 3.0.1, extracted from the Swagger page bundle). The catalogue is in `src/server/integrations/garmin/endpoints.ts`. They include overnight HRV (`/hrv-service/hrv/daily/{from}/{to}`), sleep with Garmin's own sleep need, stress, Body Battery, daily summaries v2 (respiration, pulse ox, jet lag), weight, the activity list and the FIT ZIP download.
+- No documented rate limit. The client spaces calls 500 ms apart and backs off on 429 and 5xx.
+- Vercel Hobby: one cron per day. Sync runs from that daily cron, on app open (when the data is older than 30 min) and from "Sync now".
