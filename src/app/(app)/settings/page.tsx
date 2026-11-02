@@ -6,6 +6,7 @@ import { formatSleep } from "@/domain";
 import { connectionStatus, publicOrigin } from "@/server/oauth";
 import { recentToolCalls } from "@/server/audit";
 import { getWhoop, whoopConfigured } from "@/server/integrations/whoop";
+import { daysUntil, garminConfigured, getGarmin } from "@/server/integrations/garmin/sync";
 import { getAppleHealth } from "@/server/integrations/apple-health";
 import { getRecovery } from "@/server/checkins";
 import { getProfile } from "@/server/profile";
@@ -14,6 +15,8 @@ import { BackIcon } from "@/components/page-header";
 import { CopyField } from "@/components/settings/copy-field";
 import {
   DisconnectClaudeButton,
+  GarminButtons,
+  GarminKeyForm,
   HealthTokenControls,
   WhoopButtons,
 } from "@/components/settings/connection-buttons";
@@ -68,7 +71,7 @@ export default async function SettingsPage({
   const h = await headers();
   const origin = publicOrigin(new Request(`https://${h.get("host") ?? "localhost"}/`, { headers: h }));
 
-  const [clients, calls, whoop, health, recovery, profile, injuries] = await Promise.all([
+  const [clients, calls, whoop, health, recovery, profile, injuries, garmin] = await Promise.all([
     connectionStatus(userId),
     recentToolCalls(userId, 40),
     getWhoop(userId),
@@ -76,8 +79,10 @@ export default async function SettingsPage({
     getRecovery(userId),
     getProfile(userId),
     listConstraintRows(userId),
+    getGarmin(userId),
   ]);
   const tz = profile.timezone;
+  const garminDaysLeft = daysUntil(garmin?.keyExpiresAt ?? null);
   const writes = calls.filter((c) => c.kind === "write");
   const lastPush = calls.find((c) => c.tool === "push_plan" && c.ok) ?? writes[0] ?? null;
   const sleepSource = recovery.today?.sources.sleep;
@@ -214,6 +219,49 @@ export default async function SettingsPage({
           </p>
         )}
         <div className="card-group">
+          <details className="group border-b border-line">
+            <summary className={`${row} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
+              <span className={`${ico} bg-surface-3 text-fg font-display font-black text-[15px]`}>G</span>
+              <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+                <span>Garmin</span>
+                <span className="text-xs text-muted">
+                  {garmin?.secretEnc
+                    ? `Sleep, HRV, resting HR, activities, synced ${syncedAt(garmin.lastSyncAt, tz)}`
+                    : "Sleep, HRV, resting HR, activities, not connected"}
+                  {sleepSource === "garmin" && recovery.today?.sleepMin != null && `, ${formatSleep(recovery.today.sleepMin)}`}
+                </span>
+                {garmin?.secretEnc && garminDaysLeft != null && garminDaysLeft <= 14 && (
+                  <span className="text-xs text-danger-text">
+                    {garminDaysLeft < 0
+                      ? "API key expired. Create a new one in Garmin Connect."
+                      : `API key expires in ${garminDaysLeft} day${garminDaysLeft === 1 ? "" : "s"}.`}
+                  </span>
+                )}
+                {garmin?.lastError && <span className="text-xs text-danger-text">Last error: {garmin.lastError}</span>}
+              </span>
+              <span className="h-11 px-3 rounded-[10px] bg-surface-3 text-fg-2 text-[13px] flex items-center">
+                {garmin?.secretEnc ? "Manage" : "Set up"}
+              </span>
+            </summary>
+            <div className="px-4 pb-4 flex flex-col gap-3">
+              {!garminConfigured() ? (
+                <p className="m-0 text-[13px] text-muted">Not configured: set GARMIN_SECRET_KEY on the server.</p>
+              ) : garmin?.secretEnc ? (
+                <>
+                  <GarminButtons />
+                  {garmin.keyExpiresAt && (
+                    <p className="m-0 text-[13px] text-muted">
+                      Key expires {garmin.keyExpiresAt.toISOString().slice(0, 10)}. You&apos;ll get a reminder 14, 7, 3 and 1
+                      days before.
+                    </p>
+                  )}
+                  <GarminKeyForm replacing />
+                </>
+              ) : (
+                <GarminKeyForm />
+              )}
+            </div>
+          </details>
           <div className={`${row} border-b border-line`}>
             <span className={`${ico} bg-surface-3 text-fg font-display font-black text-[15px]`}>W</span>
             <span className="flex-1 flex flex-col gap-0.5 min-w-0">

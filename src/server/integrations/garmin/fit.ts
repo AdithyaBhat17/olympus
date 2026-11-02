@@ -1,5 +1,6 @@
 import { Decoder, Stream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
+import type { FitLap } from "@/lib/db/schema";
 
 /**
  * Activity downloads come back as a ZIP holding one FIT file. This unzips
@@ -137,4 +138,55 @@ export function summarizeFit(fit: DecodedFit): FitSummary {
     subSport: typeof session?.subSport === "string" ? session.subSport : null,
     errors: fit.errors,
   };
+}
+
+export function fitLaps(messages: FitMessages): FitLap[] {
+  return (messages.lapMesgs ?? [])
+    .filter((l) => l.startTime instanceof Date)
+    .map((l) => ({
+      start: (l.startTime as Date).toISOString(),
+      durationSec: typeof l.totalElapsedTime === "number" ? Math.round(l.totalElapsedTime) : null,
+      avgHr: typeof l.avgHeartRate === "number" ? l.avgHeartRate : null,
+      maxHr: typeof l.maxHeartRate === "number" ? l.maxHeartRate : null,
+      distanceM: typeof l.totalDistance === "number" ? Math.round(l.totalDistance) : null,
+    }));
+}
+
+/** Session totals worth keeping, plus the session's time in HR zones (seconds per zone). */
+export function fitMeta(messages: FitMessages): Record<string, unknown> {
+  const s = messages.sessionMesgs?.[0] ?? {};
+  const keep = [
+    "sport",
+    "subSport",
+    "totalElapsedTime",
+    "totalTimerTime",
+    "totalCalories",
+    "avgHeartRate",
+    "maxHeartRate",
+    "totalTrainingEffect",
+    "totalAnaerobicTrainingEffect",
+    "trainingLoadPeak",
+    "totalDistance",
+    "totalAscent",
+  ];
+  const meta: Record<string, unknown> = {};
+  for (const k of keep) if (s[k] != null) meta[k] = s[k];
+  const zone = (messages.timeInZoneMesgs ?? []).find((z) => z.referenceMesg === "session");
+  if (zone && Array.isArray(zone.timeInHrZone)) {
+    meta.timeInHrZoneSec = (zone.timeInHrZone as unknown[]).map((v) => (typeof v === "number" ? Math.round(v) : null));
+    if (Array.isArray(zone.hrZoneHighBoundary)) meta.hrZoneHighBoundary = zone.hrZoneHighBoundary;
+  }
+  return meta;
+}
+
+/** HR as offsets from the first sample, for activity_streams. */
+export function packHr(series: HrSample[]): { start: Date | null; t: number[]; bpm: number[] } {
+  if (!series.length) return { start: null, t: [], bpm: [] };
+  const t0 = series[0].t;
+  return { start: new Date(t0 * 1000), t: series.map((s) => s.t - t0), bpm: series.map((s) => s.bpm) };
+}
+
+/** Minutes with at least one HR sample: what hr_covered_min means for Apple Health too. */
+export function hrCoveredMin(series: HrSample[]): number {
+  return new Set(series.map((s) => Math.floor(s.t / 60))).size;
 }

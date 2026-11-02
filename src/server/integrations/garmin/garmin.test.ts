@@ -11,7 +11,7 @@ import {
   rangeRequest,
 } from "./endpoints";
 import { addSample, coverageRows, emptyCoverage, findFields, isEmptyDoc } from "./coverage";
-import { decodeFit, extractFitFiles, hrSeries, strengthSets, summarizeFit } from "./fit";
+import { decodeFit, extractFitFiles, fitLaps, fitMeta, hrCoveredMin, hrSeries, packHr, strengthSets, summarizeFit } from "./fit";
 
 const ep = (id: string) => GARMIN_ENDPOINTS.find((e) => e.id === id)!;
 
@@ -193,12 +193,20 @@ describe("FIT", () => {
       category: ["squat"],
     });
     put(Profile.MesgNum.SET, { timestamp: new Date(start.getTime() + 180_000), duration: 120, setType: "rest" });
+    put(Profile.MesgNum.LAP, {
+      timestamp: new Date(start.getTime() + 180_000),
+      startTime: start,
+      totalElapsedTime: 180,
+      avgHeartRate: 102,
+      maxHeartRate: 104,
+    });
     put(Profile.MesgNum.SESSION, {
       timestamp: new Date(start.getTime() + 180_000),
       startTime: start,
       sport: "training",
       subSport: "strengthTraining",
       totalElapsedTime: 180,
+      totalTrainingEffect: 2.5,
     });
     return enc.close();
   }
@@ -222,6 +230,21 @@ describe("FIT", () => {
     expect(sum.sport).toBe("training");
     expect(sum.subSport).toBe("strengthTraining");
     expect(sum.fieldsByMessage.recordMesgs).toContain("heartRate");
+  });
+
+  it("packs HR for storage and reads laps and session meta", () => {
+    const fit = decodeFit("a.fit", strengthFit());
+    const hr = hrSeries(fit.messages);
+    const packed = packHr(hr);
+    expect(packed.start?.toISOString()).toBe("2026-11-01T05:00:00.000Z");
+    expect(packed.t).toEqual([0, 1, 2, 3, 4]);
+    expect(packed.bpm).toEqual([100, 101, 102, 103, 104]);
+    expect(hrCoveredMin(hr)).toBe(1);
+    expect(packHr([])).toEqual({ start: null, t: [], bpm: [] });
+    expect(fitLaps(fit.messages)).toEqual([
+      { start: "2026-11-01T05:00:00.000Z", durationSec: 180, avgHr: 102, maxHr: 104, distanceM: null },
+    ]);
+    expect(fitMeta(fit.messages)).toMatchObject({ sport: "training", subSport: "strengthTraining", totalTrainingEffect: 2.5 });
   });
 
   it("accepts a bare FIT and rejects junk", () => {

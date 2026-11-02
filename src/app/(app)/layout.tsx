@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { Providers } from "@/components/providers";
 import BottomNav from "@/components/bottom-nav";
 import { syncWhoopIfStale } from "@/server/integrations/whoop";
+import { syncGarminIfStale } from "@/server/integrations/garmin/sync";
 import { getProfile, rememberDisplayName } from "@/server/profile";
 import { TimezoneSync } from "@/components/timezone-sync";
 
@@ -18,10 +19,11 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  // Keep last night's Whoop sleep fresh without slowing the page down.
+  // Keep last night's Whoop / Garmin data fresh without slowing the page down.
   const email = session.user.email;
   if (email) {
     after(() => syncWhoopIfStale(email).catch((err) => console.error("whoop sync", err)));
+    after(() => syncGarminIfStale(email).catch((err) => console.error("garmin sync", err)));
   }
   const profile = email ? await getProfile(email) : null;
   // The iOS app shows the name too, and it only has the database to go on.

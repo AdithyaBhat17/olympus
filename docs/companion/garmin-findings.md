@@ -27,10 +27,10 @@ The FIT files were **not stripped**: training effect, anaerobic effect and peak 
 
 ## Not available
 
-- **Skin temperature.** No field anywhere. The illness/temperature signal is out of scope unless a future device adds it.
+- **Skin temperature (not yet).** The Cirqa measures it, but it was still calibrating at discovery time, and the Personal API spec has no skin-temperature value field. The only related field is a sleep flag, `isSkinTempMct`. Every raw sleep and summary response is kept in `raw_garmin`, so if Garmin starts returning it, a re-parse picks it up. Re-run `pnpm garmin:discover` once calibration finishes.
 - **Sleep score.** `sleepScores` comes back empty, so the Instinct 2 doesn't score sleep. That's fine, because we compute our own sleep metrics.
 - **Strength sets from the watch.** The gym session was recorded as *Fitness Equipment*, which has no set messages. Olympus stays the source for sets, reps and load. Garmin supplies the time window and HR for the session.
-- **Body composition.** The only weight is the profile setting; there's no scale. BIA scans will be entered in Olympus (Phase 6).
+- **Body composition through Garmin.** The only weight is the profile setting. Weight and body composition will come from a **Withings** scale instead (Phase 6). Apple Health gets weight, body fat and lean mass from Withings, but has no visceral-fat type. Visceral fat is the headline metric, so the Withings API is probably needed.
 - **Garmin nutrition.** Endpoint works, but nothing is logged there. Unused.
 
 ## API behaviour learned
@@ -39,3 +39,10 @@ The FIT files were **not stripped**: training effect, anaerobic effect and peak 
 - `stress.daily` and `steps.daily` reject a 30-day window and accept 28. Others accepted 30. The sync uses 28-day windows everywhere.
 - `hrv.day` returns 204 on nights without data.
 - Latency is ~0.3–1 s per call. 30 days of everything took ~3 min at 500 ms spacing.
+
+## Sync rules settled during the branch test (2026-11-03)
+
+- **Resting HR goes into the check-in only on nights Garmin also recorded sleep.** Garmin's RHR is a whole-day figure. On days the watch wasn't worn overnight (before the Cirqa) it came from partial wear, and it would have outranked a Whoop or Watch value that saw the whole night. `daily_wearable` still keeps every value.
+- **Days the watch wasn't worn are skipped.** The daily summary still returns them, with zeros.
+- **Apple Health copies of Garmin workouts are hidden.** All three Apple Health workouts in the database were Garmin Connect copies (device "Connect"), and each matched a Garmin activity.
+- **Older gym sessions were recorded as *Strength*,** and their FIT files carry strength sets (7 of 8). The Oct–Nov sessions are *Fitness Equipment* and have none. Olympus stays the source for sets either way.

@@ -12,6 +12,7 @@ import {
   primaryKey,
   uniqueIndex,
   index,
+  smallint,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { EXERCISE_CATEGORIES } from "../constants";
@@ -383,6 +384,13 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
     .notNull(),
 });
 
+export interface IntegrationSyncState {
+  /** Last calendar date daily data was fetched through. */
+  dailyThrough?: string;
+  /** Last day a key-expiry reminder was sent (yyyy-MM-dd). */
+  expiryRemindedOn?: string;
+}
+
 export const integrations = pgTable(
   "integrations",
   {
@@ -395,6 +403,11 @@ export const integrations = pgTable(
     ingestTokenHash: text("ingest_token_hash"),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
     lastError: text("last_error"),
+    /** Garmin: the personal API key, AES-256-GCM encrypted (see src/server/secrets.ts). */
+    secretEnc: text("secret_enc"),
+    /** Garmin: when the personal API key stops working (the athlete enters it). */
+    keyExpiresAt: timestamp("key_expires_at", { withTimezone: true }),
+    syncState: jsonb("sync_state").$type<IntegrationSyncState>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -413,7 +426,7 @@ export const externalActivities = pgTable(
   "external_activities",
   {
     userId: text("user_id").notNull(),
-    source: text("source").$type<"apple_health">().notNull(),
+    source: text("source").$type<"apple_health" | "garmin">().notNull(),
     /** HKWorkout UUID. */
     externalId: text("external_id").notNull(),
     /** Local date the activity started, in the athlete's timezone. */
@@ -430,6 +443,8 @@ export const externalActivities = pgTable(
     avgHr: integer("avg_hr"),
     maxHr: integer("max_hr"),
     hrCoveredMin: integer("hr_covered_min"),
+    /** Garmin extras: training effect, load, activity name, local offset. */
+    details: jsonb("details").$type<ActivityDetails | null>(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -441,6 +456,120 @@ export const externalActivities = pgTable(
 );
 
 export type ExternalActivityRow = typeof externalActivities.$inferSelect;
+
+export interface ActivityDetails {
+  name?: string;
+  aerobicEffect?: number;
+  anaerobicEffect?: number;
+  trainingLoad?: number;
+  effectLabel?: string;
+  /** Minutes east of UTC where it was recorded. */
+  utcOffsetMin?: number;
+  totalKcal?: number;
+}
+
+export interface FitLap {
+  start: string;
+  durationSec: number | null;
+  avgHr: number | null;
+  maxHr: number | null;
+  distanceM: number | null;
+}
+
+/** Per-second detail from an activity's FIT file. */
+export const activityStreams = pgTable(
+  "activity_streams",
+  {
+    userId: text("user_id").notNull(),
+    source: text("source").$type<"garmin">().notNull(),
+    externalId: text("external_id").notNull(),
+    hrStart: timestamp("hr_start", { withTimezone: true }),
+    hrT: integer("hr_t").array().notNull().default([]),
+    hrBpm: smallint("hr_bpm").array().notNull().default([]),
+    laps: jsonb("laps").$type<FitLap[]>().notNull().default([]),
+    strengthSets: jsonb("strength_sets").$type<unknown[]>().notNull().default([]),
+    fitMeta: jsonb("fit_meta").$type<Record<string, unknown> | null>(),
+    parsedAt: timestamp("parsed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.source, t.externalId] })]
+);
+
+// ---------------------------------------------------------------------------
+// Garmin raw responses + per-device daily wearable data
+// ---------------------------------------------------------------------------
+
+export const rawGarmin = pgTable(
+  "raw_garmin",
+  {
+    userId: text("user_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    resourceKey: text("resource_key").notNull(),
+    localDate: date("local_date"),
+    payload: jsonb("payload").notNull(),
+    payloadSha256: text("payload_sha256").notNull(),
+    firstFetchedAt: timestamp("first_fetched_at", { withTimezone: true }).defaultNow().notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.endpoint, t.resourceKey] }),
+    index("idx_raw_garmin_user_date").on(t.userId, t.localDate),
+  ]
+);
+
+export interface SleepNeed {
+  baselineMin?: number;
+  actualMin?: number;
+  feedback?: string;
+  trainingFeedback?: string;
+  sleepHistoryAdjustment?: string;
+  hrvAdjustment?: string;
+  napAdjustment?: string;
+  /** Minutes after local midnight. */
+  bedtimeStartMin?: number;
+  bedtimeEndMin?: number;
+}
+
+export const dailyWearable = pgTable(
+  "daily_wearable",
+  {
+    userId: text("user_id").notNull(),
+    date: date("date").notNull(),
+    source: text("source").$type<"garmin" | "whoop" | "apple_health">().notNull(),
+    hrvMs: smallint("hrv_ms"),
+    hrvMethod: text("hrv_method").$type<"rmssd" | "sdnn">(),
+    hrvWeeklyAvgMs: smallint("hrv_weekly_avg_ms"),
+    hrv5minHighMs: smallint("hrv_5min_high_ms"),
+    hrvStatus: text("hrv_status"),
+    restingHr: smallint("resting_hr"),
+    sleepMin: smallint("sleep_min"),
+    deepMin: smallint("deep_min"),
+    lightMin: smallint("light_min"),
+    remMin: smallint("rem_min"),
+    awakeMin: smallint("awake_min"),
+    awakenings: smallint("awakenings"),
+    napMin: smallint("nap_min"),
+    sleepStart: timestamp("sleep_start", { withTimezone: true }),
+    sleepEnd: timestamp("sleep_end", { withTimezone: true }),
+    sleepUtcOffsetMin: smallint("sleep_utc_offset_min"),
+    sleepHrAvg: smallint("sleep_hr_avg"),
+    respirationAvg: numeric("respiration_avg", { precision: 4, scale: 1, mode: "number" }),
+    spo2Avg: numeric("spo2_avg", { precision: 4, scale: 1, mode: "number" }),
+    sleepStressAvg: smallint("sleep_stress_avg"),
+    sleepNeed: jsonb("sleep_need").$type<SleepNeed | null>(),
+    stressAvg: smallint("stress_avg"),
+    stress: jsonb("stress").$type<Record<string, number> | null>(),
+    bodyBattery: jsonb("body_battery").$type<Record<string, number> | null>(),
+    steps: integer("steps"),
+    moderateMin: smallint("moderate_min"),
+    vigorousMin: smallint("vigorous_min"),
+    activeKcal: integer("active_kcal"),
+    jetLag: jsonb("jet_lag").$type<Record<string, unknown> | null>(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date, t.source] })]
+);
+
+export type DailyWearableInsert = typeof dailyWearable.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Relations
