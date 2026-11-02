@@ -275,12 +275,12 @@ From Phase 2 on, every scoring module ships with vitest tests, and a `scripts/se
 |---|---|---|---|
 | Thyronorm | 150 mcg | On waking | Coffee comes 3–4 h later, so the 30–60 min rule is met by a wide margin |
 | Selenium | **100 mcg** (not 200) | With a meal | |
-| Magnesium glycinate | 2 tablets, 200 mg total | Bedtime | Is 200 mg elemental magnesium or the glycinate compound? The label says which |
-| Vitamin D3 | **60,000 IU once a week** | With a fat-containing meal, one weekday | Which day |
+| Magnesium glycinate | 2 tablets, 200 mg of glycinate total (about 28 mg elemental, since glycinate is ~14% magnesium) | Bedtime | Stored as compound + elemental so labs and adherence read correctly |
+| Vitamin D3 | **60,000 IU once a week, Saturday** | With a fat-containing meal | |
 | Naturelo One Daily | 1 tab | With a meal, ≥4 h after Thyronorm | Label photo later (iron, calcium, biotin) |
-| ON Gold Standard Whey | 1 scoop, 24 g protein (~31 g powder) | Post-workout | Assumed 24 g is the protein per scoop |
+| ON Gold Standard Whey | 1 scoop, 24 g protein (~31 g powder) | Post-workout | Confirmed |
 | Sports Research Multi Collagen | 1 serving | Flexible | Nutrition from the label |
-| Creatine monohydrate | **5 g** daily | Any time | Written as "5mg"; taken to mean 5 g |
+| Creatine monohydrate | **5 g** daily | Any time | Confirmed |
 
 ## 7. Garmin Personal API (verified 2026-11-03)
 
