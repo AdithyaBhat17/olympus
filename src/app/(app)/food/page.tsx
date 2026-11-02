@@ -4,10 +4,12 @@ import { addDays, formatDayShort, tzOffsetMin } from "@/lib/dates";
 import { mealForTime } from "@/domain/nutrition";
 import { todayFor, getProfile } from "@/server/profile";
 import { dayView } from "@/server/food/logs";
+import { todaySlots } from "@/server/supplements";
 import { PageHeader } from "@/components/page-header";
 import { DaySummary } from "@/components/food/day-summary";
 import { MealList } from "@/components/food/meal-list";
 import { LogButton } from "@/components/food/log-button";
+import { SlotCard } from "@/components/supplements/slot-card";
 
 export const metadata = { title: "Food" };
 
@@ -15,7 +17,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
   const userId = await requireUserEmail();
   const [today, profile, sp] = await Promise.all([todayFor(userId), getProfile(userId), searchParams]);
   const date = sp.d && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) && sp.d <= today ? sp.d : today;
-  const view = await dayView(userId, date);
+  const [view, slots] = await Promise.all([dayView(userId, date), todaySlots(userId, date)]);
   const isToday = date === today;
   const now = new Date();
   const localMin = Math.floor((((now.getTime() / 60_000 + tzOffsetMin(now, profile.timezone)) % 1440) + 1440) % 1440);
@@ -44,6 +46,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
         }
       />
       <DaySummary view={view} />
+      <SlotCard data={slots} compact />
       <MealList view={view} />
       <LogButton date={date} isToday={isToday} defaultMeal={isToday ? mealForTime(localMin) : "lunch"} />
     </div>

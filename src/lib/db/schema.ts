@@ -774,3 +774,124 @@ export const weighIns = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.source, t.measuredAt] })]
 );
+
+// ---------------------------------------------------------------------------
+// Supplements, timing rules, labs (Phase 2b). See migration-013-supplements.sql.
+// ---------------------------------------------------------------------------
+
+export type SupplementSlot = "waking" | "breakfast" | "lunch" | "dinner" | "pre_workout" | "post_workout" | "bedtime" | "any";
+
+export const supplements = pgTable("supplements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  form: text("form").$type<"tablet" | "capsule" | "softgel" | "powder" | "liquid" | "gummy" | "other">().notNull().default("tablet"),
+  servingDesc: text("serving_desc").notNull().default("1 serving"),
+  servingsPerDose: num("servings_per_dose", 5, 2).notNull().default(1),
+  servingsPerContainer: num("servings_per_container", 7, 1),
+  slot: text("slot").$type<SupplementSlot>().notNull(),
+  activeDays: smallint("active_days").array().notNull().default([]),
+  tags: text("tags").array().notNull().default([]),
+  markers: text("markers").array().notNull().default([]),
+  foodId: uuid("food_id").references(() => foods.id),
+  foodGramsPerServing: num("food_grams_per_serving", 6, 1),
+  whereToBuy: jsonb("where_to_buy").$type<Array<{ region: string; note: string }>>().notNull().default([]),
+  notes: text("notes"),
+  position: smallint("position").notNull().default(0),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type SupplementRow = typeof supplements.$inferSelect;
+
+export const supplementIngredients = pgTable(
+  "supplement_ingredients",
+  {
+    supplementId: uuid("supplement_id")
+      .notNull()
+      .references(() => supplements.id, { onDelete: "cascade" }),
+    nutrient: text("nutrient").notNull(),
+    amount: num("amount", 10, 3).notNull(),
+    unit: text("unit").$type<"mcg" | "mg" | "g" | "IU" | "kcal" | "%">().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.supplementId, t.nutrient] })]
+);
+
+export const supplementLogs = pgTable(
+  "supplement_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    supplementId: uuid("supplement_id")
+      .notNull()
+      .references(() => supplements.id, { onDelete: "cascade" }),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull(),
+    tz: text("tz").notNull(),
+    localDate: date("local_date").notNull(),
+    status: text("status").$type<"taken" | "half" | "skipped">().notNull(),
+    doseMultiplier: num("dose_multiplier", 4, 2).notNull(),
+    late: boolean("late").notNull().default(false),
+    foodLogId: uuid("food_log_id").references(() => foodLogs.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("supplement_logs_user_id_supplement_id_local_date_key").on(t.userId, t.supplementId, t.localDate)]
+);
+
+export const supplementInventory = pgTable("supplement_inventory", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  supplementId: uuid("supplement_id")
+    .notNull()
+    .references(() => supplements.id, { onDelete: "cascade" }),
+  at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+  servings: num("servings", 7, 1).notNull(),
+  kind: text("kind").$type<"restock" | "count">().notNull(),
+  region: text("region"),
+  note: text("note"),
+});
+
+export const timingRules = pgTable("timing_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id"),
+  key: text("key").notNull(),
+  subjectTag: text("subject_tag").notNull(),
+  objectTag: text("object_tag").notNull(),
+  minGapMin: integer("min_gap_min").notNull(),
+  direction: text("direction").$type<"after" | "either">().notNull(),
+  message: text("message").notNull(),
+  citation: text("citation").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const labResults = pgTable(
+  "lab_results",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    drawnOn: date("drawn_on").notNull(),
+    marker: text("marker").notNull(),
+    value: num("value", 10, 3).notNull(),
+    unit: text("unit").notNull(),
+    refLow: num("ref_low", 10, 3),
+    refHigh: num("ref_high", 10, 3),
+    lab: text("lab"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("lab_results_user_id_drawn_on_marker_key").on(t.userId, t.drawnOn, t.marker)]
+);
+
+export const labAppointments = pgTable("lab_appointments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  tz: text("tz").notNull(),
+  markers: text("markers").array().notNull().default([]),
+  fasting: boolean("fasting").notNull().default(false),
+  note: text("note"),
+  thyroidMedInstruction: text("thyroid_med_instruction"),
+  doneAt: timestamp("done_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

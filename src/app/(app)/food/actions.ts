@@ -22,6 +22,8 @@ import {
 } from "@/server/food/foods";
 import { createLog, deleteItem, deleteLog, updateItemGrams, type NewLog } from "@/server/food/logs";
 import { draftFromText } from "@/server/food/log-text";
+import { nudgesFor } from "@/server/supplements";
+import { nudgeSummary } from "@/domain/supplements";
 
 type R<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -95,8 +97,8 @@ export async function barcodeAction(code: string) {
 }
 
 export async function logItemsAction(input: NewLog) {
-  return run((userId) =>
-    createLog(userId, {
+  return run(async (userId) => {
+    const log = await createLog(userId, {
       meal: input.meal,
       date: input.date,
       time: input.time,
@@ -110,8 +112,12 @@ export async function logItemsAction(input: NewLog) {
         estGrams: i.estGrams == null ? null : Number(i.estGrams),
         confidence: i.confidence == null ? null : Number(i.confidence),
       })),
-    })
-  );
+    });
+    // Medication timing: a gentle note if this meal sits close to something it shouldn't.
+    const nudges = await nudgesFor(userId, [`f:${log.id}`], log.eatenAt).catch(() => []);
+    const summary = nudgeSummary(nudges);
+    return { ...log, nudges: summary ? [summary] : [] };
+  });
 }
 
 export async function deleteLogAction(id: string) {

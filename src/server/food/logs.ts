@@ -43,7 +43,7 @@ function countsToProtein(food: { name: string; tags: string[] }, collagenCounts:
   return !(food.tags.includes("collagen") || /\bcollagen\b/i.test(food.name));
 }
 
-export async function createLog(userId: string, input: NewLog): Promise<{ id: string; date: string }> {
+export async function createLog(userId: string, input: NewLog): Promise<{ id: string; date: string; eatenAt: Date }> {
   const items = input.items.filter((i) => i.grams > 0);
   if (!items.length) throw new DomainError("Add at least one food with its weight.");
   if (items.some((i) => i.grams > 5000)) throw new DomainError("That's over 5 kg of one food. Check the grams.");
@@ -94,7 +94,7 @@ export async function createLog(userId: string, input: NewLog): Promise<{ id: st
     })
   );
   await syncProteinCheckIn(userId, localDate);
-  return { id: log.id, date: localDate };
+  return { id: log.id, date: localDate, eatenAt };
 }
 
 async function ownLog(userId: string, logId: string) {

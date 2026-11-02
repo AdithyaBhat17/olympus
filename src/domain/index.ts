@@ -10,3 +10,4 @@ export * from "./targets";
 export * from "./training-load";
 export * from "./check-in-sources";
 export * from "./nutrition";
+export * from "./supplements";

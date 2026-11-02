@@ -150,6 +150,7 @@ export function LogSheet({
         return;
       }
       toast.success(`Logged ${Math.round(totals.kcal)} kcal, ${Math.round(totals.proteinCounted)} g protein`);
+      for (const n of r.data.nudges) toast.info(n, { duration: 9000 });
       reset();
       onClose();
       router.refresh();
