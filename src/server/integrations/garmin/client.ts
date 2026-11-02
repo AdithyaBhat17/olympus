@@ -85,6 +85,36 @@ export function parseTokenResponse(body: Record<string, unknown>, now: number): 
   };
 }
 
+/** Seconds since epoch from a JWT's `exp` claim, or null. Doesn't verify anything. */
+export function jwtExp(token: string): number | null {
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as { exp?: unknown };
+    return typeof claims.exp === "number" ? claims.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The token endpoint answers with the bare JWT as the body (seen 2026-11-03),
+ * not JSON. Accept either, and take the lifetime from the JWT's exp claim.
+ */
+export function parseTokenText(text: string, now: number): GarminToken {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{")) return parseTokenResponse(JSON.parse(trimmed), now);
+  const raw = trimmed.replace(/^"|"$/g, "");
+  if (!/^[\w-]+\.[\w-]+\.[\w-]*$/.test(raw)) throw new Error("Garmin token response was neither JSON nor a JWT");
+  const exp = jwtExp(raw);
+  const expiresIn = exp ? exp - Math.floor(now / 1000) : 24 * 3600;
+  return {
+    accessToken: raw,
+    expiresAt: now + Math.max(60, expiresIn - 600) * 1000,
+    responseKeys: ["(bare JWT)", ...(exp ? ["exp"] : [])],
+  };
+}
+
 export class GarminClient {
   private token: GarminToken | null = null;
   private lastRequestAt = 0;
@@ -108,13 +138,14 @@ export class GarminClient {
     if (!force && this.token && this.token.expiresAt > this.now()) return this.token;
     const res = await this.request(TOKEN_PATH, {
       method: "POST",
-      headers: { Authorization: `ApiKey ${this.opts.apiKey}`, Accept: "application/json" },
+      // No Accept header: the token endpoint answers 406 to Accept: application/json.
+      headers: { Authorization: `ApiKey ${this.opts.apiKey}` },
     });
     const text = await res.text();
     if (!res.ok) {
       throw new GarminApiError(`Garmin token exchange failed: ${res.status}`, res.status, TOKEN_PATH, text.slice(0, 300));
     }
-    this.token = parseTokenResponse(JSON.parse(text), this.now());
+    this.token = parseTokenText(text, this.now());
     return this.token;
   }
 

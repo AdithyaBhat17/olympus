@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Encoder, Profile, type Mesg } from "@garmin/fitsdk";
 import { zipSync } from "fflate";
-import { backoffMs, GarminApiError, GarminClient, parseTokenResponse } from "./client";
+import { backoffMs, GarminApiError, GarminClient, jwtExp, parseTokenResponse, parseTokenText } from "./client";
 import {
   chunkWindow,
   datesBetween,
@@ -76,6 +76,17 @@ describe("client", () => {
     expect(() => parseTokenResponse({ nope: 1 }, 0)).toThrow(/no access token/);
   });
 
+  it("accepts a bare JWT body and reads its exp", () => {
+    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const jwt = `${b64({ alg: "RS256" })}.${b64({ exp: 1000 + 86400 })}.sig`;
+    expect(jwtExp(jwt)).toBe(87400);
+    const t = parseTokenText(`${jwt}\n`, 1000 * 1000);
+    expect(t.accessToken).toBe(jwt);
+    expect(t.expiresAt).toBe(1000 * 1000 + (86400 - 600) * 1000);
+    expect(parseTokenText(JSON.stringify({ access_token: "x" }), 0).accessToken).toBe("x");
+    expect(() => parseTokenText("<html>nope</html>", 0)).toThrow();
+  });
+
   it("backs off exponentially, honours Retry-After, caps", () => {
     expect(backoffMs(0, null, 0.5)).toBe(1000);
     expect(backoffMs(3, null, 0.5)).toBe(8000);
@@ -84,9 +95,10 @@ describe("client", () => {
   });
 
   function fakeFetch(responses: Array<() => Response>) {
-    const calls: Array<{ url: string; auth: string | null }> = [];
+    const calls: Array<{ url: string; auth: string | null; accept?: string | null }> = [];
     const impl = (async (url: string, init?: RequestInit) => {
-      calls.push({ url, auth: new Headers(init?.headers).get("authorization") });
+      const h = new Headers(init?.headers);
+      calls.push({ url, auth: h.get("authorization"), ...(url.includes("/token") ? { accept: h.get("accept") } : {}) });
       const next = responses.shift();
       if (!next) throw new Error("no more responses");
       return next();
@@ -102,6 +114,7 @@ describe("client", () => {
     const r = await c.getJson("/x", { date: "2026-11-01", skip: undefined });
     expect(r.data).toEqual({ ok: 1 });
     expect(calls[0].auth).toBe("ApiKey KEY");
+    expect(calls[0].accept).toBeNull();
     expect(calls[0].url).toMatch(/personal-api-key\/token$/);
     expect(calls[1]).toEqual({ url: "https://personal.connectapi.garmin.com/x?date=2026-11-01", auth: "Bearer tok" });
   });
