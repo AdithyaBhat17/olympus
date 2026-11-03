@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { foodParseEvents, type ParseFinalItem } from "@/lib/db/schema";
 import { jsonCall, LlmError } from "../llm/openrouter";
 import { getFood, searchFoods, usualPortions, per100, type FoodSummary } from "./foods";
-import { chooseGrams, cleanItem, isParseResult, parseOutcome, parsePrompt, PARSE_SCHEMA, type ParseResult, type PortionChoice } from "./text-parse";
+import { listStack } from "../supplements";
+import { chooseGrams, cleanItem, isParseResult, matchSupplement, parseOutcome, parsePrompt, PARSE_SCHEMA, type ParseResult, type PortionChoice } from "./text-parse";
 
 export interface DraftItem {
   /** What the person wrote for this item. */
@@ -25,6 +26,10 @@ export interface DraftItem {
   /** Nutrients for `grams` of the match. */
   kcal: number;
   protein: number;
+  /** "HH:mm" when the text said when; null = the sheet's time. */
+  time: string | null;
+  /** One of the athlete's supplements: logged as a dose, not a food. */
+  supplement: { id: string; name: string; servingDesc: string } | null;
 }
 
 export interface TextDraft {
@@ -41,12 +46,16 @@ export interface TextDraft {
  * confirm sheet. Nothing is saved here.
  */
 export async function draftFromText(userId: string, text: string, client: "web" | "ios" | null = null): Promise<TextDraft> {
-  const usual = await usualPortions(userId);
+  const [usual, stack] = await Promise.all([usualPortions(userId), listStack(userId)]);
   const started = Date.now();
   let result;
   try {
     result = await jsonCall<ParseResult>({
-      messages: parsePrompt(text, usual.map((u) => ({ name: u.name, grams: u.grams, times: u.times }))),
+      messages: parsePrompt(
+        text,
+        usual.map((u) => ({ name: u.name, grams: u.grams, times: u.times })),
+        stack.map((s) => ({ name: s.name, hint: [...s.tags, s.brand].filter(Boolean).join(", ") || undefined }))
+      ),
       schema: PARSE_SCHEMA,
       validate: isParseResult,
     });
@@ -61,12 +70,20 @@ export async function draftFromText(userId: string, text: string, client: "web" 
 
   const items = await Promise.all(
     parsed.map(async (p): Promise<DraftItem> => {
+      const supp = p.supplement ? matchSupplement(p.supplement, stack) : null;
+      if (supp) {
+        return {
+          said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate",
+          confidence: p.confidence, match: null, alternatives: [], kcal: 0, protein: 0, time: p.time,
+          supplement: { id: supp.id, name: supp.name, servingDesc: supp.servingDesc },
+        };
+      }
       const candidates = await searchFoods(userId, p.search, 6, { preferCooked: true });
       // A wrong food is worse than none: only a candidate with the food word is picked.
       // Weak ones stay as alternatives, so the sheet can offer them.
       const top = candidates[0]?.strong === false ? undefined : candidates[0];
       if (!top) {
-        return { said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: candidates.slice(0, 5), kcal: 0, protein: 0 };
+        return { said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: candidates.slice(0, 5), kcal: 0, protein: 0, time: p.time, supplement: null };
       }
       const { portions, food } = await getFood(userId, top.id);
       const choice = chooseGrams(p, portions, usualById.get(top.id) ?? null);
@@ -84,6 +101,8 @@ export async function draftFromText(userId: string, text: string, client: "web" 
         alternatives: candidates.slice(1),
         kcal: m.kcal,
         protein: m.protein,
+        time: p.time,
+        supplement: null,
       };
     })
   );
@@ -113,7 +132,7 @@ async function recordDraft(
         latencyMs: r.latencyMs ?? null,
         costUsd: r.costUsd ?? null,
         error: r.error ?? null,
-        unmatched: items.filter((i) => !i.match).length,
+        unmatched: items.filter((i) => !i.match && !i.supplement).length,
         draft: items.map((i) => ({
           said: i.said,
           search: i.search,
@@ -127,6 +146,8 @@ async function recordDraft(
           matchName: i.match?.name ?? null,
           matchSource: i.match?.source ?? null,
           alternativeIds: i.alternatives.map((a) => a.id),
+          time: i.time,
+          supplementId: i.supplement?.id ?? null,
         })),
       })
       .returning({ id: foodParseEvents.id });
@@ -143,12 +164,12 @@ async function recordDraft(
  * combined draft and stored on the first; the rest are linked with zeros, so
  * weekly sums stay right. A draft only counts once.
  */
-export async function recordOutcome(userId: string, draftIds: string[], logId: string, final: ParseFinalItem[]): Promise<void> {
+export async function recordOutcome(userId: string, draftIds: string[], logId: string | null, final: ParseFinalItem[]): Promise<void> {
   try {
     const events = await db
       .select({ id: foodParseEvents.id, draft: foodParseEvents.draft })
       .from(foodParseEvents)
-      .where(and(inArray(foodParseEvents.id, draftIds), eq(foodParseEvents.userId, userId), isNull(foodParseEvents.foodLogId)))
+      .where(and(inArray(foodParseEvents.id, draftIds), eq(foodParseEvents.userId, userId), isNull(foodParseEvents.loggedAt)))
       .orderBy(asc(foodParseEvents.createdAt));
     if (!events.length) return;
     const o = parseOutcome(events.flatMap((e) => e.draft), final);

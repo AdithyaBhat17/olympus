@@ -20,7 +20,7 @@ import {
   type UserFoodInput,
 } from "@/server/food/foods";
 import { deleteItem, deleteLog, updateItemGrams, type NewLog } from "@/server/food/logs";
-import { barcodeSummary, logWithNudges } from "@/server/food/screen";
+import { barcodeSummary, logWithNudges, type DescribedDose } from "@/server/food/screen";
 import { draftFromText } from "@/server/food/log-text";
 
 type R<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -74,7 +74,7 @@ export async function barcodeAction(code: string) {
   return run((userId) => barcodeSummary(userId, str(code, 20)), false);
 }
 
-export async function logItemsAction(input: NewLog) {
+export async function logItemsAction(input: NewLog & { doses?: DescribedDose[] }) {
   return run((userId) =>
     logWithNudges(userId, {
       meal: input.meal,
@@ -90,6 +90,11 @@ export async function logItemsAction(input: NewLog) {
         grams: Number(i.grams),
         estGrams: i.estGrams == null ? null : Number(i.estGrams),
         confidence: i.confidence == null ? null : Number(i.confidence),
+        time: typeof i.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(i.time) ? i.time : null,
+      })),
+      doses: (input.doses ?? []).slice(0, 20).map((d) => ({
+        supplementId: str(d.supplementId, 40),
+        time: typeof d.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(d.time) ? d.time : null,
       })),
     })
   );

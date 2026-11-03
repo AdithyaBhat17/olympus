@@ -57,7 +57,7 @@ export function buildParseReport(rows: ParseEventRow[]): ParseReport {
   const latencies = rows.map((r) => r.latencyMs).filter((n): n is number => n != null).sort((a, b) => a - b);
   const sum = (k: "kept" | "regrammed" | "swapped" | "removed" | "added") => rows.reduce((s, r) => s + (r[k] ?? 0), 0);
   const items = {
-    drafted: rows.reduce((s, r) => s + r.draft.length, 0),
+    drafted: rows.reduce((s, r) => s + r.draft.filter((d) => !d.supplementId).length, 0),
     unmatched: rows.reduce((s, r) => s + r.unmatched, 0),
     kept: sum("kept"),
     regrammed: sum("regrammed"),
@@ -72,7 +72,8 @@ export function buildParseReport(rows: ParseEventRow[]): ParseReport {
   // Not in the database: every unmatched draft item, logged or not.
   const missing = new Map<string, { said: string; search: string; times: number; examples: string[] }>();
   for (const r of rows) {
-    for (const d of r.draft.filter((x) => !x.matchId)) {
+    // Supplements are logged as doses, not looked up as foods.
+    for (const d of r.draft.filter((x) => !x.matchId && !x.supplementId)) {
       const k = d.search || d.said;
       const m = missing.get(k) ?? { said: d.said, search: d.search, times: 0, examples: [] };
       m.times++;

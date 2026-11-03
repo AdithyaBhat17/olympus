@@ -755,6 +755,9 @@ export interface ParseDraftItem {
   matchName: string | null;
   matchSource: string | null;
   alternativeIds: string[];
+  /** Added with times in describe; absent on older rows. */
+  time?: string | null;
+  supplementId?: string | null;
 }
 
 export interface ParseFinalItem {
