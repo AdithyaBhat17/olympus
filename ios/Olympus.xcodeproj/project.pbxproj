@@ -302,7 +302,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/Olympus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = WMSVZVDA5C;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -312,6 +312,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Olympus reads your protein, water, sleep, HRV and resting heart rate so your PT can program around your recovery.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Debug builds only: adds sample data to the Simulator's Health.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Olympus uses the camera to scan food barcodes. Nothing is recorded or uploaded.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -337,7 +338,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/Olympus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = WMSVZVDA5C;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -347,6 +348,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Olympus reads your protein, water, sleep, HRV and resting heart rate so your PT can program around your recovery.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Olympus only reads your Health data. It never saves anything to Health.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Olympus uses the camera to scan food barcodes. Nothing is recorded or uploaded.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -369,7 +371,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = WMSVZVDA5C;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/OlympusWidgets-Info.plist";
@@ -395,7 +397,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = WMSVZVDA5C;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/OlympusWidgets-Info.plist";

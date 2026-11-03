@@ -48,3 +48,6 @@ public/worker-*.js.map
 
 # Garmin discovery raw responses (health data)
 /.garmin-discovery/
+
+# Food database downloads (USDA, INDB)
+/.food-data/

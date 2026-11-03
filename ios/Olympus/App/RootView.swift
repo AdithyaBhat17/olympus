@@ -3,11 +3,12 @@ import SwiftUI
 import UIKit
 
 enum Tab: Hashable, CaseIterable {
-    case today, log, progress, library
+    case today, food, log, progress, library
 
     var icon: String {
         switch self {
         case .today: "sun.max.fill"
+        case .food: "fork.knife"
         case .log: "list.bullet.rectangle.fill"
         case .progress: "chart.line.uptrend.xyaxis"
         case .library: "books.vertical.fill"
@@ -17,6 +18,7 @@ enum Tab: Hashable, CaseIterable {
     var label: String {
         switch self {
         case .today: "Today"
+        case .food: "Food"
         case .log: "Log"
         case .progress: "Progress"
         case .library: "Library"
@@ -29,6 +31,8 @@ enum Tab: Hashable, CaseIterable {
 @Observable
 final class Router {
     var tab: Tab = .today
+    /// Set by olympus://food/log; the Food tab opens its log sheet and clears it.
+    var foodLog: FoodLogSheet.Mode?
     /// A session to show full screen: live, or its summary when done.
     var session: SessionRoute?
     var formCue: FormCueRoute?
@@ -55,16 +59,37 @@ struct RootView: View {
                 MainTabs()
                     .environment(router)
                     .task { await model.signedIn() }
-                    // olympus://session/<id>, from the workout Live Activity.
-                    .onOpenURL { url in
-                        guard url.scheme == "olympus", url.host() == "session", let id = url.pathComponents.dropFirst().first else { return }
-                        if router.session?.id != id { router.session = .init(id: id) }
+                    .onOpenURL(perform: open)
+                    #if DEBUG
+                    // Headless simulator runs: SIMCTL_CHILD_OLYMPUS_DEBUG_URL=olympus://tab/food.
+                    .task {
+                        if let s = ProcessInfo.processInfo.environment["OLYMPUS_DEBUG_URL"], let url = URL(string: s) { open(url) }
                     }
+                    #endif
             } else {
                 SignInView()
             }
         }
         .overlay(alignment: .top) { ToastOverlay() }
+    }
+
+    /// olympus://session/<id> (the workout Live Activity), olympus://tab/food,
+    /// olympus://food/log?mode=search.
+    private func open(_ url: URL) {
+        guard url.scheme == "olympus" else { return }
+        let arg = url.pathComponents.dropFirst().first
+        switch url.host() {
+        case "session":
+            if let id = arg, router.session?.id != id { router.session = .init(id: id) }
+        case "tab":
+            if let t = Tab.allCases.first(where: { "\($0)" == arg }) { router.tab = t }
+        case "food" where arg == "log":
+            let mode = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "mode" }?.value
+            router.tab = .food
+            router.foodLog = mode.flatMap(FoodLogSheet.Mode.init) ?? .describe
+        default: break
+        }
     }
 }
 
@@ -75,10 +100,11 @@ struct MainTabs: View {
     var body: some View {
         @Bindable var router = router
         ZStack(alignment: .bottom) {
-            // All four stay alive, so switching tabs keeps each one's data and
+            // All five stay alive, so switching tabs keeps each one's data and
             // scroll position (and never re-fetches into an error when offline).
             ZStack {
                 tab(.today) { TodayView() }
+                tab(.food) { FoodView() }
                 tab(.log) { HistoryView() }
                 tab(.progress) { ProgressListView() }
                 tab(.library) { LibraryView() }
@@ -119,7 +145,7 @@ extension MainTabs {
     }
 }
 
-/// The floating dark pill from src/components/bottom-nav.tsx: four icon tabs,
+/// The floating dark pill from src/components/bottom-nav.tsx: five icon tabs,
 /// a white capsule that springs to the active one.
 struct TabPill: View {
     @Binding var selection: Tab

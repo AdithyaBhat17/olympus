@@ -32,7 +32,7 @@ struct TodayRecoveryCard: View {
     private var targets: RecoveryCardData.CardTargets { data.targets }
     private var short: Bool { vals.sleepMin.map { $0 < targets.minSleepMin } ?? false }
 
-    private static let sourceLabel = ["garmin": "Garmin", "whoop": "Whoop", "apple_health": "Apple Health", "claude": "Claude", "manual": "Manual"]
+    private static let sourceLabel = ["food_log": "Food log", "garmin": "Garmin", "whoop": "Whoop", "apple_health": "Apple Health", "claude": "Claude", "manual": "Manual"]
     private static let deviceSources: Set<String> = ["garmin", "whoop", "apple_health"]
 
     /// " (Garmin)" for a value a device synced; nothing for one the athlete typed.

@@ -57,3 +57,34 @@ export function formatTimeInTz(d: Date, tz: string): string {
     minute: "2-digit",
   }).format(d);
 }
+
+/** Minutes east of UTC for `tz` at instant `d`. */
+export function tzOffsetMin(d: Date, tz: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value])
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return Math.round((asUtc - Math.floor(d.getTime() / 1000) * 1000) / 60_000);
+}
+
+/** "2024-06-28" + "21:20" in `tz` → the UTC instant. */
+export function localToUtc(isoDate: string, hhmm: string, tz: string): Date {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const [h, min] = hhmm.split(":").map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, min);
+  let t = guess - tzOffsetMin(new Date(guess), tz) * 60_000;
+  // Once more in case the first guess sat across a DST change.
+  t = guess - tzOffsetMin(new Date(t), tz) * 60_000;
+  return new Date(t);
+}

@@ -15,6 +15,8 @@ export interface AthleteProfile {
   timezoneSet: boolean;
   targets: Targets;
   rotation: string[];
+  /** Collagen protein counts toward the protein floor (off by default). */
+  collagenCountsToProtein: boolean;
 }
 
 /** One read per request; every "today" and target on the page agrees. */
@@ -29,6 +31,7 @@ export const getProfile = cache(async (userId: string): Promise<AthleteProfile> 
       ? { kcal: row.kcal, proteinG: row.proteinG, waterMl: row.waterMl, minSleepMin: row.minSleepMin }
       : DEFAULT_TARGETS,
     rotation: row?.rotation.length ? row.rotation : [...DEFAULT_ROTATION],
+    collagenCountsToProtein: row?.collagenCountsToProtein ?? false,
   };
 });
 

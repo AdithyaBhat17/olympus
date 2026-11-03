@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { garminConfigured, garminUserIds, remindKeyExpiry, syncGarmin } from "@/server/integrations/garmin/sync";
+import { dailySupplementReminders, supplementUserIds } from "@/server/supplements";
 
 /**
- * Daily Garmin sync + key-expiry reminders, called by Vercel Cron (Hobby
- * allows one run a day; app opens fill the gaps). Vercel sends
- * `Authorization: Bearer $CRON_SECRET`.
+ * The daily job, called by Vercel Cron (Hobby allows one run a day; app
+ * opens fill the gaps): Garmin sync + key-expiry reminders, then supplement
+ * refill and blood-test reminders. Vercel sends `Authorization: Bearer $CRON_SECRET`.
  */
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -19,7 +20,15 @@ function authorized(req: Request): boolean {
 
 export async function GET(req: Request) {
   if (!authorized(req)) return new Response("Unauthorized", { status: 401 });
-  if (!garminConfigured()) return Response.json({ ok: true, skipped: "GARMIN_SECRET_KEY not set" });
+  const reminders: Array<{ user: number; sent: boolean; error?: string }> = [];
+  for (const [i, userId] of (await supplementUserIds()).entries()) {
+    try {
+      reminders.push({ user: i, sent: await dailySupplementReminders(userId) });
+    } catch (err) {
+      reminders.push({ user: i, sent: false, error: String(err instanceof Error ? err.message : err).slice(0, 200) });
+    }
+  }
+  if (!garminConfigured()) return Response.json({ ok: true, skipped: "GARMIN_SECRET_KEY not set", reminders });
   const results: Array<{ user: number; ok: boolean; days?: number; activities?: number; reminded?: boolean; error?: string }> = [];
   const users = await garminUserIds();
   for (const [i, userId] of users.entries()) {
@@ -33,5 +42,5 @@ export async function GET(req: Request) {
       results.push({ user: i, ok: false, error: String(err instanceof Error ? err.message : err).slice(0, 200) });
     }
   }
-  return Response.json({ ok: results.every((r) => r.ok), results });
+  return Response.json({ ok: results.every((r) => r.ok), results, reminders });
 }

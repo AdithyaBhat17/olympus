@@ -191,6 +191,8 @@ export const athleteProfiles = pgTable("athlete_profiles", {
   minSleepMin: integer("min_sleep_min").notNull().default(360),
   /** Session letters in rotation order, e.g. {A,B,C}. */
   rotation: text("rotation").array().notNull().default(["A", "B", "C"]),
+  /** Collagen protein counts toward the protein floor. Off: incomplete amino acids, negligible leucine. */
+  collagenCountsToProtein: boolean("collagen_counts_to_protein").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -609,3 +611,287 @@ export const planItemsRelations = relations(planItems, ({ one }) => ({
     references: [exercises.id],
   }),
 }));
+
+// ---------------------------------------------------------------------------
+// Food (Phase 2): database, recipes, logs, weigh-ins. See migration-012-food.sql.
+// ---------------------------------------------------------------------------
+
+export type FoodSourceKind = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "off";
+
+const num = (name: string, precision: number, scale: number) => numeric(name, { precision, scale, mode: "number" });
+
+export const foods = pgTable("foods", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id"),
+  source: text("source").$type<FoodSourceKind>().notNull(),
+  sourceId: text("source_id"),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  barcode: text("barcode"),
+  category: text("category"),
+  aliases: text("aliases").array().notNull().default([]),
+  searchText: text("search_text").notNull(),
+  kcal100g: num("kcal_100g", 7, 2).notNull(),
+  protein100g: num("protein_100g", 6, 2),
+  carbs100g: num("carbs_100g", 6, 2),
+  fat100g: num("fat_100g", 6, 2),
+  fibre100g: num("fibre_100g", 6, 2),
+  sugar100g: num("sugar_100g", 6, 2),
+  sodiumMg100g: num("sodium_mg_100g", 8, 2),
+  micros: jsonb("micros").$type<Record<string, number>>().notNull().default({}),
+  tags: text("tags").array().notNull().default([]),
+  servingG: num("serving_g", 7, 1),
+  servingLabel: text("serving_label"),
+  recipeYieldG: num("recipe_yield_g", 8, 1),
+  verified: boolean("verified").notNull().default(false),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type FoodRow = typeof foods.$inferSelect;
+export type FoodInsert = typeof foods.$inferInsert;
+
+export const foodPortions = pgTable(
+  "food_portions",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    foodId: uuid("food_id")
+      .notNull()
+      .references(() => foods.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    grams: num("grams", 7, 1).notNull(),
+    position: smallint("position").notNull().default(0),
+  },
+  (t) => [uniqueIndex("food_portions_food_id_label_key").on(t.foodId, t.label)]
+);
+
+export const recipeIngredients = pgTable(
+  "recipe_ingredients",
+  {
+    recipeId: uuid("recipe_id")
+      .notNull()
+      .references(() => foods.id, { onDelete: "cascade" }),
+    position: smallint("position").notNull(),
+    ingredientId: uuid("ingredient_id")
+      .notNull()
+      .references(() => foods.id),
+    grams: num("grams", 7, 1).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.recipeId, t.position] })]
+);
+
+export type FoodInputMode = "search" | "text" | "photo" | "barcode" | "saved" | "recipe" | "supplement" | "mfp_import";
+
+export const foodLogs = pgTable("food_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  eatenAt: timestamp("eaten_at", { withTimezone: true }).notNull(),
+  tz: text("tz").notNull(),
+  localDate: date("local_date").notNull(),
+  meal: text("meal").$type<"breakfast" | "lunch" | "dinner" | "snack">().notNull(),
+  inputMode: text("input_mode").$type<FoodInputMode>().notNull(),
+  rawText: text("raw_text"),
+  note: text("note"),
+  model: text("model"),
+  costUsd: num("cost_usd", 8, 5),
+  externalRef: text("external_ref"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const foodLogItems = pgTable("food_log_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  logId: uuid("log_id")
+    .notNull()
+    .references(() => foodLogs.id, { onDelete: "cascade" }),
+  position: smallint("position").notNull().default(0),
+  foodId: uuid("food_id").references(() => foods.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  foodSource: text("food_source").notNull(),
+  grams: num("grams", 7, 1),
+  kcal: num("kcal", 7, 1).notNull(),
+  proteinG: num("protein_g", 6, 1).notNull().default(0),
+  carbsG: num("carbs_g", 6, 1).notNull().default(0),
+  fatG: num("fat_g", 6, 1).notNull().default(0),
+  fibreG: num("fibre_g", 6, 1).notNull().default(0),
+  countsToProtein: boolean("counts_to_protein").notNull().default(true),
+  estGrams: num("est_grams", 7, 1),
+  confidence: num("confidence", 3, 2),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const foodFavourites = pgTable(
+  "food_favourites",
+  {
+    userId: text("user_id").notNull(),
+    foodId: uuid("food_id")
+      .notNull()
+      .references(() => foods.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.foodId] })]
+);
+
+export const savedMeals = pgTable(
+  "saved_meals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("saved_meals_user_id_name_key").on(t.userId, t.name)]
+);
+
+export const savedMealItems = pgTable(
+  "saved_meal_items",
+  {
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => savedMeals.id, { onDelete: "cascade" }),
+    position: smallint("position").notNull(),
+    foodId: uuid("food_id")
+      .notNull()
+      .references(() => foods.id),
+    grams: num("grams", 7, 1).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.mealId, t.position] })]
+);
+
+export const weighIns = pgTable(
+  "weigh_ins",
+  {
+    userId: text("user_id").notNull(),
+    source: text("source").$type<"manual" | "mfp" | "apple_health" | "withings" | "garmin">().notNull(),
+    measuredAt: timestamp("measured_at", { withTimezone: true }).notNull(),
+    tz: text("tz").notNull(),
+    localDate: date("local_date").notNull(),
+    kg: num("kg", 5, 2),
+    bodyFatPct: num("body_fat_pct", 4, 1),
+    waistCm: num("waist_cm", 5, 1),
+    neckCm: num("neck_cm", 5, 1),
+    hipsCm: num("hips_cm", 5, 1),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.source, t.measuredAt] })]
+);
+
+// ---------------------------------------------------------------------------
+// Supplements, timing rules, labs (Phase 2b). See migration-013-supplements.sql.
+// ---------------------------------------------------------------------------
+
+export type SupplementSlot = "waking" | "breakfast" | "lunch" | "dinner" | "pre_workout" | "post_workout" | "bedtime" | "any";
+
+export const supplements = pgTable("supplements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  form: text("form").$type<"tablet" | "capsule" | "softgel" | "powder" | "liquid" | "gummy" | "other">().notNull().default("tablet"),
+  servingDesc: text("serving_desc").notNull().default("1 serving"),
+  servingsPerDose: num("servings_per_dose", 5, 2).notNull().default(1),
+  servingsPerContainer: num("servings_per_container", 7, 1),
+  slot: text("slot").$type<SupplementSlot>().notNull(),
+  activeDays: smallint("active_days").array().notNull().default([]),
+  tags: text("tags").array().notNull().default([]),
+  markers: text("markers").array().notNull().default([]),
+  foodId: uuid("food_id").references(() => foods.id),
+  foodGramsPerServing: num("food_grams_per_serving", 6, 1),
+  whereToBuy: jsonb("where_to_buy").$type<Array<{ region: string; note: string }>>().notNull().default([]),
+  notes: text("notes"),
+  position: smallint("position").notNull().default(0),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type SupplementRow = typeof supplements.$inferSelect;
+
+export const supplementIngredients = pgTable(
+  "supplement_ingredients",
+  {
+    supplementId: uuid("supplement_id")
+      .notNull()
+      .references(() => supplements.id, { onDelete: "cascade" }),
+    nutrient: text("nutrient").notNull(),
+    amount: num("amount", 10, 3).notNull(),
+    unit: text("unit").$type<"mcg" | "mg" | "g" | "IU" | "kcal" | "%">().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.supplementId, t.nutrient] })]
+);
+
+export const supplementLogs = pgTable(
+  "supplement_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    supplementId: uuid("supplement_id")
+      .notNull()
+      .references(() => supplements.id, { onDelete: "cascade" }),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull(),
+    tz: text("tz").notNull(),
+    localDate: date("local_date").notNull(),
+    status: text("status").$type<"taken" | "half" | "skipped">().notNull(),
+    doseMultiplier: num("dose_multiplier", 4, 2).notNull(),
+    late: boolean("late").notNull().default(false),
+    foodLogId: uuid("food_log_id").references(() => foodLogs.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("supplement_logs_user_id_supplement_id_local_date_key").on(t.userId, t.supplementId, t.localDate)]
+);
+
+export const supplementInventory = pgTable("supplement_inventory", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  supplementId: uuid("supplement_id")
+    .notNull()
+    .references(() => supplements.id, { onDelete: "cascade" }),
+  at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+  servings: num("servings", 7, 1).notNull(),
+  kind: text("kind").$type<"restock" | "count">().notNull(),
+  region: text("region"),
+  note: text("note"),
+});
+
+export const timingRules = pgTable("timing_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id"),
+  key: text("key").notNull(),
+  subjectTag: text("subject_tag").notNull(),
+  objectTag: text("object_tag").notNull(),
+  minGapMin: integer("min_gap_min").notNull(),
+  direction: text("direction").$type<"after" | "either">().notNull(),
+  message: text("message").notNull(),
+  citation: text("citation").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const labResults = pgTable(
+  "lab_results",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").notNull(),
+    drawnOn: date("drawn_on").notNull(),
+    marker: text("marker").notNull(),
+    value: num("value", 10, 3).notNull(),
+    unit: text("unit").notNull(),
+    refLow: num("ref_low", 10, 3),
+    refHigh: num("ref_high", 10, 3),
+    lab: text("lab"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("lab_results_user_id_drawn_on_marker_key").on(t.userId, t.drawnOn, t.marker)]
+);
+
+export const labAppointments = pgTable("lab_appointments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  tz: text("tz").notNull(),
+  markers: text("markers").array().notNull().default([]),
+  fasting: boolean("fasting").notNull().default(false),
+  note: text("note"),
+  thyroidMedInstruction: text("thyroid_med_instruction"),
+  doneAt: timestamp("done_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
