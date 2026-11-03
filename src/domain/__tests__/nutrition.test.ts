@@ -157,6 +157,11 @@ describe("search ranking", () => {
     expect(rankScore(c({ timesLogged: 20 }), "x")).toBeGreaterThan(rankScore(c({}), "x"));
     expect(rankScore(c({ favourite: true }), "x")).toBeGreaterThan(rankScore(c({}), "x"));
   });
+
+  it("puts doubtful data below the same match from a sound row", () => {
+    expect(rankScore(c({ verified: false }), "x")).toBeLessThan(rankScore(c({}), "x"));
+    expect(rankScore(c({ verified: false }), "x")).toBeLessThan(rankScore(c({ verified: true }), "x"));
+  });
 });
 
 describe("searchText", () => {

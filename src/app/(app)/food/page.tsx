@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { requireUserEmail } from "@/lib/auth";
-import { addDays, formatDayShort, tzOffsetMin } from "@/lib/dates";
-import { mealForTime } from "@/domain/nutrition";
-import { todayFor, getProfile } from "@/server/profile";
-import { dayView, weekSummary } from "@/server/food/logs";
-import { todaySlots } from "@/server/supplements";
+import { formatDayShort } from "@/lib/dates";
+import { foodScreen } from "@/server/food/screen";
 import { PageHeader } from "@/components/page-header";
 import { WeekStrip } from "@/components/food/week-strip";
 import { ProteinHero } from "@/components/food/protein-hero";
@@ -17,17 +14,11 @@ export const metadata = { title: "Food" };
 
 export default async function FoodPage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
   const userId = await requireUserEmail();
-  const [today, profile, sp] = await Promise.all([todayFor(userId), getProfile(userId), searchParams]);
-  const date = sp.d && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) && sp.d <= today ? sp.d : today;
-  // The strip ends on today while the day is in this week, else a few days after it.
-  const weekEnd = addDays(date, 3) < today ? addDays(date, 3) : today;
-  const [view, slots, week] = await Promise.all([dayView(userId, date), todaySlots(userId, date), weekSummary(userId, weekEnd)]);
-  const isToday = date === today;
-  const now = new Date();
-  const localMin = Math.floor((((now.getTime() / 60_000 + tzOffsetMin(now, profile.timezone)) % 1440) + 1440) % 1440);
+  const { d } = await searchParams;
+  const { date, today, isToday, defaultMeal, view, week, slots } = await foodScreen(userId, d);
 
   return (
-    <LogProvider date={date} isToday={isToday} defaultMeal={isToday ? mealForTime(localMin) : "lunch"}>
+    <LogProvider date={date} isToday={isToday} defaultMeal={defaultMeal}>
       <div className="pb-[calc(env(safe-area-inset-bottom,0px)+200px)]">
         <PageHeader
           eyebrow={isToday ? `Today, ${formatDayShort(date)}` : formatDayShort(date)}

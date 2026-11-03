@@ -171,6 +171,8 @@ export interface SearchCandidate {
   aliasExact?: boolean;
   /** Database category ("Fruits and Fruit Juices"), when known. */
   category?: string | null;
+  /** False when the row's numbers are doubtful (crowd data, INDB fried recipes). */
+  verified?: boolean;
 }
 
 /** Foods usually eaten raw: "raw" in their name is how they're eaten, not a warning. */
@@ -205,6 +207,7 @@ export function rankScore(c: SearchCandidate, query: string, opts: RankOptions =
   s += SOURCE_BONUS[c.source];
   s += Math.min(0.3, Math.log1p(c.timesLogged) * 0.1);
   if (c.favourite) s += 0.15;
+  if (c.verified === false) s -= 0.15;
   // Long, qualified names ("Beverages, coffee, brewed, prepared with tap water, decaffeinated") read worse.
   s -= Math.min(0.15, Math.max(0, name.length - 40) / 400);
   return Math.round(s * 1000) / 1000;

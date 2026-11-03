@@ -11,7 +11,6 @@ import {
   favouriteFoods,
   listSavedMeals,
   saveMeal,
-  foodByBarcode,
   getFood,
   recentFoods,
   saveRecipe,
@@ -20,10 +19,9 @@ import {
   type RecipeInput,
   type UserFoodInput,
 } from "@/server/food/foods";
-import { createLog, deleteItem, deleteLog, updateItemGrams, type NewLog } from "@/server/food/logs";
+import { deleteItem, deleteLog, updateItemGrams, type NewLog } from "@/server/food/logs";
+import { barcodeSummary, logWithNudges } from "@/server/food/screen";
 import { draftFromText } from "@/server/food/log-text";
-import { nudgesFor } from "@/server/supplements";
-import { nudgeSummary } from "@/domain/supplements";
 
 type R<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -73,32 +71,12 @@ export async function foodDetailAction(id: string) {
 }
 
 export async function barcodeAction(code: string) {
-  return run(async (userId) => {
-    const food = await foodByBarcode(str(code, 20));
-    if (!food) throw new DomainError("Not found on Open Food Facts. Add it from the label instead.");
-    const hits = await searchFoods(userId, food.name, 10);
-    return hits.find((h) => h.id === food.id) ?? {
-      id: food.id,
-      name: food.name,
-      brand: food.brand,
-      source: food.source,
-      kcal100g: food.kcal100g,
-      protein100g: food.protein100g,
-      carbs100g: food.carbs100g,
-      fat100g: food.fat100g,
-      fibre100g: food.fibre100g,
-      servingG: food.servingG,
-      servingLabel: food.servingLabel,
-      verified: food.verified,
-      favourite: false,
-      timesLogged: 0,
-    };
-  }, false);
+  return run((userId) => barcodeSummary(userId, str(code, 20)), false);
 }
 
 export async function logItemsAction(input: NewLog) {
-  return run(async (userId) => {
-    const log = await createLog(userId, {
+  return run((userId) =>
+    logWithNudges(userId, {
       meal: input.meal,
       date: input.date,
       time: input.time,
@@ -112,12 +90,8 @@ export async function logItemsAction(input: NewLog) {
         estGrams: i.estGrams == null ? null : Number(i.estGrams),
         confidence: i.confidence == null ? null : Number(i.confidence),
       })),
-    });
-    // Medication timing: a gentle note if this meal sits close to something it shouldn't.
-    const nudges = await nudgesFor(userId, [`f:${log.id}`], log.eatenAt).catch(() => []);
-    const summary = nudgeSummary(nudges);
-    return { ...log, nudges: summary ? [summary] : [] };
-  });
+    })
+  );
 }
 
 export async function deleteLogAction(id: string) {

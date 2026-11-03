@@ -83,6 +83,16 @@ describe("indbFood", () => {
     expect(m.portions).toEqual([{ label: "1 katori", grams: 150 }]);
   });
 
+  it("marks deep-fried recipes that count all the frying oil as unverified", () => {
+    // INDB's poori, pakora, bhatura... carry the whole pan of oil: 70-90 g fat per 100 g.
+    expect(indbFood({ ...row, food_name: "Poori", energy_kcal: 738, fat_g: 77.6 })!.food.verified).toBe(false);
+    expect(indbFood({ ...row, food_name: "Paneer pulao", energy_kcal: 582, fat_g: 59.8 })!.food.verified).toBe(false);
+    // Foods that really are that fatty stay verified.
+    expect(indbFood({ ...row, food_name: "Mayonnaise", energy_kcal: 775, fat_g: 84.5 })!.food.verified).toBe(true);
+    expect(indbFood({ ...row, food_name: "Cumin seeds baghar (Jeera baghar/tadka)", energy_kcal: 737, fat_g: 78.8 })!.food.verified).toBe(true);
+    expect(indbFood(row)!.food.verified).toBe(true);
+  });
+
   it("drops rows without a code, name or believable energy", () => {
     expect(indbFood({ ...row, food_code: "" })).toBeNull();
     expect(indbFood({ ...row, energy_kcal: 1200 })).toBeNull();

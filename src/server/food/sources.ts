@@ -152,6 +152,17 @@ function splitAlias(raw: string): { name: string; aliases: string[] } {
   return { name, aliases };
 }
 
+/**
+ * INDB's deep-fried recipes (poori, pakora, bhatura, vada, cutlet...) count
+ * the whole pan of frying oil, not what the food absorbs: 60-90 g fat per
+ * 100 g, about double the real calories. Over 35 g fat per 100 g is only
+ * believable for fats themselves.
+ */
+const TRULY_FATTY = /mayonnaise|dressing|baghar|tadka|ghee|butter|\boil\b/i;
+export function indbPlausible(name: string, fatPer100g: number | undefined): boolean {
+  return (fatPer100g ?? 0) <= 35 || TRULY_FATTY.test(name);
+}
+
 /** One INDB "Nutrient Data" row keyed by header. Values per 100 g. */
 export function indbFood(row: Record<string, unknown>): MappedFood | null {
   const code = typeof row.food_code === "string" ? row.food_code.trim() : "";
@@ -191,7 +202,7 @@ export function indbFood(row: Record<string, unknown>): MappedFood | null {
       micros,
       servingG: servingG ?? null,
       servingLabel: portions[0]?.label ?? null,
-      verified: true,
+      verified: indbPlausible(rawName, num(row.fat_g)),
     },
     portions
   );
