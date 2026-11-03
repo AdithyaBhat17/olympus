@@ -2,8 +2,8 @@ import OlympusCore
 import SwiftUI
 import UIKit
 
-/// Settings › Recovery sources: Whoop (server-side OAuth in the system sheet)
-/// and Apple Health (read on this iPhone by HealthSync, replacing the web's
+/// Settings › Recovery sources: Garmin (personal API key, synced by the
+/// server), Whoop (server-side OAuth in the system sheet) and Apple Health (read on this iPhone by HealthSync, replacing the web's
 /// Shortcut + token setup).
 struct SettingsRecoverySources: View {
     @Environment(AppModel.self) private var model
@@ -38,6 +38,10 @@ struct SettingsRecoverySources: View {
                     .transition(.opacity)
             }
             SettingsCard {
+                if let garmin = screen.garmin {
+                    SettingsGarminRow(garmin: garmin, timezone: timezone, reload: reload)
+                    SettingsDivider()
+                }
                 whoopRow
                 SettingsDivider()
                 SettingsAppleHealthRow(serverLastSync: screen.appleHealth.lastSyncAt)

@@ -184,7 +184,7 @@ export function SlotCard({ data, compact = false }: { data: TodaySlots; compact?
         </h2>
         {compact && (
           <Link href="/supplements" className="h-10 px-2 rounded-full flex items-center gap-0.5 text-[15px] font-semibold text-fg-2">
-            Stack
+            Manage
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 6l6 6-6 6" />
             </svg>

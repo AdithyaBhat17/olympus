@@ -33,6 +33,10 @@ final class Router {
     var tab: Tab = .today
     /// Set by olympus://food/log; the Food tab opens its log sheet and clears it.
     var foodLog: FoodLogSheet.Mode?
+    /// Set by olympus://food/slot/<slot>; the Food tab opens that supplement slot.
+    var foodSlot: String?
+    /// Set by olympus://settings; Today pushes Settings.
+    var settings = false
     /// A session to show full screen: live, or its summary when done.
     var session: SessionRoute?
     var formCue: FormCueRoute?
@@ -74,7 +78,7 @@ struct RootView: View {
     }
 
     /// olympus://session/<id> (the workout Live Activity), olympus://tab/food,
-    /// olympus://food/log?mode=search.
+    /// olympus://food/log?mode=search, olympus://food/slot/lunch.
     private func open(_ url: URL) {
         guard url.scheme == "olympus" else { return }
         let arg = url.pathComponents.dropFirst().first
@@ -88,6 +92,12 @@ struct RootView: View {
                 .queryItems?.first { $0.name == "mode" }?.value
             router.tab = .food
             router.foodLog = mode.flatMap(FoodLogSheet.Mode.init) ?? .describe
+        case "settings":
+            router.tab = .today
+            router.settings = true
+        case "food" where arg == "slot":
+            router.tab = .food
+            router.foodSlot = url.pathComponents.dropFirst(2).first
         default: break
         }
     }

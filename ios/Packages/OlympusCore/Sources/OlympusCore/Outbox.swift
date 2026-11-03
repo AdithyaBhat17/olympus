@@ -100,6 +100,27 @@ public struct CheckInInput: Codable, Hashable, Sendable {
     }
 }
 
+/// One supplement's dose for a day (POST /api/v1/supplements/doses).
+public struct DoseInput: Codable, Hashable, Sendable {
+    public enum Status: String, Codable, Hashable, Sendable { case taken, half, skipped }
+    public var supplementId: String
+    public var status: Status
+    public var date: String
+    public var late: Bool?
+    public var multiplier: Double?
+    /// ISO 8601 with offset. Sent with every tap, so a dose that syncs later keeps its time.
+    public var at: String?
+
+    public init(supplementId: String, status: Status, date: String, late: Bool? = nil, multiplier: Double? = nil, at: String? = nil) {
+        self.supplementId = supplementId
+        self.status = status
+        self.date = date
+        self.late = late
+        self.multiplier = multiplier
+        self.at = at
+    }
+}
+
 public enum OutboxOp: Codable, Hashable, Sendable {
     case logSet(sessionId: String, input: LogSetInput)
     case removeSet(sessionId: String, input: RemoveSetInput)
@@ -108,6 +129,9 @@ public enum OutboxOp: Codable, Hashable, Sendable {
     case saveNotes(sessionId: String, notes: String?)
     case finish(sessionId: String, notes: String?)
     case sendToPT(sessionId: String, notes: String?)
+    case setDose(DoseInput)
+    case clearDose(supplementId: String, date: String)
+    case takeSlot(slot: String, date: String, at: String?)
 
     /** Ops with the same key supersede each other while queued. */
     public var key: String {
@@ -119,6 +143,10 @@ public enum OutboxOp: Codable, Hashable, Sendable {
         case let .saveNotes(s, _): return "notes:\(s)"
         case let .finish(s, _): return "finish:\(s)"
         case let .sendToPT(s, _): return "sendToPT:\(s)"
+        // Same key: an undo while offline cancels the queued dose instead of following it.
+        case let .setDose(i): return "dose:\(i.supplementId):\(i.date)"
+        case let .clearDose(id, date): return "dose:\(id):\(date)"
+        case let .takeSlot(slot, date, _): return "slot:\(slot):\(date)"
         }
     }
 }

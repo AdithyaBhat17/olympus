@@ -5,6 +5,7 @@ import SwiftUI
 /// opens Settings, the next-session card, recovery bubbles and the PT's flags.
 struct TodayView: View {
     @Environment(AppModel.self) private var model
+    @Environment(Router.self) private var router
     /// The avatar letter, remembered so the header doesn't flash "?" on launch.
     @AppStorage("today.initial") private var initial = "?"
 
@@ -32,6 +33,8 @@ struct TodayView: View {
         .background(Color.bg.ignoresSafeArea())
         .navigationTitle("Today")
         .toolbar(.hidden, for: .navigationBar)
+        // olympus://settings (the avatar's NavigationLink covers taps).
+        .navigationDestination(isPresented: Bindable(router).settings) { SettingsView() }
     }
 
     private func load() async throws -> TodayScreen {

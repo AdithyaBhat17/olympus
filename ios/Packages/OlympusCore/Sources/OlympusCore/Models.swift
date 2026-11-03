@@ -632,6 +632,15 @@ public struct SettingsScreen: Codable, Sendable {
         public var lastSyncAt: String?
         public var lastError: String?
     }
+    public struct Garmin: Codable, Sendable {
+        public var configured: Bool
+        public var connected: Bool
+        public var lastSyncAt: String?
+        public var lastError: String?
+        public var keyExpiresAt: String?
+        /// Days until the personal API key expires; negative once it has.
+        public var keyDaysLeft: Int?
+    }
     public struct AppleHealth: Codable, Sendable {
         public var lastSyncAt: String?
     }
@@ -645,6 +654,8 @@ public struct SettingsScreen: Codable, Sendable {
     public var profile: AthleteProfile
     public var claude: Claude
     public var whoop: Whoop
+    /// Optional: servers before the Garmin settings card don't send it.
+    public var garmin: Garmin?
     public var appleHealth: AppleHealth
     public var injuries: [Injury]
 }

@@ -11,7 +11,7 @@ export const POST = route(async ({ req, userId }) => {
   if (!openRouterConfigured()) throw new DomainError("Text logging isn't set up on the server (OpenRouter key missing).");
   const { text } = await body(req, input);
   try {
-    return await draftFromText(userId, text);
+    return await draftFromText(userId, text, "ios");
   } catch (err) {
     if (err instanceof LlmError) {
       console.error(err);

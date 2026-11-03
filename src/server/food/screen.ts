@@ -7,6 +7,10 @@ import { nudgesFor, todaySlots, type TodaySlots } from "../supplements";
 import { DomainError } from "../errors";
 import { foodByBarcode, searchFoods, type FoodSummary } from "./foods";
 import { createLog, dayView, weekSummary, type DayView, type NewLog, type WeekDay } from "./logs";
+import { recordOutcome } from "./log-text";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { foodLogItems } from "@/lib/db/schema";
 
 /**
  * Everything the Food screen shows, in one call: web page and iOS app read
@@ -63,6 +67,19 @@ export async function barcodeSummary(userId: string, code: string): Promise<Food
 /** Log a meal, then the medication-timing note for it, if any. */
 export async function logWithNudges(userId: string, input: NewLog) {
   const log = await createLog(userId, input);
+  if (input.draftIds?.length) {
+    const items = await db
+      .select({ foodId: foodLogItems.foodId, name: foodLogItems.name, grams: foodLogItems.grams })
+      .from(foodLogItems)
+      .where(eq(foodLogItems.logId, log.id))
+      .orderBy(asc(foodLogItems.position));
+    await recordOutcome(
+      userId,
+      input.draftIds,
+      log.id,
+      items.filter((i) => i.foodId).map((i) => ({ foodId: i.foodId!, name: i.name, grams: i.grams ?? 0 }))
+    );
+  }
   const nudges = await nudgesFor(userId, [`f:${log.id}`], log.eatenAt).catch(() => []);
   const summary = nudgeSummary(nudges);
   return { ...log, nudges: summary ? [summary] : [] };

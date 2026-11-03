@@ -719,6 +719,50 @@ export const foodLogItems = pgTable("food_log_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** One "describe what you ate" attempt and what was finally saved (migration 014). */
+export const foodParseEvents = pgTable("food_parse_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  text: text("text").notNull(),
+  client: text("client").$type<"web" | "ios">(),
+  model: text("model"),
+  latencyMs: integer("latency_ms"),
+  costUsd: num("cost_usd", 8, 5),
+  error: text("error"),
+  draft: jsonb("draft").$type<ParseDraftItem[]>().notNull().default([]),
+  foodLogId: uuid("food_log_id").references(() => foodLogs.id, { onDelete: "set null" }),
+  loggedAt: timestamp("logged_at", { withTimezone: true }),
+  final: jsonb("final").$type<ParseFinalItem[] | null>(),
+  unmatched: smallint("unmatched").notNull().default(0),
+  kept: smallint("kept"),
+  regrammed: smallint("regrammed"),
+  swapped: smallint("swapped"),
+  removed: smallint("removed"),
+  added: smallint("added"),
+});
+
+export interface ParseDraftItem {
+  said: string;
+  search: string;
+  quantity: number;
+  unit: string;
+  estGrams: number;
+  grams: number;
+  basis: string;
+  confidence: number;
+  matchId: string | null;
+  matchName: string | null;
+  matchSource: string | null;
+  alternativeIds: string[];
+}
+
+export interface ParseFinalItem {
+  foodId: string;
+  name: string;
+  grams: number;
+}
+
 export const foodFavourites = pgTable(
   "food_favourites",
   {

@@ -9,11 +9,13 @@ const set = z.object({
   date: isoDate.optional(),
   late: z.boolean().optional(),
   multiplier: z.number().min(0.5).max(4).optional(),
+  /** When it was actually taken (ISO 8601 with offset). Defaults to now, or the slot time on a past day. */
+  at: z.iso.datetime({ offset: true }).optional(),
 });
 
 export const POST = route(async ({ req, userId }) => {
-  const { supplementId, ...rest } = await body(req, set);
-  const r = await setDose(userId, supplementId, { ...rest, late: !!rest.late });
+  const { supplementId, at, ...rest } = await body(req, set);
+  const r = await setDose(userId, supplementId, { ...rest, late: !!rest.late, at: at ? new Date(at) : undefined });
   const summary = nudgeSummary(r.nudges);
   return { nudges: summary ? [summary] : [] };
 });

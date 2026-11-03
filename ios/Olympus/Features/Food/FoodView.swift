@@ -12,7 +12,9 @@ struct FoodView: View {
     @State private var error: String?
     @State private var log: LogRequest?
     @State private var editing: DayLogItem?
-    @State private var openSlot: TodaySlots.Slot?
+    @State private var openSlot: SlotRef?
+
+    struct SlotRef: Identifiable { let id: String }
 
     struct LogRequest: Identifiable {
         let id = UUID()
@@ -39,6 +41,11 @@ struct FoodView: View {
             router.foodLog = nil
             if let screen { log = LogRequest(mode: mode, meal: screen.defaultMeal) }
         }
+        .onChange(of: router.foodSlot != nil && screen != nil, initial: true) { _, ready in
+            guard ready, let id = router.foodSlot else { return }
+            router.foodSlot = nil
+            if screen?.slots.slots.contains(where: { $0.id == id }) == true { openSlot = .init(id: id) }
+        }
         .sheet(item: $log) { req in
             if let screen {
                 FoodLogSheet(date: screen.date, isToday: screen.isToday, meal: req.meal, mode: req.mode) {
@@ -49,11 +56,16 @@ struct FoodView: View {
         .sheet(item: $editing) { item in
             FoodItemSheet(item: item) { model.dataChanged() }
         }
-        .sheet(item: $openSlot) { slot in
+        .sheet(item: $openSlot) { ref in
             if let screen {
-                SupplementSlotSheet(slot: slot, date: screen.slots.date) { model.dataChanged() }
+                SupplementSlotSheet(day: slotsBinding(screen), slotId: ref.id, isToday: screen.isToday)
             }
         }
+    }
+
+    /// The day's slots, written in place by the optimistic supplement actions.
+    private func slotsBinding(_ fallback: FoodScreen) -> Binding<TodaySlots> {
+        Binding(get: { screen?.slots ?? fallback.slots }, set: { screen?.slots = $0 })
     }
 
     private func load() async {
@@ -86,7 +98,7 @@ struct FoodView: View {
                     .padding(.top, 16)
 
                 if !s.slots.slots.isEmpty {
-                    SupplementTiles(slots: s.slots, open: { openSlot = $0 }, changed: { model.dataChanged() })
+                    SupplementTiles(day: slotsBinding(s), isToday: s.isToday, open: { openSlot = .init(id: $0.id) })
                         .padding(.top, 24)
                 }
 

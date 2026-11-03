@@ -48,7 +48,7 @@ export async function draftTextAction(text: string) {
     if (!openRouterConfigured()) throw new DomainError("Text logging isn't set up on the server (OpenRouter key missing).");
     const t = str(text, 1000).trim();
     if (t.length < 2) throw new DomainError("Describe what you ate.");
-    return draftFromText(userId, t);
+    return draftFromText(userId, t, "web");
   }, false);
 }
 
@@ -84,6 +84,7 @@ export async function logItemsAction(input: NewLog) {
       rawText: input.rawText,
       model: input.model,
       costUsd: input.costUsd,
+      draftIds: (input.draftIds ?? []).slice(0, 10).map((d) => str(d, 40)),
       items: (input.items ?? []).slice(0, 40).map((i) => ({
         foodId: str(i.foodId, 40),
         grams: Number(i.grams),

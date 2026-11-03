@@ -153,6 +153,10 @@ struct SlotItem: Codable, Identifiable, Sendable {
     var supplement: Supplement
     var status: Status
     var late: Bool
+    /// ISO 8601, when it was logged as taken (or skipped).
+    var takenAt: String?
+    /// 1, 2 (×2) or 0.5 (half); nil until logged.
+    var multiplier: Double?
     var id: String { supplement.id }
     var isDone: Bool { status != .pending }
 
@@ -232,6 +236,7 @@ struct TextDraft: Codable, Sendable {
     var items: [Item]
     var model: String
     var costUsd: Double?
+    var draftId: String?
 }
 
 struct SavedMeal: Codable, Identifiable, Sendable {
@@ -279,6 +284,8 @@ struct NewFoodLog: Encodable {
     var rawText: String?
     var model: String?
     var costUsd: Double?
+    /// The describe drafts this came from, so the server can score them.
+    var draftIds: [String]?
     var items: [Item]
 }
 
