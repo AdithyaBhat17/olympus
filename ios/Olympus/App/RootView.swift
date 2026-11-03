@@ -33,6 +33,8 @@ final class Router {
     var tab: Tab = .today
     /// Set by olympus://food/log; the Food tab opens its log sheet and clears it.
     var foodLog: FoodLogSheet.Mode?
+    /// olympus://food/log?text=…: what to describe.
+    var foodLogText: String?
     /// Set by olympus://food/slot/<slot>; the Food tab opens that supplement slot.
     var foodSlot: String?
     /// Set by olympus://settings; Today pushes Settings.
@@ -78,7 +80,8 @@ struct RootView: View {
     }
 
     /// olympus://session/<id> (the workout Live Activity), olympus://tab/food,
-    /// olympus://food/log?mode=search, olympus://food/slot/lunch.
+    /// olympus://food/log?mode=search, olympus://food/log?text=2%20rotis,
+    /// olympus://food/slot/lunch.
     private func open(_ url: URL) {
         guard url.scheme == "olympus" else { return }
         let arg = url.pathComponents.dropFirst().first
@@ -88,9 +91,11 @@ struct RootView: View {
         case "tab":
             if let t = Tab.allCases.first(where: { "\($0)" == arg }) { router.tab = t }
         case "food" where arg == "log":
-            let mode = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first { $0.name == "mode" }?.value
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let mode = query.first { $0.name == "mode" }?.value
+            let text = query.first { $0.name == "text" }?.value?.trimmingCharacters(in: .whitespacesAndNewlines)
             router.tab = .food
+            router.foodLogText = text.flatMap { $0.isEmpty ? nil : String($0.prefix(1000)) }
             router.foodLog = mode.flatMap(FoodLogSheet.Mode.init) ?? .describe
         case "settings":
             router.tab = .today

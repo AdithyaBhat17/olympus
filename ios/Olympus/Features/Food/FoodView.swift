@@ -20,6 +20,7 @@ struct FoodView: View {
         let id = UUID()
         var mode: FoodLogSheet.Mode
         var meal: Meal
+        var text: String?
     }
 
     var body: some View {
@@ -38,8 +39,10 @@ struct FoodView: View {
         .task(id: "\(date ?? "today")·\(model.dataVersion)") { await load() }
         .onChange(of: router.foodLog != nil && screen != nil, initial: true) { _, ready in
             guard ready, let mode = router.foodLog else { return }
+            let text = router.foodLogText
             router.foodLog = nil
-            if let screen { log = LogRequest(mode: mode, meal: screen.defaultMeal) }
+            router.foodLogText = nil
+            if let screen { log = LogRequest(mode: text == nil ? mode : .describe, meal: screen.defaultMeal, text: text) }
         }
         .onChange(of: router.foodSlot != nil && screen != nil, initial: true) { _, ready in
             guard ready, let id = router.foodSlot else { return }
@@ -48,7 +51,7 @@ struct FoodView: View {
         }
         .sheet(item: $log) { req in
             if let screen {
-                FoodLogSheet(date: screen.date, isToday: screen.isToday, meal: req.meal, mode: req.mode) {
+                FoodLogSheet(date: screen.date, isToday: screen.isToday, meal: req.meal, mode: req.mode, initialText: req.text) {
                     model.dataChanged()
                 }
             }

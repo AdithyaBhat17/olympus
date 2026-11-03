@@ -27,7 +27,7 @@ async function main() {
     .where(and(eq(foodParseEvents.userId, user), gte(foodParseEvents.createdAt, from)))
     .orderBy(asc(foodParseEvents.createdAt));
 
-  const report = buildParseReport(rows.map((r) => ({ ...r, logged: r.foodLogId != null })));
+  const report = buildParseReport(rows.map((r) => ({ ...r, logged: r.loggedAt != null })));
   const md = reportMarkdown(report, from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
   const out = arg("out");
   if (out) {

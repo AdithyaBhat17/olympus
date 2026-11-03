@@ -195,13 +195,19 @@ function sameWord(a: string, b: string): boolean {
  * last query word that isn't a preparation word ("chai" in "masala chai",
  * "rice" in "rice cooked"). A candidate without it is a different food.
  */
-export function matchCoverage(c: Pick<SearchCandidate, "text">, query: string): { share: number; head: boolean } {
+export function matchCoverage(
+  c: Pick<SearchCandidate, "text"> & { name?: string },
+  query: string
+): { share: number; head: boolean; lead: boolean } {
   const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !STOP_WORDS.has(w));
-  if (!words.length || c.text == null) return { share: 1, head: true };
+  if (!words.length || c.text == null) return { share: 1, head: true, lead: true };
   const have = new Set(c.text.split(" "));
   const has = (w: string) => [...have].some((h) => sameWord(h, w));
   const head = [...words].reverse().find((w) => !PREP_WORDS.test(w)) ?? words[words.length - 1];
-  return { share: words.filter(has).length / words.length, head: has(head) };
+  // The candidate's own food word leads its name: "Yogurt, plain, whole milk" is a yogurt.
+  // Two parts, for USDA's "Beverages, coffee, …" and "Cheese, paneer".
+  const leadWords = (c.name ?? c.text).toLowerCase().split(",").slice(0, 2).join(" ").split(/[^\p{L}\p{N}]+/u);
+  return { share: words.filter(has).length / words.length, head: has(head), lead: leadWords.some((w) => sameWord(w, head)) };
 }
 
 /** Good enough to put in a draft unasked. Otherwise the draft says "no match" and offers it as an alternative. */
@@ -229,11 +235,14 @@ export function rankScore(c: SearchCandidate, query: string, opts: RankOptions =
   const name = c.name.toLowerCase();
   let s = c.similarity;
   if (c.allWords) s += 0.25;
-  if (c.aliasExact) s += 0.3; // full coverage by definition
+  // A curated alias is full coverage and leads by definition, so it beats a mere name match ("dal").
+  if (c.aliasExact) s += 0.5;
   else if (c.text != null) {
-    const { share, head } = matchCoverage(c, q);
+    const { share, head, lead } = matchCoverage(c, q);
     s += 0.3 * share;
     if (!head) s -= 0.4;
+    // Leading with it: that food. Only further in: something made with it ("Yogurt, …, whole milk").
+    else s += lead ? 0.2 : -0.25;
   }
   if (name === q || c.aliasExact) s += 0.5;
   else if (name.startsWith(q)) s += 0.1;

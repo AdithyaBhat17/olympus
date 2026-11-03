@@ -172,10 +172,26 @@ describe("search ranking", () => {
     expect(rankCandidates([yolk, egg], "egg", 2, { preferCooked: true })[0]).toBe(egg);
   });
 
+  it("the food word must lead the candidate's name: 'whole milk' is milk, not yogurt made with whole milk", () => {
+    const yogurt = c({ name: "Yogurt, plain, whole milk", source: "usda_foundation", similarity: 1, text: "yogurt plain whole milk dahi curd" });
+    const milk = c({ name: "Milk, whole, 3.25% milkfat, with added vitamin D", source: "usda_foundation", similarity: 0.6, text: "milk whole 3.25% milkfat with added vitamin d milk full cream milk doodh" });
+    expect(rankCandidates([yogurt, milk], "whole milk", 2, { preferCooked: true })[0]).toBe(milk);
+    // "Beverages, coffee, …" and "Cheese, paneer": the food is in the first two parts.
+    expect(matchCoverage(c({ name: "Beverages, coffee, brewed", text: "beverages coffee brewed" }), "coffee").lead).toBe(true);
+    expect(matchCoverage(c({ name: "Cheese, paneer", text: "cheese paneer" }), "paneer").lead).toBe(true);
+    expect(matchCoverage(c({ name: "Yogurt, plain, whole milk", text: "yogurt plain whole milk" }), "milk").lead).toBe(false);
+  });
+
+  it("a curated alias beats another source's food of the same name ('dal' is everyday dal)", () => {
+    const mixed = c({ name: "Mixed dal", source: "indb", similarity: 1, aliasExact: true, text: "mixed dal dal plain dal" });
+    const fndds = c({ name: "Dal", source: "usda_fndds", similarity: 1, text: "dal" });
+    expect(rankCandidates([fndds, mixed], "dal", 2, { preferCooked: true })[0]).toBe(mixed);
+  });
+
   it("only the food word counts as the head: trailing 'cooked' or 'raw' doesn't", () => {
     expect(matchCoverage(c({ text: "rice white long grain regular enriched cooked" }), "rice cooked")).toMatchObject({ head: true, share: 1 });
     expect(matchCoverage(c({ text: "chapati roti roti chapati phulka rotis chapatis" }), "rotis")).toMatchObject({ head: true });
-    expect(matchCoverage(c({ text: "dry masala chops" }), "masala chai")).toEqual({ share: 0.5, head: false });
+    expect(matchCoverage(c({ text: "dry masala chops" }), "masala chai")).toMatchObject({ share: 0.5, head: false });
   });
 
   it("a match without the food word is weak, so the draft says 'no match' instead of guessing", () => {

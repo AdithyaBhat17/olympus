@@ -37,6 +37,15 @@ interface BasketItem {
   confidence?: number;
   basis?: string;
   alternatives?: FoodSummary[];
+  /** "HH:mm" from a describe: logged as its own meal at that time. */
+  time?: string | null;
+}
+
+/** A supplement named in a describe ("at 9:30 thyroid tablet"): logged as a dose. */
+interface DoseItem {
+  key: string;
+  supplement: { id: string; name: string; servingDesc: string };
+  time: string | null;
 }
 
 const SOURCE_SHORT: Record<string, string> = {
@@ -81,6 +90,7 @@ export function LogSheet({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("describe");
   const [basket, setBasket] = useState<BasketItem[]>([]);
+  const [doses, setDoses] = useState<DoseItem[]>([]);
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [time, setTime] = useState("13:00");
   const [draftMeta, setDraftMeta] = useState<{ text: string; model: string; cost: number | null; draftIds: string[] } | null>(null);
@@ -96,6 +106,7 @@ export function LogSheet({
 
   const reset = () => {
     setBasket([]);
+    setDoses([]);
     setDraftMeta(null);
     setFromSaved(false);
     setTab("describe");
@@ -125,8 +136,10 @@ export function LogSheet({
   };
 
   const fromDraft = (d: TextDraft, text: string) => {
+    const named = d.items.filter((i) => i.supplement).map((i) => ({ key: newKey(), supplement: i.supplement!, time: i.time }));
+    setDoses((ds) => [...ds, ...named.filter((n) => !ds.some((x) => x.supplement.id === n.supplement.id))]);
     const items: BasketItem[] = d.items
-      .filter((i) => i.match)
+      .filter((i) => i.match && !i.supplement)
       .map((i) => ({
         key: newKey(),
         food: i.match!,
@@ -137,8 +150,9 @@ export function LogSheet({
         confidence: i.confidence,
         basis: i.basis,
         alternatives: i.alternatives,
+        time: i.time,
       }));
-    const missed = d.items.filter((i) => !i.match).map((i) => i.said);
+    const missed = d.items.filter((i) => !i.match && !i.supplement).map((i) => i.said);
     setBasket((b) => [...b, ...items]);
     // Several describes in one sheet: keep every draft id; the last text/model stand for the log.
     setDraftMeta((m) => ({ text: m ? `${m.text}; ${text}` : text, model: d.model, cost: (m?.cost ?? 0) + (d.costUsd ?? 0), draftIds: [...(m?.draftIds ?? []), ...(d.draftId ? [d.draftId] : [])] }));
@@ -163,13 +177,18 @@ export function LogSheet({
         model: draftMeta?.model ?? null,
         costUsd: draftMeta?.cost ?? null,
         draftIds: draftMeta?.draftIds ?? [],
-        items: basket.map((i) => ({ foodId: i.food.id, grams: i.grams, estGrams: i.estGrams ?? null, confidence: i.confidence ?? null })),
+        items: basket.map((i) => ({ foodId: i.food.id, grams: i.grams, estGrams: i.estGrams ?? null, confidence: i.confidence ?? null, time: i.time ?? null })),
+        doses: doses.map((d) => ({ supplementId: d.supplement.id, time: d.time })),
       });
       if (!r.ok) {
         toast.error(r.error);
         return;
       }
-      toast.success(`Logged ${Math.round(totals.kcal)} kcal, ${Math.round(totals.proteinCounted)} g protein`);
+      const parts = [
+        basket.length ? `${Math.round(totals.kcal)} kcal, ${Math.round(totals.proteinCounted)} g protein` : null,
+        doses.length ? doses.map((d) => d.supplement.name).join(", ") : null,
+      ].filter(Boolean);
+      toast.success(`Logged ${parts.join(" and ")}`);
       for (const n of r.data.nudges) toast.info(n, { duration: 9000 });
       reset();
       onClose();
@@ -205,7 +224,7 @@ export function LogSheet({
           <button
             type="button"
             onClick={save}
-            disabled={!basket.length || saving}
+            disabled={(!basket.length && !doses.length) || saving}
             className="h-11 min-w-[88px] px-4 rounded-full bg-accent text-accent-ink text-[15px] font-extrabold disabled:bg-surface-2 disabled:text-faint"
           >
             {saving ? "Adding…" : basket.length ? `Add ${Math.round(totals.proteinCounted)} g` : "Add"}
@@ -242,7 +261,7 @@ export function LogSheet({
           {tab === "search" && <SearchTab onPick={(f) => add(f)} onPickMeal={addMeal} />}
           {tab === "barcode" && <BarcodeTab onFound={(f) => add(f)} />}
 
-          {basket.length > 0 && (
+          {(basket.length > 0 || doses.length > 0) && (
             <section className="mt-5">
               <div className="flex items-baseline justify-between mb-3">
                 <h2 className="section-label m-0">Check the amounts</h2>
@@ -251,6 +270,31 @@ export function LogSheet({
                 </span>
               </div>
               <ul className="flex flex-col gap-2.5 m-0 p-0 list-none">
+                {doses.map((d) => (
+                  <li key={d.key} className="flex items-center gap-3 rounded-[24px] bg-surface pl-3 pr-1 py-2">
+                    <span aria-hidden="true" className="size-10 rounded-full bg-accent/10 text-accent flex items-center justify-center">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+                        <path d="m8.5 8.5 7 7" />
+                      </svg>
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[16px] font-semibold truncate">{d.supplement.name}</span>
+                      <span className="flex items-center gap-1.5 mt-1">
+                        <span className="tag h-6 text-[12px] bg-fg text-bg tabular-nums">{d.time ? `At ${d.time}` : "Now"}</span>
+                        <span className="text-[13px] text-muted truncate">{d.supplement.servingDesc}</span>
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDoses((ds) => ds.filter((x) => x.key !== d.key))}
+                      aria-label={`Don't log ${d.supplement.name}`}
+                      className="size-11 rounded-full flex items-center justify-center text-fg-2"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
                 {basket.map((i) => (
                   <BasketRow
                     key={i.key}
@@ -285,7 +329,7 @@ export function LogSheet({
                     </button>
                   </div>
                 ))}
-              {!isToday && (
+              {!isToday && basket.some((i) => !i.time) && (
                 <label className="flex items-center justify-between mt-4 h-14 px-5 rounded-[20px] bg-surface">
                   <span className="text-[16px] font-semibold">Time eaten</span>
                   <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-10 px-3 rounded-full bg-surface-2 text-fg num text-[15px]" />
@@ -358,6 +402,7 @@ function BasketRow({
             {item.food.brand ? <span className="text-muted font-normal"> · {item.food.brand}</span> : null}
           </div>
           <div className="flex gap-1.5 flex-wrap mt-1.5">
+            {item.time && <span className="tag h-6 text-[12px] bg-fg text-bg tabular-nums">At {item.time}</span>}
             <span className="tag h-6 text-[12px]">{SOURCE_SHORT[item.food.source] ?? item.food.source}</span>
             {!item.food.verified && <span className="tag h-6 text-[12px] bg-danger-bg text-danger-text">Unverified</span>}
             {lowConfidence ? (
@@ -482,11 +527,11 @@ function DescribeTab({ onDraft }: { onDraft: (d: TextDraft, text: string) => voi
           }}
           rows={3}
           aria-label="What you ate"
-          placeholder="2 rotis, dal, 150 g chicken tikka, coffee with milk"
+          placeholder="2 rotis and dal, at 4 coffee with milk"
           className="w-full px-3.5 pt-3 bg-transparent text-fg text-[17px] leading-snug resize-none focus:outline-none placeholder:text-faint"
         />
         <div className="flex items-center justify-between gap-2 pl-3.5">
-          <span className="text-[13px] text-muted">Say amounts if you know them</span>
+          <span className="text-[13px] text-muted">Say amounts and times if you know them</span>
           <button
             type="submit"
             disabled={pending || text.trim().length < 2}

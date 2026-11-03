@@ -122,10 +122,19 @@ struct BasketItem: Identifiable {
     var confidence: Double?
     var basis: String?
     var alternatives: [FoodSummary] = []
+    /// "HH:mm" from a describe; logged as its own meal at that time.
+    var time: String?
 
     var protein: Double { food.protein(grams) }
     var countedProtein: Double { food.isCollagen ? 0 : protein }
     var kcal: Double { food.kcal(grams) }
+}
+
+/// A supplement named in a describe ("at 9:30 thyroid tablet"): logged as a dose.
+struct DescribedDose: Identifiable {
+    let id = UUID()
+    var supplement: DraftSupplement
+    var time: String?
 }
 
 /// Describe, search or scan, then check the amounts and add. The web's LogSheet.
@@ -149,23 +158,27 @@ struct FoodLogSheet: View {
     let isToday: Bool
     @State var meal: Meal
     @State var mode: Mode
+    var initialText: String?
     let logged: () -> Void
 
     @State private var basket: [BasketItem] = []
+    @State private var doses: [DescribedDose] = []
     @State private var draft: (text: String, model: String, cost: Double?, ids: [String])?
     @State private var fromSaved = false
     @State private var time = Date()
     @State private var saving = false
 
-    init(date: String, isToday: Bool, meal: Meal, mode: Mode, logged: @escaping () -> Void) {
+    init(date: String, isToday: Bool, meal: Meal, mode: Mode, initialText: String? = nil, logged: @escaping () -> Void) {
         self.date = date
         self.isToday = isToday
+        self.initialText = initialText
         _meal = State(initialValue: meal)
         _mode = State(initialValue: mode)
         self.logged = logged
     }
 
     private var protein: Double { basket.reduce(0) { $0 + $1.countedProtein } }
+    private var isEmpty: Bool { basket.isEmpty && doses.isEmpty }
     private var kcal: Double { basket.reduce(0) { $0 + $1.kcal } }
 
     var body: some View {
@@ -175,11 +188,11 @@ struct FoodLogSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     switch mode {
-                    case .describe: DescribePane(onDraft: add(draft:text:))
+                    case .describe: DescribePane(onDraft: add(draft:text:), initialText: initialText)
                     case .search: SearchPane(onPick: { add($0) }, onPickMeal: add(meal:))
                     case .barcode: BarcodePane(onFound: { add($0) })
                     }
-                    if !basket.isEmpty { basketSection }
+                    if !basket.isEmpty || !doses.isEmpty { basketSection }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
@@ -189,7 +202,7 @@ struct FoodLogSheet: View {
         .background(Color.bg.ignoresSafeArea())
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(40)
-        .interactiveDismissDisabled(!basket.isEmpty)
+        .interactiveDismissDisabled(!basket.isEmpty || !doses.isEmpty)
     }
 
     private var header: some View {
@@ -218,13 +231,13 @@ struct FoodLogSheet: View {
                 Text(saving ? "Adding…" : basket.isEmpty ? "Add" : "Add \(Int(protein.rounded())) g")
                     .font(.system(size: 15, weight: .heavy))
                     .monospacedDigit()
-                    .foregroundStyle(basket.isEmpty ? Color.faint : .white)
+                    .foregroundStyle(isEmpty ? Color.faint : .white)
                     .padding(.horizontal, 16)
                     .frame(minWidth: 88, minHeight: 44)
-                    .background(basket.isEmpty ? Color.surface2 : Color.coral, in: Capsule())
+                    .background(isEmpty ? Color.surface2 : Color.coral, in: Capsule())
                     .contentTransition(.numericText())
             }
-            .disabled(basket.isEmpty || saving)
+            .disabled(isEmpty || saving)
             .animation(.snappy, value: protein)
         }
         .padding(.horizontal, 16)
@@ -261,13 +274,16 @@ struct FoodLogSheet: View {
                 (Text("\(Int(protein.rounded())) g").font(.num(15)).foregroundColor(.coral) + Text(" · \(Int(kcal.rounded())) kcal").font(.system(size: 13)).foregroundColor(.muted))
                     .monospacedDigit()
             }
+            ForEach(doses) { d in
+                DoseRow(dose: d) { withAnimation(.snappy) { doses.removeAll { $0.id == d.id } } }
+            }
             ForEach($basket) { $item in
                 BasketCard(item: $item) { basket.removeAll { $0.id == item.id } }
             }
             if basket.contains(where: { $0.food.isCollagen }) {
                 Text("Collagen protein isn't counted toward your protein target.").font(.system(size: 13)).foregroundStyle(Color.muted)
             }
-            if !isToday {
+            if !isToday && basket.contains(where: { $0.time == nil }) {
                 HStack {
                     Text("Time eaten").font(.system(size: 16, weight: .semibold))
                     Spacer()
@@ -302,10 +318,14 @@ struct FoodLogSheet: View {
 
     private func add(draft d: TextDraft, text: String) {
         let items = d.items.compactMap { i -> BasketItem? in
-            guard let m = i.match else { return nil }
-            return BasketItem(food: m.food, grams: i.grams, portions: m.portions, said: i.said, estGrams: i.estGrams, confidence: i.confidence, basis: i.basis, alternatives: i.alternatives)
+            guard let m = i.match, i.supplement == nil else { return nil }
+            return BasketItem(food: m.food, grams: i.grams, portions: m.portions, said: i.said, estGrams: i.estGrams, confidence: i.confidence, basis: i.basis, alternatives: i.alternatives, time: i.time)
         }
-        withAnimation(.snappy) { basket += items }
+        let named = d.items.compactMap { i in i.supplement.map { DescribedDose(supplement: $0, time: i.time) } }
+        withAnimation(.snappy) {
+            doses += named.filter { n in !doses.contains { $0.supplement.id == n.supplement.id } }
+            basket += items
+        }
         // Several describes in one sheet: keep every draft id so each is scored.
         draft = (
             draft.map { "\($0.text); \(text)" } ?? text,
@@ -313,7 +333,7 @@ struct FoodLogSheet: View {
             (draft?.cost ?? 0) + (d.costUsd ?? 0),
             (draft?.ids ?? []) + (d.draftId.map { [$0] } ?? [])
         )
-        let missed = d.items.filter { $0.match == nil }.map(\.said)
+        let missed = d.items.filter { $0.match == nil && $0.supplement == nil }.map(\.said)
         if !missed.isEmpty {
             model.show("No match for \(missed.joined(separator: ", ")). Search for \(missed.count > 1 ? "them" : "it") instead.", kind: .error)
         }
@@ -332,9 +352,12 @@ struct FoodLogSheet: View {
             model: draft?.model,
             costUsd: draft?.cost,
             draftIds: draft?.ids,
-            items: basket.map { .init(foodId: $0.food.id, grams: $0.grams, estGrams: $0.estGrams, confidence: $0.confidence) }
+            items: basket.map { .init(foodId: $0.food.id, grams: $0.grams, estGrams: $0.estGrams, confidence: $0.confidence, time: $0.time) },
+            doses: doses.isEmpty ? nil : doses.map { .init(supplementId: $0.supplement.id, time: $0.time) }
         )
-        let summary = "Logged \(Int(kcal.rounded())) kcal, \(Int(protein.rounded())) g protein"
+        let food = basket.isEmpty ? nil : "\(Int(kcal.rounded())) kcal, \(Int(protein.rounded())) g protein"
+        let supps = doses.isEmpty ? nil : doses.map(\.supplement.name).joined(separator: ", ")
+        let summary = "Logged " + [food, supps].compactMap { $0 }.joined(separator: " and ")
         Task {
             defer { saving = false }
             do {
@@ -345,6 +368,51 @@ struct FoodLogSheet: View {
                 dismiss()
             } catch { model.show(error) }
         }
+    }
+}
+
+/// A supplement from the describe text: name, when, and remove.
+private struct DoseRow: View {
+    let dose: DescribedDose
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "pills.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.coral)
+                .frame(width: 40, height: 40)
+                .background(Color.coral.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dose.supplement.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.fg)
+                // The time first, like the food cards: it's what decides the timing notes.
+                HStack(spacing: 6) {
+                    Text(dose.time.map { "At \($0)" } ?? "Now")
+                        .font(.system(size: 12, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.bg)
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(Color.fg, in: Capsule())
+                    Text(dose.supplement.servingDesc)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.muted)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            Button {
+                Haptics.tick()
+                remove()
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.fg2).frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Don't log \(dose.supplement.name)")
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 4)
+        .padding(.vertical, 8)
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 
@@ -368,6 +436,7 @@ private struct BasketCard: View {
                     (Text(item.food.name).font(.system(size: 16, weight: .semibold)).foregroundColor(.fg)
                         + Text(item.food.brand.map { " · \($0)" } ?? "").font(.system(size: 16)).foregroundColor(.muted))
                     HStack(spacing: 6) {
+                        if let t = item.time { tag("At \(t)", fg: .bg, bg: .fg) }
                         tag(item.food.sourceShort)
                         if !item.food.verified { tag("Unverified", fg: .dangerInk, bg: Color.danger.opacity(0.1)) }
                         if let c = item.confidence, c < 0.6 {
@@ -521,6 +590,8 @@ private struct SaveMealButton: View {
 private struct DescribePane: View {
     @Environment(AppModel.self) private var model
     let onDraft: (TextDraft, String) -> Void
+    /// From olympus://food/log?text=…: filled in and read straight away (nothing is logged until Add).
+    var initialText: String?
     @State private var text = ""
     @State private var reading = false
     @FocusState private var focused: Bool
@@ -530,7 +601,7 @@ private struct DescribePane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
-                TextField("2 rotis, dal, 150 g chicken tikka, coffee with milk", text: $text, axis: .vertical)
+                TextField("2 rotis and dal, at 4 coffee with milk", text: $text, axis: .vertical)
                     .font(.system(size: 17))
                     .lineLimit(3...6)
                     .focused($focused)
@@ -539,7 +610,7 @@ private struct DescribePane: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 14)
                 HStack {
-                    Text("Say amounts if you know them").font(.system(size: 13)).foregroundStyle(Color.muted)
+                    Text("Say amounts and times if you know them").font(.system(size: 13)).foregroundStyle(Color.muted)
                     Spacer()
                     Button(action: find) {
                         Group {
@@ -559,6 +630,12 @@ private struct DescribePane: View {
             }
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(focused ? Color.coral : .clear, lineWidth: 2.5))
+            .task {
+                if let t = initialText, text.isEmpty {
+                    text = t
+                    find()
+                }
+            }
 
             Text("Nutrients come from the food database. The AI only reads what you ate and estimates grams, so check the amounts before adding.")
                 .font(.system(size: 13))

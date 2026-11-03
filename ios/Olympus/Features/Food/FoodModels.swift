@@ -232,11 +232,21 @@ struct TextDraft: Codable, Sendable {
         var confidence: Double
         var match: DraftMatch?
         var alternatives: [FoodSummary]
+        /// "HH:mm" when the text said when ("at 12 coffee").
+        var time: String?
+        /// One of the athlete's supplements ("thyroid tablet" → Thyronorm): a dose, not a food.
+        var supplement: DraftSupplement?
     }
     var items: [Item]
     var model: String
     var costUsd: Double?
     var draftId: String?
+}
+
+struct DraftSupplement: Codable, Hashable, Sendable {
+    var id: String
+    var name: String
+    var servingDesc: String
 }
 
 struct SavedMeal: Codable, Identifiable, Sendable {
@@ -276,6 +286,12 @@ struct NewFoodLog: Encodable {
         var grams: Double
         var estGrams: Double?
         var confidence: Double?
+        /// Its own meal at this time; nil = the sheet's.
+        var time: String?
+    }
+    struct Dose: Encodable {
+        var supplementId: String
+        var time: String?
     }
     var meal: Meal
     var date: String?
@@ -287,9 +303,12 @@ struct NewFoodLog: Encodable {
     /// The describe drafts this came from, so the server can score them.
     var draftIds: [String]?
     var items: [Item]
+    /// Supplements named in a describe, logged as doses.
+    var doses: [Dose]?
 }
 
 struct LoggedFood: Decodable {
-    var id: String
+    /// nil when only supplements were logged.
+    var id: String?
     var nudges: [String]
 }

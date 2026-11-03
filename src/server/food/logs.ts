@@ -21,6 +21,8 @@ export interface NewItem {
   /** What a parser or model proposed, before the athlete edited it. */
   estGrams?: number | null;
   confidence?: number | null;
+  /** "HH:mm" from a describe ("at 12 coffee"): logged as its own meal at that time. */
+  time?: string | null;
 }
 
 export interface NewLog {
