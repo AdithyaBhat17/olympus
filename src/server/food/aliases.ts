@@ -23,13 +23,13 @@ export const USDA_ALIASES: Array<{ match: RegExp; aliases: string[] }> = [
   { match: /^Chickpea flour \(besan\)$/, aliases: ["gram flour"] },
   { match: /^Rice, white, long-grain, regular, raw, enriched$/, aliases: ["basmati rice raw", "chawal raw"] },
   { match: /^Rice, white, long-grain, regular, enriched, cooked$/, aliases: ["rice", "white rice", "basmati rice cooked", "chawal cooked", "steamed rice"] },
-  { match: /^Rice, brown, long-grain, cooked( \(Includes foods for USDA's Food Distribution Program\))?$/, aliases: ["brown rice cooked"] },
+  { match: /^Rice, brown, long-grain, cooked( \(Includes foods for USDA's Food Distribution Program\))?$/, aliases: ["brown rice cooked", "brown rice"] },
   { match: /^Yogurt, plain, whole milk$/, aliases: ["dahi", "curd"] },
   { match: /^Yogurt, plain, low fat$/, aliases: ["low fat dahi", "low fat curd"] },
   { match: /^Butter, Clarified butter \(ghee\)$/, aliases: ["desi ghee"] },
   { match: /^Milk, whole, 3\.25% milkfat, with added vitamin D$/, aliases: ["milk", "full cream milk", "doodh"] },
   { match: /^Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D$/, aliases: ["toned milk"] },
-  { match: /^Oats, whole grain, rolled, old fashioned$/, aliases: ["rolled oats raw"] },
+  { match: /^Oats, whole grain, rolled, old fashioned$/, aliases: ["rolled oats raw", "oats", "rolled oats"] },
   { match: /^Egg, whole, raw, fresh$/, aliases: ["egg", "eggs", "anda", "whole egg"] },
   { match: /^Egg, whole, cooked, hard-boiled$/, aliases: ["boiled egg", "boiled eggs"] },
   { match: /^Egg, white, raw, fresh$/, aliases: ["egg white"] },
@@ -52,6 +52,12 @@ export const USDA_ALIASES: Array<{ match: RegExp; aliases: string[] }> = [
   { match: /^Chapati\/Roti$/, aliases: ["roti", "chapati", "phulka", "rotis", "chapatis"] },
   { match: /^Plain dosa/i, aliases: ["dosa"] },
   { match: /^Plain parantha\/paratha/i, aliases: ["paratha", "parantha"] },
+  // FNDDS: the plain cheese for a bare "paneer" (otherwise paneer soup wins).
+  { match: /^Cheese, paneer$/, aliases: ["paneer", "fresh paneer"] },
+  // Milk tea is what "chai" or "tea" means at home (food_parse_events: "masala chai" → "Dry masala chops").
+  { match: /^Hot tea \(Garam Chai\)$/, aliases: ["chai", "tea", "masala chai", "milk tea", "cutting chai", "adrak chai", "ginger tea", "elaichi chai"] },
+  // A bare "dal" is the everyday yellow dal; INDB's closest is mixed dal (not whole moong).
+  { match: /^Mixed dal$/, aliases: ["dal", "plain dal", "yellow dal", "dal tadka", "dal fry", "toor dal tadka", "arhar dal tadka"] },
 ];
 
 /** Aliases for a USDA or INDB description, plus which patterns were used (for the report). */

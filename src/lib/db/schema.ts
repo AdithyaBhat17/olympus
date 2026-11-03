@@ -616,7 +616,7 @@ export const planItemsRelations = relations(planItems, ({ one }) => ({
 // Food (Phase 2): database, recipes, logs, weigh-ins. See migration-012-food.sql.
 // ---------------------------------------------------------------------------
 
-export type FoodSourceKind = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "off";
+export type FoodSourceKind = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off";
 
 const num = (name: string, precision: number, scale: number) => numeric(name, { precision, scale, mode: "number" });
 

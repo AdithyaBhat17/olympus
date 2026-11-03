@@ -144,7 +144,7 @@ export function mealForTime(localMinutes: number): Meal {
 
 // --- Search ranking ----------------------------------------------------------
 
-export type FoodSource = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "off";
+export type FoodSource = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off";
 
 /** Your own first, then Indian verified data, then USDA, then crowd-sourced packaged foods. */
 const SOURCE_BONUS: Record<FoodSource, number> = {
@@ -153,6 +153,8 @@ const SOURCE_BONUS: Record<FoodSource, number> = {
   indb: 0.2,
   usda_foundation: 0.12,
   usda_sr: 0.08,
+  // Foods as eaten (guacamole, hummus, burritos); below INDB, so Indian dishes stay Indian.
+  usda_fndds: 0.1,
   off: 0,
 };
 
@@ -173,6 +175,40 @@ export interface SearchCandidate {
   category?: string | null;
   /** False when the row's numbers are doubtful (crowd data, INDB fried recipes). */
   verified?: boolean;
+  /** The row's search_text (name, brand, aliases), for word coverage. */
+  text?: string;
+}
+
+const STOP_WORDS = new Set(["a", "an", "and", "the", "of", "with", "in", "on", "for", "or"]);
+/** Preparation words that trail the food in a query ("rice cooked"): never the head. */
+const PREP_WORDS = /^(raw|cooked|boiled|fried|grilled|roasted|steamed|baked|plain|homemade|home|fresh|hot|cold|small|large|big|medium)$/;
+
+function sameWord(a: string, b: string): boolean {
+  if (a === b) return true;
+  // Plurals: roti/rotis, tomato/tomatoes.
+  const strip = (w: string) => w.replace(/(es|s)$/, "");
+  return a.length > 3 && b.length > 3 && strip(a) === strip(b);
+}
+
+/**
+ * How much of the query a candidate contains. `head` is the food word: the
+ * last query word that isn't a preparation word ("chai" in "masala chai",
+ * "rice" in "rice cooked"). A candidate without it is a different food.
+ */
+export function matchCoverage(c: Pick<SearchCandidate, "text">, query: string): { share: number; head: boolean } {
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !STOP_WORDS.has(w));
+  if (!words.length || c.text == null) return { share: 1, head: true };
+  const have = new Set(c.text.split(" "));
+  const has = (w: string) => [...have].some((h) => sameWord(h, w));
+  const head = [...words].reverse().find((w) => !PREP_WORDS.test(w)) ?? words[words.length - 1];
+  return { share: words.filter(has).length / words.length, head: has(head) };
+}
+
+/** Good enough to put in a draft unasked. Otherwise the draft says "no match" and offers it as an alternative. */
+export function isStrongMatch(c: Pick<SearchCandidate, "text" | "aliasExact">, query: string): boolean {
+  if (c.aliasExact) return true;
+  const { share, head } = matchCoverage(c, query);
+  return head && share >= 0.5;
 }
 
 /** Foods usually eaten raw: "raw" in their name is how they're eaten, not a warning. */
@@ -193,6 +229,12 @@ export function rankScore(c: SearchCandidate, query: string, opts: RankOptions =
   const name = c.name.toLowerCase();
   let s = c.similarity;
   if (c.allWords) s += 0.25;
+  if (c.aliasExact) s += 0.3; // full coverage by definition
+  else if (c.text != null) {
+    const { share, head } = matchCoverage(c, q);
+    s += 0.3 * share;
+    if (!head) s -= 0.4;
+  }
   if (name === q || c.aliasExact) s += 0.5;
   else if (name.startsWith(q)) s += 0.1;
   if (

@@ -62,9 +62,11 @@ export async function draftFromText(userId: string, text: string, client: "web" 
   const items = await Promise.all(
     parsed.map(async (p): Promise<DraftItem> => {
       const candidates = await searchFoods(userId, p.search, 6, { preferCooked: true });
-      const top = candidates[0];
+      // A wrong food is worse than none: only a candidate with the food word is picked.
+      // Weak ones stay as alternatives, so the sheet can offer them.
+      const top = candidates[0]?.strong === false ? undefined : candidates[0];
       if (!top) {
-        return { said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: [], kcal: 0, protein: 0 };
+        return { said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: candidates.slice(0, 5), kcal: 0, protein: 0 };
       }
       const { portions, food } = await getFood(userId, top.id);
       const choice = chooseGrams(p, portions, usualById.get(top.id) ?? null);

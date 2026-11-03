@@ -5,6 +5,8 @@ import {
   forGrams,
   mealForTime,
   rankCandidates,
+  matchCoverage,
+  isStrongMatch,
   rankScore,
   recipePer100,
   remaining,
@@ -156,6 +158,34 @@ describe("search ranking", () => {
     expect(rankScore(c({ name: "egg" }), "egg")).toBeGreaterThan(rankScore(c({ name: "egg, whole, raw" }), "egg"));
     expect(rankScore(c({ timesLogged: 20 }), "x")).toBeGreaterThan(rankScore(c({}), "x"));
     expect(rankScore(c({ favourite: true }), "x")).toBeGreaterThan(rankScore(c({}), "x"));
+  });
+
+  it("a candidate missing the food itself loses: 'masala chai' is tea, not masala chops", () => {
+    const chops = c({ name: "Dry masala chops", source: "indb", similarity: 0.75, allWords: false, text: "dry masala chops" });
+    const chai = c({ name: "Hot tea (Garam Chai)", source: "indb", similarity: 0.4, allWords: false, text: "hot tea garam chai garam chai" });
+    expect(rankCandidates([chops, chai], "masala chai")[0]).toBe(chai);
+  });
+
+  it("an exact alias still beats rows that merely contain every word ('egg' is not dried egg yolk)", () => {
+    const egg = c({ name: "Egg, whole, raw, fresh", source: "usda_foundation", similarity: 1, aliasExact: true, category: "Dairy and Egg Products", text: "egg whole raw fresh egg eggs anda whole egg" });
+    const yolk = c({ name: "Egg, yolk, dried", source: "usda_foundation", similarity: 1, text: "egg yolk dried" });
+    expect(rankCandidates([yolk, egg], "egg", 2, { preferCooked: true })[0]).toBe(egg);
+  });
+
+  it("only the food word counts as the head: trailing 'cooked' or 'raw' doesn't", () => {
+    expect(matchCoverage(c({ text: "rice white long grain regular enriched cooked" }), "rice cooked")).toMatchObject({ head: true, share: 1 });
+    expect(matchCoverage(c({ text: "chapati roti roti chapati phulka rotis chapatis" }), "rotis")).toMatchObject({ head: true });
+    expect(matchCoverage(c({ text: "dry masala chops" }), "masala chai")).toEqual({ share: 0.5, head: false });
+  });
+
+  it("a match without the food word is weak, so the draft says 'no match' instead of guessing", () => {
+    expect(isStrongMatch(c({ text: "dry masala chops" }), "masala chai")).toBe(false);
+    expect(isStrongMatch(c({ text: "hot tea garam chai" }), "masala chai")).toBe(true);
+    expect(isStrongMatch(c({ text: "guacamole" }), "guacamole")).toBe(true);
+    expect(isStrongMatch(c({ text: "avocados raw california" }), "guacamole")).toBe(false);
+    // An exact alias is always strong; without search text there's nothing to judge.
+    expect(isStrongMatch(c({ text: "mixed dal dal", aliasExact: true }), "dal")).toBe(true);
+    expect(isStrongMatch(c({}), "anything")).toBe(true);
   });
 
   it("puts doubtful data below the same match from a sound row", () => {

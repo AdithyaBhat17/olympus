@@ -45,6 +45,7 @@ const SOURCE_SHORT: Record<string, string> = {
   indb: "INDB",
   usda_foundation: "USDA",
   usda_sr: "USDA",
+  usda_fndds: "USDA",
   off: "OFF",
 };
 
