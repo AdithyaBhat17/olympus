@@ -3,6 +3,7 @@ import { connectionStatus } from "@/server/oauth";
 import { recentToolCalls } from "@/server/audit";
 import { getWhoop, whoopConfigured } from "@/server/integrations/whoop";
 import { getAppleHealth } from "@/server/integrations/apple-health";
+import { daysUntil, garminConfigured, getGarmin } from "@/server/integrations/garmin/sync";
 import { getProfile } from "@/server/profile";
 import { listConstraintRows } from "@/server/exercises";
 
@@ -12,13 +13,14 @@ import { listConstraintRows } from "@/server/exercises";
  * Timestamps are ISO; the app formats them in the athlete's timezone.
  */
 export async function settingsScreen(userId: string, origin: string) {
-  const [clients, calls, whoop, health, profile, injuries] = await Promise.all([
+  const [clients, calls, whoop, health, profile, injuries, garmin] = await Promise.all([
     connectionStatus(userId),
     recentToolCalls(userId, 40),
     getWhoop(userId),
     getAppleHealth(userId),
     getProfile(userId),
     listConstraintRows(userId),
+    getGarmin(userId),
   ]);
   const writes = calls.filter((c) => c.kind === "write");
   const lastPush = calls.find((c) => c.tool === "push_plan" && c.ok) ?? writes[0] ?? null;
@@ -51,6 +53,15 @@ export async function settingsScreen(userId: string, origin: string) {
       connected: !!whoop?.accessToken,
       lastSyncAt: whoop?.lastSyncAt?.toISOString() ?? null,
       lastError: whoop?.lastError ?? null,
+    },
+    garmin: {
+      configured: garminConfigured(),
+      connected: !!garmin?.secretEnc,
+      lastSyncAt: garmin?.lastSyncAt?.toISOString() ?? null,
+      lastError: garmin?.lastError ?? null,
+      keyExpiresAt: garmin?.keyExpiresAt?.toISOString() ?? null,
+      /** Days until the personal API key expires (negative once it has). */
+      keyDaysLeft: daysUntil(garmin?.keyExpiresAt ?? null),
     },
     appleHealth: { lastSyncAt: health?.lastSyncAt?.toISOString() ?? null },
     injuries: injuries.map((c) => ({
