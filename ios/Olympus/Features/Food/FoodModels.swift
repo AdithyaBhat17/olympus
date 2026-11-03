@@ -236,6 +236,7 @@ struct TextDraft: Codable, Sendable {
     var items: [Item]
     var model: String
     var costUsd: Double?
+    var draftId: String?
 }
 
 struct SavedMeal: Codable, Identifiable, Sendable {
@@ -283,6 +284,8 @@ struct NewFoodLog: Encodable {
     var rawText: String?
     var model: String?
     var costUsd: Double?
+    /// The describe drafts this came from, so the server can score them.
+    var draftIds: [String]?
     var items: [Item]
 }
 

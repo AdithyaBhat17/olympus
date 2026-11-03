@@ -152,7 +152,7 @@ struct FoodLogSheet: View {
     let logged: () -> Void
 
     @State private var basket: [BasketItem] = []
-    @State private var draft: (text: String, model: String, cost: Double?)?
+    @State private var draft: (text: String, model: String, cost: Double?, ids: [String])?
     @State private var fromSaved = false
     @State private var time = Date()
     @State private var saving = false
@@ -306,7 +306,13 @@ struct FoodLogSheet: View {
             return BasketItem(food: m.food, grams: i.grams, portions: m.portions, said: i.said, estGrams: i.estGrams, confidence: i.confidence, basis: i.basis, alternatives: i.alternatives)
         }
         withAnimation(.snappy) { basket += items }
-        draft = (text, d.model, d.costUsd)
+        // Several describes in one sheet: keep every draft id so each is scored.
+        draft = (
+            draft.map { "\($0.text); \(text)" } ?? text,
+            d.model,
+            (draft?.cost ?? 0) + (d.costUsd ?? 0),
+            (draft?.ids ?? []) + (d.draftId.map { [$0] } ?? [])
+        )
         let missed = d.items.filter { $0.match == nil }.map(\.said)
         if !missed.isEmpty {
             model.show("No match for \(missed.joined(separator: ", ")). Search for \(missed.count > 1 ? "them" : "it") instead.", kind: .error)
@@ -325,6 +331,7 @@ struct FoodLogSheet: View {
             rawText: draft?.text,
             model: draft?.model,
             costUsd: draft?.cost,
+            draftIds: draft?.ids,
             items: basket.map { .init(foodId: $0.food.id, grams: $0.grams, estGrams: $0.estGrams, confidence: $0.confidence) }
         )
         let summary = "Logged \(Int(kcal.rounded())) kcal, \(Int(protein.rounded())) g protein"

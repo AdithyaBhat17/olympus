@@ -34,6 +34,8 @@ export interface NewLog {
   rawText?: string | null;
   model?: string | null;
   costUsd?: number | null;
+  /** The describe drafts this came from (food_parse_events), for quality tracking. */
+  draftIds?: string[];
   items: NewItem[];
 }
 

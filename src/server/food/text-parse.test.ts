@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseGrams, cleanItem, isParseResult, parsePrompt, type ParsedItem } from "./text-parse";
+import { chooseGrams, cleanItem, isParseResult, parseOutcome, parsePrompt, type ParsedItem } from "./text-parse";
 
 const item = (over: Partial<ParsedItem>): ParsedItem => ({
   name: "roti",
@@ -66,5 +66,25 @@ describe("parsePrompt", () => {
     expect(system.content).toContain("Home toor dal: 180 g");
     expect(system.content).toContain("Never estimate calories");
     expect(user.content).toBe("2 rotis and dal");
+  });
+});
+
+describe("parseOutcome", () => {
+  const d = (matchId: string | null, grams: number) => ({ matchId, grams });
+  const f = (foodId: string, grams: number) => ({ foodId, grams });
+
+  it("counts kept, regrammed, swapped, removed and added", () => {
+    const draft = [d("roti", 80), d("dal", 150), d("rice", 150), d("ghee", 13), d(null, 15)];
+    // roti kept (82 is within 5 g), dal corrected to 200, rice swapped for brown rice, ghee removed.
+    const final = [f("roti", 82), f("dal", 200), f("brown-rice", 150)];
+    expect(parseOutcome(draft, final)).toEqual({ kept: 1, regrammed: 1, swapped: 1, removed: 1, added: 0 });
+  });
+
+  it("treats a small relative change on a big portion as kept, and extra foods as added", () => {
+    expect(parseOutcome([d("rice", 300)], [f("rice", 320), f("pickle", 10)])).toEqual({ kept: 1, regrammed: 0, swapped: 0, removed: 0, added: 1 });
+  });
+
+  it("matches the same food twice in order", () => {
+    expect(parseOutcome([d("egg", 50), d("egg", 50)], [f("egg", 50), f("egg", 100)])).toEqual({ kept: 1, regrammed: 1, swapped: 0, removed: 0, added: 0 });
   });
 });

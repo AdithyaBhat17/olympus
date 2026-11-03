@@ -11,6 +11,7 @@ const input = z.object({
   rawText: z.string().max(2000).nullable().optional(),
   model: z.string().max(100).nullable().optional(),
   costUsd: z.number().min(0).max(10).nullable().optional(),
+  draftIds: z.array(uuid).max(10).optional(),
   items: z
     .array(
       z.object({

@@ -135,3 +135,44 @@ export function chooseGrams(
   if (portion && unit !== "serving") return { grams: Math.round(portion.grams * item.quantity), basis: "portion" };
   return { grams: item.grams, basis: "estimate" };
 }
+
+export interface ParseOutcome {
+  /** Logged as drafted (grams within 5 g or 10 %). */
+  kept: number;
+  /** Same food, different grams. */
+  regrammed: number;
+  /** A drafted food replaced by another. */
+  swapped: number;
+  /** A drafted food dropped. */
+  removed: number;
+  /** A food that wasn't in the draft. */
+  added: number;
+}
+
+/**
+ * How the saved meal differs from the draft: the describe flow's quality
+ * signal. Unmatched draft items (no food found) are counted separately by
+ * the caller. A removal and an addition in the same meal count as a swap.
+ */
+export function parseOutcome(
+  draft: Array<{ matchId: string | null; grams: number }>,
+  final: Array<{ foodId: string; grams: number }>
+): ParseOutcome {
+  const left = [...final];
+  let kept = 0;
+  let regrammed = 0;
+  let missing = 0;
+  for (const d of draft) {
+    if (!d.matchId) continue;
+    const i = left.findIndex((f) => f.foodId === d.matchId);
+    if (i < 0) {
+      missing++;
+      continue;
+    }
+    const [f] = left.splice(i, 1);
+    if (Math.abs(f.grams - d.grams) <= Math.max(5, d.grams * 0.1)) kept++;
+    else regrammed++;
+  }
+  const swapped = Math.min(missing, left.length);
+  return { kept, regrammed, swapped, removed: missing - swapped, added: left.length - swapped };
+}

@@ -13,6 +13,7 @@
     "garmin:sync": "tsx scripts/garmin/sync.ts",
     "food:import": "tsx scripts/food/import-db.ts",
     "food:import-mfp": "tsx scripts/food/import-mfp.ts",
+    "food:parse-report": "tsx scripts/food/parse-report.ts",
     "supplements:seed": "tsx scripts/supplements/seed-stack.ts"
   },
   "dependencies": {

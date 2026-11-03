@@ -82,7 +82,7 @@ export function LogSheet({
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [time, setTime] = useState("13:00");
-  const [draftMeta, setDraftMeta] = useState<{ text: string; model: string; cost: number | null } | null>(null);
+  const [draftMeta, setDraftMeta] = useState<{ text: string; model: string; cost: number | null; draftIds: string[] } | null>(null);
   const [fromSaved, setFromSaved] = useState(false);
   const [mealName, setMealName] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
@@ -139,7 +139,8 @@ export function LogSheet({
       }));
     const missed = d.items.filter((i) => !i.match).map((i) => i.said);
     setBasket((b) => [...b, ...items]);
-    setDraftMeta({ text, model: d.model, cost: d.costUsd });
+    // Several describes in one sheet: keep every draft id; the last text/model stand for the log.
+    setDraftMeta((m) => ({ text: m ? `${m.text}; ${text}` : text, model: d.model, cost: (m?.cost ?? 0) + (d.costUsd ?? 0), draftIds: [...(m?.draftIds ?? []), ...(d.draftId ? [d.draftId] : [])] }));
     if (missed.length) toast.warning(`No match for ${missed.join(", ")}. Search for ${missed.length > 1 ? "them" : "it"} instead.`);
   };
 
@@ -160,6 +161,7 @@ export function LogSheet({
         rawText: draftMeta?.text ?? null,
         model: draftMeta?.model ?? null,
         costUsd: draftMeta?.cost ?? null,
+        draftIds: draftMeta?.draftIds ?? [],
         items: basket.map((i) => ({ foodId: i.food.id, grams: i.grams, estGrams: i.estGrams ?? null, confidence: i.confidence ?? null })),
       });
       if (!r.ok) {
