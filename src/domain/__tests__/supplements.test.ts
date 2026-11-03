@@ -86,7 +86,12 @@ describe("nudgeSummary", () => {
     expect(nudgeSummary([])).toBeNull();
     expect(nudgeSummary([n("coffee", 25, 60)])).toContain("Thyronorm and coffee were 25 min apart");
     expect(nudgeSummary([n("dahi", 16, 240), n("milk", 21, 240), n("soya roti", 21, 120)])).toBe(
-      "Thyronorm was 16 min–21 min from dahi, milk and soya roti. These are usually spaced 2 h–4 h apart; details and sources are under Supplements › Timing rules."
+      "Thyronorm was 16–21 min from dahi, milk and soya roti. They're usually kept 2–4 h apart. Details and sources: Supplements › Timing rules."
+    );
+  });
+  it("lists each food once, and says 'with' when there was no gap", () => {
+    expect(nudgeSummary([n("boiled egg + Yogurt + banana", 0, 30), n("yogurt", 0, 240)])).toBe(
+      "Thyronorm was taken with boiled egg, Yogurt and banana. They're usually kept 30 min–4 h apart. Details and sources: Supplements › Timing rules."
     );
   });
 });

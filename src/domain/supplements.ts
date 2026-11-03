@@ -241,7 +241,15 @@ export function labChecklist(
   return items.sort((a, b) => a.from - b.from);
 }
 
-const fmtGap = (m: number) => (m < 60 ? `${m} min` : `${Math.round((m / 60) * 10) / 10} h`);
+const hours = (m: number) => Math.round((m / 60) * 10) / 10;
+
+/** "16–21 min", "30 min–4 h", "2–4 h": the unit once when both ends share it. */
+function fmtRange(lo: number, hi: number): string {
+  if (lo === hi) return lo < 60 ? `${lo} min` : `${hours(lo)} h`;
+  if (hi < 60) return `${lo}–${hi} min`;
+  if (lo >= 60) return `${hours(lo)}–${hours(hi)} h`;
+  return `${lo} min–${hours(hi)} h`;
+}
 
 /**
  * One calm line for any number of nudges: what was close to what, and the
@@ -252,11 +260,18 @@ export function nudgeSummary(nudges: Nudge[]): string | null {
   if (!nudges.length) return null;
   if (nudges.length === 1) return nudgeText(nudges[0]);
   const subject = nudges[0].subject;
-  const objects = [...new Set(nudges.filter((n) => n.subject === subject).map((n) => n.object))];
+  // A meal arrives as "egg + yogurt + banana" and a single food rule may name
+  // one of those again: list each food once, first spelling wins.
+  const seen = new Map<string, string>();
+  for (const n of nudges.filter((x) => x.subject === subject)) {
+    for (const part of n.object.split(" + ").map((p) => p.trim()).filter(Boolean)) {
+      if (!seen.has(part.toLowerCase())) seen.set(part.toLowerCase(), part);
+    }
+  }
+  const objects = [...seen.values()];
+  const list = objects.length > 1 ? `${objects.slice(0, -1).join(", ")} and ${objects.at(-1)}` : objects[0];
   const gaps = nudges.map((n) => n.gapMin);
   const want = nudges.map((n) => n.suggestedMin);
-  const lo = Math.min(...want);
-  const hi = Math.max(...want);
-  const list = objects.length > 1 ? `${objects.slice(0, -1).join(", ")} and ${objects.at(-1)}` : objects[0];
-  return `${subject} was ${fmtGap(Math.min(...gaps))}${Math.max(...gaps) !== Math.min(...gaps) ? `–${fmtGap(Math.max(...gaps))}` : ""} from ${list}. These are usually spaced ${lo === hi ? fmtGap(lo) : `${fmtGap(lo)}–${fmtGap(hi)}`} apart; details and sources are under Supplements › Timing rules.`;
+  const when = Math.max(...gaps) < 5 ? `taken with ${list}` : `${fmtRange(Math.min(...gaps), Math.max(...gaps))} from ${list}`;
+  return `${subject} was ${when}. They're usually kept ${fmtRange(Math.min(...want), Math.max(...want))} apart. Details and sources: Supplements › Timing rules.`;
 }

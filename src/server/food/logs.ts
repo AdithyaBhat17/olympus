@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { foodLogItems, foodLogs, type FoodInputMode } from "@/lib/db/schema";
-import { isoDateInTz, localToUtc, tzOffsetMin } from "@/lib/dates";
+import { addDays, formatTimeInTz, isoDateInTz, localToUtc, tzOffsetMin } from "@/lib/dates";
 import { dayTotals, forGrams, mealForTime, remaining, type DayTotals, type Meal, type Remaining } from "@/domain/nutrition";
 import { upsertCheckIn } from "../checkins";
 import { DomainError } from "../errors";
@@ -187,6 +187,8 @@ export interface DayLog {
   id: string;
   meal: Meal;
   eatenAt: string;
+  /** "08:10" in the athlete's timezone. */
+  time: string;
   inputMode: FoodInputMode;
   items: DayLogItem[];
   totals: { kcal: number; protein: number };
@@ -235,6 +237,7 @@ export async function dayView(userId: string, date: string): Promise<DayView> {
       id: l.id,
       meal: l.meal,
       eatenAt: l.eatenAt.toISOString(),
+      time: formatTimeInTz(l.eatenAt, l.tz),
       inputMode: l.inputMode,
       items: its,
       totals: {
@@ -259,4 +262,31 @@ export async function dayView(userId: string, date: string): Promise<DayView> {
     remaining: remaining(totals, { kcalTarget: targets.kcal, proteinTarget: targets.protein }),
     targets,
   };
+}
+
+export interface WeekDay {
+  date: string;
+  /** Protein that counts toward the target, g. */
+  protein: number;
+  kcal: number;
+  logged: boolean;
+}
+
+/** The 7 days ending on `endDate`, oldest first: the Food page's week strip. */
+export async function weekSummary(userId: string, endDate: string): Promise<WeekDay[]> {
+  const start = addDays(endDate, -6);
+  const res = await db.execute(sql`
+    SELECT l.local_date::text AS date,
+      coalesce(sum(i.protein_g) FILTER (WHERE i.counts_to_protein), 0)::float AS protein,
+      coalesce(sum(i.kcal), 0)::float AS kcal
+    FROM food_logs l JOIN food_log_items i ON i.log_id = l.id
+    WHERE l.user_id = ${userId} AND l.local_date BETWEEN ${start} AND ${endDate}
+    GROUP BY l.local_date`);
+  const rows = (res as unknown as { rows?: Record<string, unknown>[] }).rows ?? (res as unknown as Record<string, unknown>[]);
+  const byDate = new Map(rows.map((r) => [String(r.date), r]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(start, i);
+    const r = byDate.get(date);
+    return { date, protein: r ? Math.round(Number(r.protein)) : 0, kcal: r ? Math.round(Number(r.kcal)) : 0, logged: !!r };
+  });
 }

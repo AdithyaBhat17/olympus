@@ -33,7 +33,9 @@ export default async function SupplementsPage() {
         </Link>
       </div>
       <PageHeader title="Supplements" eyebrow="Reminders and records. Not medical advice." />
-      <SlotCard data={slots} />
+      <div className="mt-6">
+        <SlotCard data={slots} />
+      </div>
 
       <section className="card mx-3 mt-3 px-4 py-3" aria-labelledby="stack-h">
         <div className="flex items-baseline justify-between">
