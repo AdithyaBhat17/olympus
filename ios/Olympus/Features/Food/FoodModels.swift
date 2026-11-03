@@ -197,7 +197,7 @@ struct FoodSummary: Codable, Identifiable, Hashable, Sendable {
         case "user": "Mine"
         case "recipe": "Recipe"
         case "indb": "INDB"
-        case "usda_foundation", "usda_sr": "USDA"
+        case "usda_foundation", "usda_sr", "usda_fndds": "USDA"
         case "off": "OFF"
         default: source
         }

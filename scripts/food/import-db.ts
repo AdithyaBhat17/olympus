@@ -1,11 +1,13 @@
 /**
  * Import the shared food databases into `foods` / `food_portions`.
  *
- *   pnpm food:import [--only usda_sr,usda_foundation,indb] [--dry-run]
+ *   pnpm food:import [--only usda_sr,usda_foundation,usda_fndds,indb] [--dry-run]
  *
  * Sources (downloaded once into .food-data/, gitignored):
  * - USDA FoodData Central SR Legacy (2018-04) and Foundation Foods
  *   (2026-10-29), JSON. Public domain (CC0).
+ * - USDA FNDDS 2021-2023 (FDC Survey Foods, 2024-10-31): foods as eaten
+ *   (guacamole, hummus, burritos, curries). Public domain (CC0).
  * - INDB, the Indian Nutrient Databank (Vijayakumar et al. 2024, Current
  *   Developments in Nutrition), INDB.xlsx from the authors' repository
  *   lindsayjaacks/Indian-Nutrient-Databank-INDB-. 1,014 Indian recipes,
@@ -28,6 +30,10 @@ const SOURCES = {
   usda_foundation: {
     url: "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_json_2026-10-29.zip",
     key: "FoundationFoods",
+  },
+  usda_fndds: {
+    url: "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_survey_food_json_2024-10-31.zip",
+    key: "SurveyFoods",
   },
   indb: {
     url: "https://raw.githubusercontent.com/lindsayjaacks/Indian-Nutrient-Databank-INDB-/main/INDB.xlsx",

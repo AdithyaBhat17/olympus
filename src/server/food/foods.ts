@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { foodFavourites, foodPortions, foods, recipeIngredients, savedMealItems, savedMeals, type FoodRow } from "@/lib/db/schema";
-import { rankCandidates, recipePer100, searchText, type FoodSource, type Per100 } from "@/domain/nutrition";
+import { isStrongMatch, rankCandidates, recipePer100, searchText, type FoodSource, type Per100 } from "@/domain/nutrition";
 import { DomainError } from "../errors";
 import { offFood, tagsFor } from "./sources";
 
@@ -21,6 +21,8 @@ export interface FoodSummary {
   verified: boolean;
   favourite: boolean;
   timesLogged: number;
+  /** Contains the food word of the query (see isStrongMatch). Weak ones are offered, never auto-picked. */
+  strong?: boolean;
 }
 
 export function per100(f: Pick<FoodRow, "kcal100g" | "protein100g" | "carbs100g" | "fat100g" | "fibre100g">): Per100 {
@@ -66,19 +68,25 @@ export async function searchFoods(
 ): Promise<FoodSummary[]> {
   const q = searchText(query);
   if (q.length < 2) return [];
+  // Any word, too: "masala chai" must reach "Garam Chai" even when trigram similarity favours "masala".
+  const anyWord = q.split(" ").filter((w) => w.length > 2).join(" or ");
   const res = await db.execute(sql`
     SELECT ${SUMMARY_COLS},
       word_similarity(${q}, f.search_text) AS sim,
       f.search_tsv @@ plainto_tsquery('simple', ${q}) AS all_words,
       ${q} = ANY (f.aliases) AS alias_exact,
       f.category,
+      f.search_text,
       EXISTS (SELECT 1 FROM food_favourites v WHERE v.user_id = ${userId} AND v.food_id = f.id) AS favourite,
       (SELECT count(*) FROM food_log_items i JOIN food_logs l ON l.id = i.log_id
         WHERE l.user_id = ${userId} AND i.food_id = f.id AND l.local_date > current_date - 90)::int AS times
     FROM foods f
     WHERE (f.user_id IS NULL OR f.user_id = ${userId}) AND f.archived_at IS NULL
-      AND (${q} <% f.search_text OR f.search_tsv @@ plainto_tsquery('simple', ${q}))
-    ORDER BY sim DESC
+      AND (${q} <% f.search_text OR f.search_tsv @@ plainto_tsquery('simple', ${q})
+        OR (${anyWord} <> '' AND f.search_tsv @@ websearch_to_tsquery('simple', ${anyWord})))
+    -- Exact aliases and short names first: a one-word query ties hundreds of rows on similarity,
+    -- and the plain food ("egg", "rice") must survive the cut.
+    ORDER BY (${q} = ANY (f.aliases)) DESC, sim DESC, length(f.name) ASC
     LIMIT 150`);
   const rows = rowsOf(res).map((r) => ({
     ...toSummary(r),
@@ -86,14 +94,14 @@ export async function searchFoods(
     allWords: Boolean(r.all_words),
     aliasExact: Boolean(r.alias_exact),
     category: (r.category as string | null) ?? null,
+    text: String(r.search_text ?? ""),
   }));
   return rankCandidates(rows, q, limit, opts).map((r): FoodSummary => {
-    const { similarity, allWords, aliasExact, category, ...f } = r;
+    const { similarity, allWords, aliasExact, category, text, ...f } = r;
     void similarity;
     void allWords;
-    void aliasExact;
     void category;
-    return f;
+    return { ...f, strong: isStrongMatch({ text, aliasExact }, q) };
   });
 }
 

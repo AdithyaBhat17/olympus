@@ -191,3 +191,40 @@ describe("MFP export", () => {
     ]);
   });
 });
+
+describe("usdaFood: FNDDS survey foods", () => {
+  // The shape of FoodData_Central_survey_food_json_2024-10-31 (Guacamole, NFS).
+  const guac = {
+    fdcId: 2709307,
+    description: "Guacamole, NFS",
+    wweiaFoodCategory: { wweiaFoodCategoryDescription: "Dips, gravies, other sauces", wweiaFoodCategoryCode: 1 },
+    foodPortions: [
+      { measureUnit: { name: "undetermined" }, modifier: "21000", gramWeight: 15, portionDescription: "1 tablespoon", sequenceNumber: 1 },
+      { measureUnit: { name: "undetermined" }, modifier: "60868", gramWeight: 70, portionDescription: "1 individual container", sequenceNumber: 2 },
+      { measureUnit: { name: "undetermined" }, modifier: "90000", gramWeight: 60, portionDescription: "Quantity not specified", sequenceNumber: 3 },
+    ],
+    foodNutrients: [
+      { nutrient: { id: 1008 }, amount: 155 },
+      { nutrient: { id: 1003 }, amount: 1.95 },
+      { nutrient: { id: 1004 }, amount: 14.2 },
+      { nutrient: { id: 1005 }, amount: 8.45 },
+    ],
+  };
+
+  it("maps nutrients, category and clean portion labels", () => {
+    const m = usdaFood(guac, "usda_fndds")!;
+    expect(m.food).toMatchObject({ source: "usda_fndds", sourceId: "2709307", name: "Guacamole, NFS", category: "Dips, gravies, other sauces", kcal100g: 155, protein100g: 1.95 });
+    // Numeric modifier codes stay out of labels; "Quantity not specified" is the default serving, not a choice.
+    expect(m.portions).toEqual([
+      { label: "1 tablespoon", grams: 15 },
+      { label: "1 individual container", grams: 70 },
+    ]);
+    expect(m.food).toMatchObject({ servingG: 60, servingLabel: "1 serving" });
+  });
+
+  it("'Guacamole, NFS' also answers to 'guacamole'", () => {
+    const m = usdaFood(guac, "usda_fndds")!;
+    expect(m.food.aliases).toContain("guacamole");
+    expect(m.food.searchText).toContain("guacamole");
+  });
+});

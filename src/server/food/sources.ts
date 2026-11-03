@@ -73,7 +73,7 @@ const USDA_MICROS: Record<number, string> = {
   1213: "leucine_g",
 };
 
-export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr"): MappedFood | null {
+export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr" | "usda_fndds"): MappedFood | null {
   const fdcId = num(item.fdcId);
   const name = typeof item.description === "string" ? item.description.trim() : "";
   if (fdcId === undefined || !name) return null;
@@ -91,10 +91,22 @@ export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr"): Map
     if (v !== undefined && v >= 0) micros[key] = round(v, 3)!;
   }
   const portions: MappedFood["portions"] = [];
+  // FNDDS: "Quantity not specified" is what a person typically eats; it's the default serving, not a choice.
+  let unspecifiedG: number | undefined;
   for (const p of Array.isArray(item.foodPortions) ? item.foodPortions : []) {
     if (!isObj(p)) continue;
     const grams = num(p.gramWeight);
     if (!grams) continue;
+    if (dataset === "usda_fndds") {
+      const desc = typeof p.portionDescription === "string" ? p.portionDescription.trim() : "";
+      if (/^quantity not specified$/i.test(desc)) {
+        unspecifiedG = round(grams, 1);
+        continue;
+      }
+      // FNDDS modifiers are numeric codes ("21000"); the description is the label.
+      if (desc && !portions.some((x) => x.label === desc)) portions.push({ label: desc, grams: round(grams, 1)! });
+      continue;
+    }
     const unit = isObj(p.measureUnit) && p.measureUnit.name !== "undetermined" ? String(p.measureUnit.name) : "";
     const label = [num(p.amount) ?? num(p.value) ?? "", unit, typeof p.modifier === "string" ? p.modifier : "", typeof p.portionDescription === "string" ? p.portionDescription : ""]
       .map(String)
@@ -104,7 +116,15 @@ export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr"): Map
       .trim();
     if (label && !portions.some((x) => x.label === label)) portions.push({ label, grams: round(grams, 1)! });
   }
-  const category = isObj(item.foodCategory) && typeof item.foodCategory.description === "string" ? item.foodCategory.description : null;
+  const category =
+    isObj(item.foodCategory) && typeof item.foodCategory.description === "string"
+      ? item.foodCategory.description
+      : isObj(item.wweiaFoodCategory) && typeof item.wweiaFoodCategory.wweiaFoodCategoryDescription === "string"
+        ? item.wweiaFoodCategory.wweiaFoodCategoryDescription
+        : null;
+  // "Guacamole, NFS" (not further specified) is the plain one: it answers to "guacamole".
+  const nfs = name.match(/^(.+?), NFS$/);
+  const aliases = nfs ? [nfs[1].toLowerCase()] : [];
   return finish(
     {
       userId: null,
@@ -114,7 +134,7 @@ export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr"): Map
       brand: null,
       barcode: null,
       category,
-      aliases: [],
+      aliases,
       kcal100g: round(pick(1008, 2048, 2047))!,
       protein100g: macro(pick(1003)),
       carbs100g: macro(pick(1005, 1050)),
@@ -123,8 +143,8 @@ export function usdaFood(item: Obj, dataset: "usda_foundation" | "usda_sr"): Map
       sugar100g: macro(pick(2000, 1063)),
       sodiumMg100g: round(pick(1093)) ?? null,
       micros,
-      servingG: portions[0]?.grams ?? null,
-      servingLabel: portions[0]?.label ?? null,
+      servingG: unspecifiedG ?? portions[0]?.grams ?? null,
+      servingLabel: unspecifiedG ? "1 serving" : (portions[0]?.label ?? null),
       verified: true,
     },
     portions
