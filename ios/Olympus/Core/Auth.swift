@@ -34,6 +34,17 @@ final class Auth {
         isSignedIn = Keychain.read(Keys.refresh) != nil
         accessToken = Keychain.read(Keys.access)
         accessExpiry = (UserDefaults.standard.object(forKey: Keys.expiry) as? Date)
+        #if DEBUG
+        // Simulator runs against a local server: a test token passed at launch
+        // (SIMCTL_CHILD_OLYMPUS_DEBUG_TOKEN), held in memory only, never saved.
+        let env = ProcessInfo.processInfo.environment
+        if let server = env["OLYMPUS_DEBUG_SERVER"].flatMap(Self.normalized), let token = env["OLYMPUS_DEBUG_TOKEN"], !token.isEmpty {
+            serverURL = server
+            accessToken = token
+            accessExpiry = .distantFuture
+            isSignedIn = true
+        }
+        #endif
     }
 
     func setServer(_ raw: String) -> Bool {
