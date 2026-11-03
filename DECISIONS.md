@@ -2,6 +2,28 @@
 
 Newest first. What was decided, and why.
 
+## 2026-11-03: Phase 2b (supplements, migration 013)
+
+- **One log row per supplement per day,** marked taken, half or skipped, with a `late` flag. A taken dose is a fact to record, not a streak to protect, so the record shows the last 14 days and there are no streaks.
+- **Timing rules are config, not code.** Each `timing_rules` row has a citation, and a user override is stored by rule key. The same check runs on every supplement dose and every food log, so coffee or a calcium-rich meal too close to Thyronorm gets flagged as well.
+- **One calm summary line** when a rule is broken. The detail and the source sit under Supplements › Timing rules, so a late coffee doesn't set off an alarm.
+- **Whey and collagen doses post to the food log,** so protein has one source. Collagen protein is logged but doesn't count toward the 155 g floor by default (its amino acids are incomplete and it has almost no leucine). A profile toggle lets it count.
+- **Inventory is worked out, not typed in.** Servings and days left come from restocks, counts and logged doses. Stock is low under 10 days. The daily Garmin cron also sends refill and pre-test reminders, so no second cron is needed on Hobby.
+- **Each pre-test checklist item has a source:** stop biotin 72 h before a thyroid test, no hard training 48 h before hs-CRP, follow the doctor's dose instruction, fast when the test needs it.
+- **The confirmed stack is seeded by `pnpm supplements:seed`,** not by the migration, because doses are personal data, not schema.
+
+## 2026-11-03: Phase 2 (food logging, migration 012)
+
+- **Foods are stored per 100 g with a source on every row** (INDB, USDA Foundation, USDA SR Legacy, OFF, user, recipe). Each log item keeps a snapshot of its nutrients, so fixing a food later never rewrites a past day.
+- **Search uses Postgres for candidates and tested TS for ranking.** Word similarity and full text find candidates. Ranking runs in `src/domain` (relevance, then your own foods, INDB, USDA, OFF, then habit and favourites), so it can be unit tested.
+- **40 curated Indian-name aliases with an exact-alias boost** (curd/dahi → yogurt, atta → whole wheat flour, roti → chapati). Without them a search for "banana" returned banana appam.
+- **The LLM gives items and grams, never nutrients.** Gemini Flash Lite via OpenRouter, falling back to 2.5 Flash Lite. Nutrients always come from the DB. Grams are picked in this order: stated, usual for you, DB portion, model estimate.
+- **Text logging prefers cooked foods over raw,** except for foods eaten raw (fruit, veg, nuts, dairy, eggs) and exact aliases.
+- **Open Food Facts is a live barcode lookup with a cache,** not a bulk import. The bulk importer only loads USDA and INDB. An OFF row is saved the first time its barcode is scanned.
+- **The MFP import is meal-level and idempotent.** The export only has meal totals, so history comes in as one item per meal, and re-running the import never duplicates anything.
+- **The food log replaces the MFP → Health Shortcut bridge for protein.** `daily_check_ins.protein` takes the food log as a source, and a typed value still wins.
+- **The bottom nav grid follows the tab count.** Food became a fifth tab, and the fixed four-column grid overflowed.
+
 ## 2026-11-03: Phase 1 (Garmin sync, migration 011)
 
 - **Gym sessions stay on *Fitness Equipment*** on the watch. *Strength* needs a button press per set, Olympus already records the sets, and sessions are matched to Garmin by time either way.
