@@ -109,6 +109,7 @@ export async function recentFoods(userId: string, limit = 20): Promise<FoodSumma
       WHERE l.user_id = ${userId} AND i.food_id IS NOT NULL AND l.local_date > current_date - 90
       GROUP BY i.food_id
     ) r JOIN foods f ON f.id = r.food_id
+    WHERE (f.user_id IS NULL OR f.user_id = ${userId})
     ORDER BY r.last_at DESC
     LIMIT ${limit}`);
   return rowsOf(res).map(toSummary);
@@ -118,7 +119,7 @@ export async function favouriteFoods(userId: string): Promise<FoodSummary[]> {
   const res = await db.execute(sql`
     SELECT ${SUMMARY_COLS}, true AS favourite, 0 AS times
     FROM food_favourites v JOIN foods f ON f.id = v.food_id
-    WHERE v.user_id = ${userId}
+    WHERE v.user_id = ${userId} AND (f.user_id IS NULL OR f.user_id = ${userId})
     ORDER BY v.created_at DESC`);
   return rowsOf(res).map(toSummary);
 }
@@ -134,7 +135,10 @@ export async function myFoods(userId: string): Promise<FoodSummary[]> {
 }
 
 export async function setFavourite(userId: string, foodId: string, on: boolean): Promise<void> {
-  if (on) await db.insert(foodFavourites).values({ userId, foodId }).onConflictDoNothing();
+  if (on) {
+    await getFood(userId, foodId); // throws unless the food is shared or the user's own
+    await db.insert(foodFavourites).values({ userId, foodId }).onConflictDoNothing();
+  }
   else await db.delete(foodFavourites).where(and(eq(foodFavourites.userId, userId), eq(foodFavourites.foodId, foodId)));
 }
 
@@ -368,7 +372,7 @@ export async function usualPortions(userId: string, limit = 30): Promise<Array<{
   const res = await db.execute(sql`
     SELECT i.food_id, f.name, percentile_cont(0.5) WITHIN GROUP (ORDER BY i.grams) AS grams, count(*)::int AS times
     FROM food_log_items i JOIN food_logs l ON l.id = i.log_id JOIN foods f ON f.id = i.food_id
-    WHERE l.user_id = ${userId} AND i.grams IS NOT NULL AND l.local_date > current_date - 120
+    WHERE l.user_id = ${userId} AND (f.user_id IS NULL OR f.user_id = ${userId}) AND i.grams IS NOT NULL AND l.local_date > current_date - 120
     GROUP BY i.food_id, f.name
     HAVING count(*) >= 2
     ORDER BY count(*) DESC
@@ -408,7 +412,7 @@ export async function listSavedMeals(userId: string): Promise<SavedMeal[]> {
   const res = await db.execute(sql`
     SELECT m.id AS meal_id, m.name AS meal_name, i.grams AS item_grams, ${SUMMARY_COLS}, false AS favourite, 0 AS times
     FROM saved_meals m JOIN saved_meal_items i ON i.meal_id = m.id JOIN foods f ON f.id = i.food_id
-    WHERE m.user_id = ${userId}
+    WHERE m.user_id = ${userId} AND (f.user_id IS NULL OR f.user_id = ${userId})
     ORDER BY m.name, i.position`);
   const meals = new Map<string, SavedMeal>();
   for (const r of rowsOf(res)) {
