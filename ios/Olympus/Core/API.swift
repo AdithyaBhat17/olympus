@@ -154,6 +154,8 @@ struct OutboxRunner: OutboxExecutor {
     }
 
     private struct Notes: Encodable { let notes: String? }
+    private struct ClearDose: Encodable { let supplementId: String; let date: String }
+    private struct TakeSlot: Encodable { let slot: String; let date: String; let at: String? }
 
     static func request(for op: OutboxOp) -> (String, String, Data?) {
         let e = JSONEncoder()
@@ -165,6 +167,9 @@ struct OutboxRunner: OutboxExecutor {
         case let .saveNotes(s, notes): return ("PUT", "sessions/\(s)/notes", try? e.encode(Notes(notes: notes)))
         case let .finish(s, notes): return ("POST", "sessions/\(s)/finish", try? e.encode(Notes(notes: notes)))
         case let .sendToPT(s, notes): return ("POST", "sessions/\(s)/send", try? e.encode(Notes(notes: notes)))
+        case let .setDose(input): return ("POST", "supplements/doses", try? e.encode(input))
+        case let .clearDose(id, date): return ("DELETE", "supplements/doses", try? e.encode(ClearDose(supplementId: id, date: date)))
+        case let .takeSlot(slot, date, at): return ("POST", "supplements/slots", try? e.encode(TakeSlot(slot: slot, date: date, at: at)))
         }
     }
 }

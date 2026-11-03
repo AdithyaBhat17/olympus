@@ -153,6 +153,8 @@ export interface SlotItem {
   status: "pending" | "taken" | "half" | "skipped";
   late: boolean;
   takenAt: string | null;
+  /** 1 = a normal dose, 2 = ×2, 0.5 = half; null until logged. */
+  multiplier: number | null;
 }
 
 export interface TodaySlots {
@@ -175,7 +177,7 @@ export async function todaySlots(userId: string, date?: string): Promise<TodaySl
       .filter((s) => s.slot === slot && isScheduled(s.activeDays, date!))
       .map((s): SlotItem => {
         const l = logs.find((x) => x.supplementId === s.id);
-        return { supplement: s, status: l ? l.status : "pending", late: l?.late ?? false, takenAt: l?.takenAt.toISOString() ?? null };
+        return { supplement: s, status: l ? l.status : "pending", late: l?.late ?? false, takenAt: l?.takenAt.toISOString() ?? null, multiplier: l ? Number(l.doseMultiplier) : null };
       }),
   })).filter((s) => s.items.length);
   return { date, slots, lowStock: stack.filter((s) => s.lowStock) };
@@ -201,6 +203,10 @@ export async function setDose(
   const [s] = await db.select().from(supplements).where(and(eq(supplements.id, supplementId), eq(supplements.userId, userId)));
   if (!s) throw new DomainError("That supplement doesn't exist.");
   const { timezone: tz } = await getProfile(userId);
+  if (opts.at) {
+    if (opts.at.getTime() > Date.now() + 2 * 60_000) throw new DomainError("That time hasn't happened yet.");
+    if (opts.date && isoDateInTz(opts.at, tz) !== opts.date) throw new DomainError("Pick a time on the same day.");
+  }
   const at = opts.at ?? (opts.date && opts.date !== (await todayFor(userId)) ? localToUtc(opts.date, SLOTS.find((x) => x.slot === s.slot)!.time, tz) : new Date());
   const date = opts.date ?? isoDateInTz(at, tz);
   const multiplier = opts.status === "skipped" ? 0 : opts.status === "half" ? 0.5 : Math.min(5, Math.max(0.25, opts.multiplier ?? 1));
@@ -223,12 +229,12 @@ export async function setDose(
 }
 
 /** One tap: everything due in a slot that isn't logged yet, as taken. */
-export async function takeSlot(userId: string, slot: SupplementSlot, date?: string): Promise<{ logged: number; nudges: Nudge[] }> {
+export async function takeSlot(userId: string, slot: SupplementSlot, date?: string, at?: Date): Promise<{ logged: number; nudges: Nudge[] }> {
   const today = await todaySlots(userId, date);
   const pending = today.slots.find((s) => s.slot === slot)?.items.filter((i) => i.status === "pending") ?? [];
   const nudges: Nudge[] = [];
   for (const i of pending) {
-    const r = await setDose(userId, i.supplement.id, { date: today.date, status: "taken" });
+    const r = await setDose(userId, i.supplement.id, { date: today.date, status: "taken", at });
     nudges.push(...r.nudges);
   }
   const seen = new Set<string>();

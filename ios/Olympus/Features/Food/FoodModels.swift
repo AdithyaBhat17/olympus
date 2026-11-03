@@ -153,6 +153,10 @@ struct SlotItem: Codable, Identifiable, Sendable {
     var supplement: Supplement
     var status: Status
     var late: Bool
+    /// ISO 8601, when it was logged as taken (or skipped).
+    var takenAt: String?
+    /// 1, 2 (×2) or 0.5 (half); nil until logged.
+    var multiplier: Double?
     var id: String { supplement.id }
     var isDone: Bool { status != .pending }
 

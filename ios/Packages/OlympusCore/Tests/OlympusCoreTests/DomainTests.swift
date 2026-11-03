@@ -155,6 +155,24 @@ final class OutboxTests: XCTestCase {
         XCTAssertEqual(received.first, set(0, reps: 8))
     }
 
+    func testAnOfflineUndoReplacesTheQueuedDose() async {
+        let server = FakeServer()
+        await server.setOnline(false)
+        let box = Outbox(fileURL: file, executor: server)
+        let dose = OutboxOp.setDose(DoseInput(supplementId: "whey", status: .taken, date: "2026-11-03", at: "2026-11-03T19:05:00+04:00"))
+        _ = await box.send(dose)
+        _ = await box.send(.setDose(DoseInput(supplementId: "mag", status: .taken, date: "2026-11-03")))
+        _ = await box.send(.clearDose(supplementId: "whey", date: "2026-11-03"))
+        await server.setOnline(true)
+        await box.flush()
+        let received = await server.received
+        // The whey dose never reaches the server; only its undo (a no-op there) does.
+        XCTAssertEqual(received, [
+            .setDose(DoseInput(supplementId: "mag", status: .taken, date: "2026-11-03")),
+            .clearDose(supplementId: "whey", date: "2026-11-03"),
+        ])
+    }
+
     func testRejectionsAreDroppedAndReported() async {
         let server = FakeServer()
         await server.setOnline(false)
