@@ -75,14 +75,21 @@ export function rankSources(query: string, hits: SearchHit[]): SearchHit[] {
 
 /**
  * "Masala chai" must not become the dry tea leaves, a hot latte the iced one,
- * nor a burger the burger-and-fries combo: a different form of the food, named on the page but not in the query,
- * is a different product. Checked on the extracted name and the address.
+ * nor a burger the burger-and-fries combo: a different form of the food, named
+ * but not asked for, is a different product.
  */
-const OTHER_FORM = /\b(patti|powder|premix|mix|leaves|granules|sachets?|concentrate|syrup|seasoning|capsules?|tablets?|iced|cold|frozen|frappuccino|decaf|decaffeinated|diet|zero|raw|dried|dry|fries|meal|combo|bucket|platter)\b/g;
-export function otherForm(query: string, ...parts: Array<string | undefined>): boolean {
-  const asked = searchText(query);
-  const page = searchText(parts.filter(Boolean).join(" ").replace(/[-_/.]+/g, " "));
-  return (page.match(OTHER_FORM) ?? []).some((w) => !asked.includes(w));
+/** A form named on the extracted product's own name that the query didn't ask for. */
+const NAME_FORMS = /\b(patti|powder|premix|mix|leaves|granules|sachets?|concentrate|syrup|seasoning|capsules?|tablets?|iced|cold|frozen|frappuccino|decaf|decaffeinated|diet|zero|raw|dried|dry|fries|meal|combo|bucket|platter)\b/g;
+/**
+ * On the page address only the unambiguous ones: "/zero-sugar-protein-bar" or "/raw-honey" is a fine page for
+ * "protein bar" or "honey", but "/zinger-burger-with-fries" is the combo even when the page calls its food "Zinger Burger".
+ */
+const URL_FORMS = /\b(patti|powder|premix|leaves|granules|sachets?|concentrate|syrup|seasoning|capsules?|tablets?|iced|frappuccino|decaf|decaffeinated|frozen|fries|combo|bucket|platter)\b/g;
+
+export function otherForm(query: string, name: string | undefined, url: string | undefined): boolean {
+  const asked = new Set(searchText(query).split(" "));
+  const flagged = (re: RegExp, text: string | undefined) => (searchText((text ?? "").replace(/[-_/.]+/g, " ")).match(re) ?? []).some((w) => !asked.has(w));
+  return flagged(NAME_FORMS, name) || flagged(URL_FORMS, url);
 }
 
 /**
@@ -102,31 +109,45 @@ type Fetch = typeof fetch;
 /** Reads a page's label text with a model. Injected so this file stays pure and testable. */
 export type Extract = (page: { query: string; url: string; text: string }) => Promise<{ answer: WebFoodAnswer; costUsd: number }>;
 
-/** The part of a page that holds the label: a few thousand characters around the first mention of calories. */
+/**
+ * The part of a page that holds the label: a few thousand characters from the
+ * first place calories are followed by a number ("Calories 190", "190 kcal"),
+ * else from a "Nutrition Facts" heading, else from any mention. A bare "high
+ * energy" or "burn calories" in marketing copy or the menu is not the label.
+ */
 export function labelText(markdown: string): string {
-  const i = markdown.search(/nutrition facts|nutrition information|calories|kcal|energy/i);
+  const anchors = [/\bcalories\s*[:\-]?\s*\d|\bkcal\s*[:\-]?\s*\d|\d\s*kcal\b|\benergy\s*[:\-]?\s*\d/i, /nutrition(al)? (facts|information|value)/i, /calories|kcal|energy/i];
+  let i = -1;
+  for (const re of anchors) {
+    i = markdown.search(re);
+    if (i >= 0) break;
+  }
   const slice = i >= 0 ? markdown.slice(Math.max(0, i - 800), i + 3500) : markdown.slice(0, 3000);
   return slice.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /**
- * One POST. The free plan allows about 12 requests a minute and a describe can
- * run several lookups at once, so a 429 waits out `retry_after_seconds` (at
- * most 6 s) and tries once more.
+ * One POST, bounded by `deadline` (a timestamp). The free plan allows about 12
+ * requests a minute and a describe can run several lookups at once, so a 429
+ * waits out `retry_after_seconds` (at most 6 s, and only if that still leaves
+ * time) and tries once more.
  */
-async function post(path: string, body: unknown, fetchImpl: Fetch, retry = true): Promise<Record<string, unknown> | null> {
+async function post(path: string, body: unknown, fetchImpl: Fetch, deadline: number, retry = true): Promise<Record<string, unknown> | null> {
+  const left = deadline - Date.now();
+  if (left < 1000) return null;
   try {
     const res = await fetchImpl(`${API}${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(Math.min(left, 12_000)),
     });
     if (res.status === 429 && retry) {
       const asked = Number(((await res.json().catch(() => ({}))) as { retry_after_seconds?: number }).retry_after_seconds);
       const wait = Math.min(6, Number.isFinite(asked) ? asked : 5);
+      if (deadline - Date.now() < wait * 1000 + 2000) return null;
       await new Promise((r) => setTimeout(r, wait * 1000));
-      return post(path, body, fetchImpl, false);
+      return post(path, body, fetchImpl, deadline, false);
     }
     if (!res.ok) return null;
     const json = (await res.json()) as Record<string, unknown>;
@@ -134,6 +155,12 @@ async function post(path: string, body: unknown, fetchImpl: Fetch, retry = true)
   } catch {
     return null;
   }
+}
+
+/** `p`, or a rejection after `ms`. */
+function within<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([p, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), Math.max(ms, 0)); })]).finally(() => clearTimeout(timer));
 }
 
 const obj = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {});
@@ -145,15 +172,18 @@ export type FirecrawlResult =
   | { ok: false; reason: string; credits: number; usd: number };
 
 const MAX_PAGES = 3;
-/** Stop trying more pages after this long: a miss must not delay the next tier by half a minute. */
-const BUDGET_MS = 8_000;
+/** The whole lookup, search to last page, ends by this: a miss must not hold up a describe (or the next tier) for long. */
+const TOTAL_MS = 20_000;
+/** Don't start another page with less than this left. */
+const MIN_PAGE_MS = 4_000;
 
-/** Search, then read up to three of the best-ranked pages; the first that passes every check wins. */
-export async function firecrawlFood(query: string, extract: Extract, fetchImpl: Fetch = fetch): Promise<FirecrawlResult> {
-  const started = Date.now();
+/** Search, then read up to three of the best-ranked pages; the first that passes every check wins. Never longer than ~20 s. */
+export async function firecrawlFood(query: string, extract: Extract, fetchImpl: Fetch = fetch, totalMs = TOTAL_MS): Promise<FirecrawlResult> {
+  const deadline = Date.now() + totalMs;
+  const minPage = Math.min(MIN_PAGE_MS, totalMs / 3);
   let credits = 0;
   let usd = 0;
-  const found = await post("/search", { query: `${query.slice(0, 120)} nutrition facts`, limit: 6 }, fetchImpl);
+  const found = await post("/search", { query: `${query.slice(0, 120)} nutrition facts`, limit: 6 }, fetchImpl, deadline);
   if (!found) return { ok: false, reason: "search failed", credits, usd };
   credits += n(found.creditsUsed) || 2;
   const web = obj(found.data).web;
@@ -163,8 +193,11 @@ export async function firecrawlFood(query: string, extract: Extract, fetchImpl: 
 
   let reason = "no page had a usable label";
   for (const hit of ranked) {
-    if (Date.now() - started > BUDGET_MS) break;
-    const page = await post("/scrape", { url: hit.url, formats: ["markdown"], onlyMainContent: true }, fetchImpl);
+    if (deadline - Date.now() < minPage) {
+      reason = "ran out of time";
+      break;
+    }
+    const page = await post("/scrape", { url: hit.url, formats: ["markdown"], onlyMainContent: true }, fetchImpl, deadline);
     if (!page) {
       reason = "page read failed";
       continue;
@@ -178,10 +211,11 @@ export async function firecrawlFood(query: string, extract: Extract, fetchImpl: 
     }
     let answer: WebFoodAnswer;
     try {
-      const r = await extract({ query, url: hit.url, text });
+      const r = await within(extract({ query, url: hit.url, text }), deadline - Date.now());
       answer = { ...r.answer, sourceUrl: hit.url };
       usd += r.costUsd;
     } catch {
+      // The model's cost isn't known when its call throws, so `usd` can undercount on failures.
       reason = "extraction failed";
       continue;
     }

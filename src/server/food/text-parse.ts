@@ -176,22 +176,29 @@ function stateMl(item: ParsedItem): number | null {
   return per ? item.quantity * per : null;
 }
 
-/** US volume portions as written in USDA labels ("1 cup", "1 tablespoon", "1 fl oz"), in ml. */
-const VOLUME_PORTIONS: Array<[RegExp, number]> = [
-  [/^1 cup\b/, 236.588],
-  [/^1 fl(uid)? oz\b/, 29.5735],
-  [/^1 tablespoon\b/, 14.7868],
-  [/^1 teaspoon\b/, 4.92892],
+/** Millilitres in one of a volume unit, for the units USDA and OFF portions are written in. */
+const VOLUME_ML: Array<[RegExp, number]> = [
+  [/^cups?$/, 236.588],
+  [/^(fl\.?\s?oz|fluid ounces?)$/, 29.5735],
+  [/^(tablespoons?|tbsp)$/, 14.7868],
+  [/^(teaspoons?|tsp)$/, 4.92892],
+  [/^(millilit(?:er|re)s?|ml)$/, 1],
+  [/^(lit(?:er|re)s?|l)$/, 1000],
 ];
 
-/** Grams per ml from the first volume portion the food has, or null. */
+/**
+ * Grams per ml from the first portion that is a volume ("1 cup", "2 tablespoon",
+ * "250 ml", "1 cup, chopped"), or null. The number counts: "2 tablespoon = 28 g".
+ */
 export function densityFromPortions(portions: Array<{ label: string; grams: number }>): number | null {
-  for (const [re, ml] of VOLUME_PORTIONS) {
-    const p = portions.find((x) => re.test(x.label.toLowerCase().trim()));
-    if (p) {
-      const d = p.grams / ml;
-      if (d >= 0.2 && d <= 1.6) return d;
-    }
+  for (const p of portions) {
+    const m = p.label.toLowerCase().trim().match(/^(\d+(?:\.\d+)?)\s*(cups?|fl\.?\s?oz|fluid ounces?|tablespoons?|tbsp|teaspoons?|tsp|millilit(?:er|re)s?|ml|lit(?:er|re)s?|l)\b/);
+    if (!m) continue;
+    const per = VOLUME_ML.find(([re]) => re.test(m[2]))?.[1];
+    const n = Number(m[1]);
+    if (!per || !(n > 0)) continue;
+    const d = p.grams / (n * per);
+    if (d >= 0.2 && d <= 1.6) return d;
   }
   return null;
 }
@@ -216,9 +223,12 @@ export function chooseGrams(
   if (unit === "g" || unit === "gram" || unit === "grams") return { grams: Math.round(item.quantity), basis: "stated" };
   const ml = stateMl(item);
   if (ml !== null) {
-    // 200 ml of milk is not 200 g: take the food's own density from a volume portion (a cup, a tbsp), else water's.
+    // 200 ml of milk is not 200 g. The volume was stated, so with the food's own density (from a cup, tablespoon, ml... portion) it is "stated".
     const density = densityFromPortions(portions);
-    return { grams: Math.round(ml * (density ?? 1)), basis: density ? "portion" : "estimate" };
+    if (density) return { grams: Math.round(ml * density), basis: "stated" };
+    // No volume portion: the model's own conversion if it's a believable density, else water's. An estimate either way.
+    const implied = item.grams / ml;
+    return { grams: Math.round(item.grams > 0 && implied >= 0.7 && implied <= 1.3 ? item.grams : ml), basis: "estimate" };
   }
   if (usualGrams && (unit === "serving" || item.quantity === 1)) return { grams: Math.round(usualGrams * item.quantity), basis: "usual" };
   const UNIT_WORDS: Record<string, string> = { tbsp: "tablespoon", tbs: "tablespoon", tsp: "teaspoon", pc: "piece", pcs: "piece" };

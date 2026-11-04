@@ -54,6 +54,14 @@ describe("rankSources: a label beats a menu page", () => {
 });
 
 describe("otherForm", () => {
+  it("ambiguous words count against the extracted name only, not the page address", () => {
+    expect(otherForm("protein bar", "Protein Bar", "https://brand.example/products/zero-sugar-protein-bar")).toBe(false);
+    expect(otherForm("honey", "Honey", "https://x.example/raw-honey")).toBe(false);
+    expect(otherForm("protein bar", "Zero Sugar Protein Bar", "https://brand.example/protein-bar")).toBe(true);
+    // ...but a combo is a combo even when the page's own name leaves it out (seen live: "Zinger Burger" at /KFC-Zinger-Burger-with-Fries)
+    expect(otherForm("kfc zinger burger", "Zinger Burger", "https://www.arise-app.com/dish/KFC-Zinger-Burger-with-Fries")).toBe(true);
+  });
+
   it("rejects a combo meal for the item alone, but allows it when asked for", () => {
     expect(otherForm("kfc zinger burger", "Zinger Burger with Fries", "https://www.arise-app.com/dish/KFC-Zinger-Burger-with-Fries")).toBe(true);
     expect(otherForm("kfc zinger burger meal", "Zinger Burger Meal", "https://kfc.example/zinger-burger-meal")).toBe(false);
@@ -76,6 +84,13 @@ describe("queryOverlap", () => {
     expect(queryOverlap("starbucks tall caffe latte", "Caffè Latte", "Starbucks")).toBe(true);
     expect(queryOverlap("starbucks tall caffe latte", "Mocha Frappuccino", "Starbucks")).toBe(false);
     expect(queryOverlap("", "anything")).toBe(false);
+  });
+});
+
+describe("labelText: finds the label, not marketing copy", () => {
+  it("anchors on calories followed by a number, even when 'energy' and 'calories' appear earlier", () => {
+    const md = "Burn calories and get high energy!\n" + "navigation ".repeat(600) + "\n## Nutrition Facts\nCalories 190\nProtein 13 g";
+    expect(labelText(md)).toContain("Calories 190");
   });
 });
 
@@ -188,6 +203,16 @@ describe("firecrawlFood", () => {
     const r = await firecrawlFood("starbucks tall caffe latte", extracting(answer()).fn, f);
     expect(calls).toEqual(["/search", "/search", "/scrape"]);
     expect(r.ok).toBe(true);
+  });
+
+  it("stops at its overall time limit even when every step is slow", async () => {
+    // The model call never returns; the lookup must still end inside its (here 2 s) budget, not after 40 s.
+    const { f } = fake([page(LABEL), page(LABEL), page(LABEL)]);
+    const hang: Extract = () => new Promise(() => {});
+    const started = Date.now();
+    const r = await firecrawlFood("starbucks tall caffe latte", hang, f, 2_000);
+    expect(Date.now() - started).toBeLessThan(3_500);
+    expect(r).toMatchObject({ ok: false });
   });
 
   it("is a failure, not an error, when Firecrawl is down", async () => {

@@ -68,7 +68,6 @@ export async function quickFoodsAction() {
 /** "Search the web" from the food search: find the label, save it as the athlete's own food. */
 export async function webFoodAction(query: string) {
   return run(async (userId) => {
-    if (!openRouterConfigured()) throw new DomainError("Web lookup isn't set up on the server (OpenRouter key missing).");
     const q = str(query, 120).trim();
     if (q.length < 3) throw new DomainError("Type a few more letters first.");
     const r = await webLookupFood(userId, q);

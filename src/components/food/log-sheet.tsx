@@ -768,12 +768,18 @@ function SearchTab({ onPick, onPickMeal }: { onPick: (f: FoodSummary, grams?: nu
   const [loading, setLoading] = useState(false);
   const [web, setWeb] = useState<{ q: string; state: "loading" | "none" } | null>(null);
   const latest = useRef(0);
+  /** Bumped when the query changes or the tab closes: a slow web lookup for an old query must not add its food. */
+  const webSeq = useRef(0);
 
   useEffect(() => {
     quickFoodsAction().then((r) => r.ok && setQuick(r.data));
+    return () => {
+      webSeq.current = -1; // unmounted: any lookup still running is ignored
+    };
   }, []);
 
   useEffect(() => {
+    webSeq.current++;
     setWeb(null);
     const term = q.trim();
     if (term.length < 2) {
@@ -794,8 +800,10 @@ function SearchTab({ onPick, onPickMeal }: { onPick: (f: FoodSummary, grams?: nu
 
   const term = q.trim();
   const searchWeb = async () => {
+    const seq = ++webSeq.current;
     setWeb({ q: term, state: "loading" });
     const r = await webFoodAction(term);
+    if (seq !== webSeq.current) return;
     if (!r.ok) {
       setWeb(null);
       toast.error(r.error);

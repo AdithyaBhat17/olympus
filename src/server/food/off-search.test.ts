@@ -21,6 +21,12 @@ describe("pickOffMatch", () => {
     expect(pickOffMatch("muscleblaze biozyme whey", [bad])).toBeNull();
   });
 
+  it("is for branded products: a generic query never becomes some brand's product", () => {
+    const sachet = { code: "2", product_name: "Instant Masala Chai Premix", brands: ["Tata Tea"], nutriments: { "energy-kcal_100g": 410, proteins_100g: 3, carbohydrates_100g: 88, fat_100g: 5 } };
+    expect(pickOffMatch("masala chai", [sachet])).toBeNull();
+    expect(pickOffMatch("tata masala chai", [sachet])?.food.brand).toBe("Tata Tea");
+  });
+
   it("needs every word: a close product is not the product", () => {
     expect(pickOffMatch("muscleblaze isolate", [biozyme, other])).toBeNull();
     expect(pickOffMatch("", [biozyme])).toBeNull();

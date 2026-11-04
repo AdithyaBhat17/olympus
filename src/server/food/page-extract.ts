@@ -9,7 +9,7 @@ export const extractFromPage: Extract = async ({ query, url, text }) => {
     messages: pageExtractPrompt(query, url, text),
     schema: WEB_FOOD_SCHEMA as unknown as { name: string; schema: Record<string, unknown> },
     validate: isWebFoodAnswer,
-    timeoutMs: 20_000,
+    timeoutMs: 12_000,
   });
   return { answer: r.data, costUsd: r.costUsd ?? 0 };
 };

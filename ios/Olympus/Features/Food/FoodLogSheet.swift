@@ -755,14 +755,17 @@ private struct UnitOption: Hashable {
     let per: Double
 }
 
-/// Grams per ml from the first volume portion the food has (a cup, a tablespoon...), as the server does.
+/// Grams per ml from the first portion that is a volume ("1 cup", "2 tablespoon", "250 ml", "1 cup, chopped"), as the server does.
 private func density(_ portions: [Portion]) -> Double? {
-    let volumes: [(String, Double)] = [("cup", 236.588), ("fl oz", 29.5735), ("fluid oz", 29.5735), ("tablespoon", 14.7868), ("teaspoon", 4.92892)]
-    for (word, ml) in volumes {
-        if let p = portions.first(where: { $0.label.lowercased().trimmingCharacters(in: .whitespaces).hasPrefix("1 \(word)") }) {
-            let d = p.grams / ml
-            if d >= 0.2 && d <= 1.6 { return d }
-        }
+    let units: [(prefix: String, ml: Double)] = [
+        ("cup", 236.588), ("fl oz", 29.5735), ("fl. oz", 29.5735), ("fluid ounce", 29.5735), ("tablespoon", 14.7868), ("tbsp", 14.7868),
+        ("teaspoon", 4.92892), ("tsp", 4.92892), ("milliliter", 1), ("millilitre", 1), ("ml", 1), ("liter", 1000), ("litre", 1000),
+    ]
+    for p in portions {
+        let parts = p.label.lowercased().trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let n = Double(parts[0]), n > 0, let u = units.first(where: { parts[1].hasPrefix($0.prefix) }) else { continue }
+        let d = p.grams / (n * u.ml)
+        if d >= 0.2 && d <= 1.6 { return d }
     }
     return nil
 }
@@ -1125,6 +1128,8 @@ private struct SearchPane: View {
         Task {
             do {
                 let r = try await model.api.post("food/web", WebPayload(query: term), as: WebFoodResult.self)
+                // The query changed while the lookup ran: don't add a food they no longer want.
+                guard q.trimmingCharacters(in: .whitespaces) == term else { return }
                 if let m = r.food {
                     Haptics.restEnd()
                     onPick(m.food, nil)
@@ -1135,6 +1140,7 @@ private struct SearchPane: View {
                     web = (term, .none)
                 }
             } catch {
+                guard q.trimmingCharacters(in: .whitespaces) == term else { return }
                 web = nil
                 model.show(error)
             }

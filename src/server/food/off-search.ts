@@ -5,7 +5,9 @@
  * nothing we'd trust.
  *
  * OFF is crowd-sourced, so a hit is only used when every word of the query is
- * in its brand or name, and its numbers pass the same sanity checks as a web
+ * in its brand or name, at least one is in its BRAND (this tier is for branded
+ * products: a generic "chai" must not become some brand's instant sachet and be
+ * saved for everyone), and its numbers pass the same sanity checks as a web
  * label (kcal present and consistent with the macros).
  */
 import { atwaterGap, searchText } from "@/domain/nutrition";
@@ -46,6 +48,8 @@ export function pickOffMatch(query: string, hits: Obj[]): MappedFood | null {
     const text = searchText([hit.brands, hit.product_name, hit.generic_name].filter((v) => typeof v === "string").join(" "));
     const have = new Set(text.split(" "));
     if (!words.every((w) => have.has(w))) continue;
+    const brand = new Set(searchText(typeof hit.brands === "string" ? hit.brands : "").split(" "));
+    if (!words.some((w) => brand.has(w))) continue;
     const mapped = offFood(hit);
     if (!mapped) continue;
     const f = mapped.food;
