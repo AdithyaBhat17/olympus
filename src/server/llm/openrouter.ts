@@ -32,6 +32,8 @@ export interface JsonCallResult<T> {
   costUsd: number | null;
   latencyMs: number;
   tokens: { prompt: number; completion: number } | null;
+  /** URLs the model's web search actually returned (empty without `web`). */
+  citations: string[];
 }
 
 export class LlmError extends Error {}
@@ -45,7 +47,8 @@ async function callOnce<T>(
   messages: Array<{ role: "system" | "user"; content: Content }>,
   schema: { name: string; schema: Record<string, unknown> },
   timeoutMs: number,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  web = false
 ): Promise<JsonCallResult<T>> {
   assertNotAnthropic(model);
   const started = Date.now();
@@ -64,12 +67,13 @@ async function callOnce<T>(
       response_format: { type: "json_schema", json_schema: { name: schema.name, strict: true, schema: schema.schema } },
       usage: { include: true },
       provider: { require_parameters: true },
+      ...(web ? { plugins: [{ id: "web", max_results: 2 }] } : {}),
     }),
   });
   const text = await res.text();
   if (!res.ok) throw new LlmError(`OpenRouter ${res.status} (${model}): ${text.slice(0, 200)}`);
   const body = JSON.parse(text) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string; annotations?: Array<{ type?: string; url_citation?: { url?: string } }> } }>;
     usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number };
     model?: string;
   };
@@ -81,8 +85,12 @@ async function callOnce<T>(
   } catch {
     throw new LlmError(`OpenRouter (${model}) returned invalid JSON`);
   }
+  const citations = (body.choices?.[0]?.message?.annotations ?? [])
+    .map((a) => a.url_citation?.url)
+    .filter((u): u is string => typeof u === "string");
   return {
     data,
+    citations,
     model: body.model ?? model,
     costUsd: typeof body.usage?.cost === "number" ? body.usage.cost : null,
     latencyMs: Date.now() - started,
@@ -101,13 +109,15 @@ export async function jsonCall<T>(opts: {
   models?: string[];
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** Let the model search the web (OpenRouter's web plugin). */
+  web?: boolean;
 }): Promise<JsonCallResult<T>> {
   if (!openRouterConfigured()) throw new LlmError("OPENROUTER_API_KEY (or OPENROUTER_KEY) is not set");
   const models = opts.models ?? [TEXT_MODEL(), TEXT_FALLBACK_MODEL()];
   let last: unknown;
   for (const model of models) {
     try {
-      const r = await callOnce<unknown>(model, opts.messages, opts.schema, opts.timeoutMs ?? 20_000, opts.fetchImpl ?? fetch);
+      const r = await callOnce<unknown>(model, opts.messages, opts.schema, opts.timeoutMs ?? 20_000, opts.fetchImpl ?? fetch, opts.web);
       if (!opts.validate(r.data)) throw new LlmError(`OpenRouter (${model}) JSON didn't match the schema`);
       return r as JsonCallResult<T>;
     } catch (err) {

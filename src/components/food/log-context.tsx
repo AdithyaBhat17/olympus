@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Meal } from "@/domain/nutrition";
 import { LogSheet, type LogTab } from "./log-sheet";
+import { lastTab } from "./last-tab";
 
 interface OpenOptions {
   tab?: LogTab;
@@ -25,9 +26,9 @@ export function LogProvider({
   defaultMeal: Meal;
   children: React.ReactNode;
 }) {
-  const [state, setState] = useState<{ open: boolean; tab: LogTab; meal: Meal }>({ open: false, tab: "describe", meal: defaultMeal });
+  const [state, setState] = useState<{ open: boolean; tab: LogTab; meal: Meal }>({ open: false, tab: "search", meal: defaultMeal });
   const open = useCallback(
-    (o?: OpenOptions) => setState({ open: true, tab: o?.tab ?? "describe", meal: o?.meal ?? defaultMeal }),
+    (o?: OpenOptions) => setState({ open: true, tab: o?.tab ?? lastTab(), meal: o?.meal ?? defaultMeal }),
     [defaultMeal]
   );
   const value = useMemo(() => open, [open]);

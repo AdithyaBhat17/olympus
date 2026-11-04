@@ -4,6 +4,7 @@ import { forGrams } from "@/domain/nutrition";
 import { db } from "@/lib/db";
 import { foodParseEvents, type ParseFinalItem } from "@/lib/db/schema";
 import { jsonCall, LlmError } from "../llm/openrouter";
+import { webLookupFood } from "./web-lookup";
 import { getFood, searchFoods, usualPortions, per100, type FoodSummary } from "./foods";
 import { listStack } from "../supplements";
 import { chooseGrams, cleanItem, isParseResult, matchSupplement, parseOutcome, parsePrompt, PARSE_SCHEMA, type ParseResult, type PortionChoice } from "./text-parse";
@@ -67,6 +68,8 @@ export async function draftFromText(userId: string, text: string, client: "web" 
   }
   const parsed = result.data.items.map(cleanItem).filter((i): i is NonNullable<typeof i> => !!i).slice(0, 20);
   const usualById = new Map(usual.map((u) => [u.foodId, u.grams]));
+  // Web lookups cost money and seconds: at most a few per describe, and only where nothing matched.
+  let webBudget = 3;
 
   const items = await Promise.all(
     parsed.map(async (p): Promise<DraftItem> => {
@@ -81,7 +84,11 @@ export async function draftFromText(userId: string, text: string, client: "web" 
       const candidates = await searchFoods(userId, p.search, 6, { preferCooked: true });
       // A wrong food is worse than none: only a candidate with the food word is picked.
       // Weak ones stay as alternatives, so the sheet can offer them.
-      const top = candidates[0]?.strong === false ? undefined : candidates[0];
+      let top: FoodSummary | undefined = candidates[0]?.strong === false ? undefined : candidates[0];
+      if (!top && webBudget > 0) {
+        webBudget--;
+        top = (await webLookupFood(userId, p.search)).food ?? undefined;
+      }
       if (!top) {
         return { said: p.name, search: p.search, quantity: p.quantity, unit: p.unit, estGrams: p.grams, grams: p.grams, basis: "estimate", confidence: p.confidence, match: null, alternatives: candidates.slice(0, 5), kcal: 0, protein: 0, time: p.time, supplement: null };
       }

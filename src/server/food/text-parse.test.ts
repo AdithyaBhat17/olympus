@@ -75,6 +75,18 @@ describe("chooseGrams", () => {
     expect(chooseGrams(item({ unit: "tsp", quantity: 1, grams: 5 }), [{ label: "1 teaspoon", grams: 4 }], null)).toEqual({ grams: 4, basis: "portion" });
   });
 
+  it("ml is volume, not weight: density comes from the food's cup/tbsp portion", () => {
+    const milk = [{ label: "1 cup", grams: 244 }];
+    expect(chooseGrams(item({ unit: "ml", quantity: 200, grams: 206 }), milk, null)).toEqual({ grams: 206, basis: "portion" });
+    expect(chooseGrams(item({ unit: "l", quantity: 1, grams: 1000 }), milk, null).grams).toBe(1031);
+    const oil = [{ label: "1 tablespoon", grams: 13.6 }];
+    expect(chooseGrams(item({ unit: "ml", quantity: 15, grams: 14 }), oil, null).grams).toBe(14);
+  });
+
+  it("ml with no volume portion is treated as water", () => {
+    expect(chooseGrams(item({ unit: "ml", quantity: 200, grams: 206 }), [], null)).toEqual({ grams: 200, basis: "estimate" });
+  });
+
   it("then the model's estimate", () => {
     expect(chooseGrams(item({ unit: "katori", quantity: 1, grams: 150 }), rotiPortions, null)).toEqual({ grams: 150, basis: "estimate" });
     expect(chooseGrams(item({ unit: "serving", quantity: 1, grams: 120 }), rotiPortions, null)).toEqual({ grams: 120, basis: "estimate" });

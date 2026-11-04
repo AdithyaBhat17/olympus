@@ -137,23 +137,28 @@ struct DescribedDose: Identifiable {
     var time: String?
 }
 
-/// Describe, search or scan, then check the amounts and add. The web's LogSheet.
+/// Find foods, then review the amounts and log. The web's LogSheet: two steps,
+/// so results never share a screen with the basket.
 struct FoodLogSheet: View {
     enum Mode: String, CaseIterable, Identifiable {
-        case describe, search, barcode
+        case search, describe, barcode
         var id: String { rawValue }
         var label: String { rawValue.capitalized }
         var icon: String {
             switch self {
-            case .describe: "sparkle"
             case .search: "magnifyingglass"
+            case .describe: "sparkle"
             case .barcode: "barcode.viewfinder"
             }
         }
     }
 
+    enum Step { case find, review }
+
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    /// The sheet opens on the mode used last.
+    @AppStorage("food.lastMode") private var lastMode = Mode.search.rawValue
     let date: String
     let isToday: Bool
     @State var meal: Meal
@@ -161,6 +166,7 @@ struct FoodLogSheet: View {
     var initialText: String?
     let logged: () -> Void
 
+    @State private var step = Step.find
     @State private var basket: [BasketItem] = []
     @State private var doses: [DescribedDose] = []
     @State private var draft: (text: String, model: String, cost: Double?, ids: [String])?
@@ -180,69 +186,54 @@ struct FoodLogSheet: View {
     private var protein: Double { basket.reduce(0) { $0 + $1.countedProtein } }
     private var isEmpty: Bool { basket.isEmpty && doses.isEmpty }
     private var kcal: Double { basket.reduce(0) { $0 + $1.kcal } }
+    private var reviewing: Bool { step == .review && !isEmpty }
 
     var body: some View {
+        ZStack {
+            // Stays mounted while reviewing, so "back" returns to the same search.
+            findStep.accessibilityHidden(reviewing)
+            if reviewing {
+                reviewStep.transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .background(Color.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) { if !isEmpty { actionBar } }
+        .animation(.snappy(duration: 0.28), value: reviewing)
+        .onChange(of: mode) { _, m in lastMode = m.rawValue }
+        .onChange(of: isEmpty) { _, empty in if empty { step = .find } }
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(40)
+        .interactiveDismissDisabled(!isEmpty)
+    }
+
+    // MARK: Find
+
+    private var findStep: some View {
         VStack(spacing: 0) {
-            header
+            HStack {
+                circleButton("xmark", "Close") { dismiss() }
+                Spacer()
+                Text("Add to \(meal.pickerLabel)").font(.system(size: 17, weight: .heavy)).foregroundStyle(Color.fg)
+                Spacer()
+                Color.clear.frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
             modePicker
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     switch mode {
+                    case .search: SearchPane(onPick: { add($0, grams: $1) }, onPickMeal: add(meal:))
                     case .describe: DescribePane(onDraft: add(draft:text:), initialText: initialText)
-                    case .search: SearchPane(onPick: { add($0) }, onPickMeal: add(meal:))
                     case .barcode: BarcodePane(onFound: { add($0) })
                     }
-                    if !basket.isEmpty || !doses.isEmpty { basketSection }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .background(Color.bg.ignoresSafeArea())
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(40)
-        .interactiveDismissDisabled(!basket.isEmpty || !doses.isEmpty)
-    }
-
-    private var header: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(Color.fg).frame(width: 44, height: 44).background(Color.surface2, in: Circle())
-            }
-            .accessibilityLabel("Close")
-            Spacer()
-            Menu {
-                Picker("Meal", selection: $meal) {
-                    ForEach(Meal.allCases) { Text($0.pickerLabel).tag($0) }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(meal.pickerLabel).font(.system(size: 17, weight: .heavy))
-                    Image(systemName: "chevron.down").font(.system(size: 12, weight: .heavy)).foregroundStyle(Color.fg2)
-                }
-                .foregroundStyle(Color.fg)
-                .padding(.horizontal, 16)
-                .frame(height: 44)
-                .background(Color.surface2, in: Capsule())
-            }
-            Spacer()
-            Button(action: save) {
-                Text(saving ? "Adding…" : basket.isEmpty ? "Add" : "Add \(Int(protein.rounded())) g")
-                    .font(.system(size: 15, weight: .heavy))
-                    .monospacedDigit()
-                    .foregroundStyle(isEmpty ? Color.faint : .white)
-                    .padding(.horizontal, 16)
-                    .frame(minWidth: 88, minHeight: 44)
-                    .background(isEmpty ? Color.surface2 : Color.coral, in: Capsule())
-                    .contentTransition(.numericText())
-            }
-            .disabled(isEmpty || saving)
-            .animation(.snappy, value: protein)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .padding(.bottom, 12)
     }
 
     private var modePicker: some View {
@@ -264,6 +255,55 @@ struct FoodLogSheet: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
+    }
+
+    // MARK: Review
+
+    private var reviewStep: some View {
+        VStack(spacing: 0) {
+            HStack {
+                circleButton("chevron.left", "Back to adding food") { step = .find }
+                Spacer()
+                Text("Review").font(.system(size: 17, weight: .heavy)).foregroundStyle(Color.fg)
+                Spacer()
+                Color.clear.frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    mealChips
+                    basketSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(Color.bg.ignoresSafeArea())
+    }
+
+    private var mealChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Meal.allCases) { m in
+                    Button {
+                        Haptics.tick()
+                        meal = m
+                    } label: {
+                        Text(m.pickerLabel)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(meal == m ? Color.bg : Color.fg2)
+                            .padding(.horizontal, 16)
+                            .frame(height: 40)
+                            .background(meal == m ? Color.fg : Color.surface, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(meal == m ? .isSelected : [])
+                }
+            }
+        }
     }
 
     private var basketSection: some View {
@@ -295,7 +335,47 @@ struct FoodLogSheet: View {
             }
             if basket.count > 1 { SaveMealButton(items: basket) }
         }
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    // MARK: Bar
+
+    private var actionBar: some View {
+        Button {
+            if reviewing { save() } else {
+                Haptics.tick()
+                step = .review
+            }
+        } label: {
+            Text(actionLabel)
+                .font(.system(size: 17, weight: .heavy))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 54)
+                .background(Color.coral, in: Capsule())
+                .contentTransition(.numericText())
+        }
+        .disabled(saving)
+        .opacity(saving ? 0.6 : 1)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(Color.bg)
+        .animation(.snappy, value: kcal)
+    }
+
+    private var actionLabel: String {
+        if reviewing {
+            if saving { return "Adding…" }
+            return basket.isEmpty ? "Log" : "Log \(Int(kcal.rounded())) kcal · \(Int(protein.rounded())) g protein"
+        }
+        return "Review \(basket.count + doses.count) · \(Int(kcal.rounded())) kcal"
+    }
+
+    private func circleButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.fg).frame(width: 44, height: 44).background(Color.surface2, in: Circle())
+        }
+        .accessibilityLabel(label)
     }
 
     // MARK: Basket
@@ -306,7 +386,7 @@ struct FoodLogSheet: View {
         withAnimation(.snappy) { basket.append(item) }
         Task {
             guard let r = try? await model.api.get("food/foods/\(food.id)", as: FoodPortions.self) else { return }
-            if let i = basket.firstIndex(where: { $0.id == item.id }) { basket[i].portions = r.portions }
+            if let i = basket.firstIndex(where: { $0.id == item.id }) { basket[i].portions = r.portions.filter(\.isUsable) }
         }
     }
 
@@ -319,7 +399,7 @@ struct FoodLogSheet: View {
     private func add(draft d: TextDraft, text: String) {
         let items = d.items.compactMap { i -> BasketItem? in
             guard let m = i.match, i.supplement == nil else { return nil }
-            return BasketItem(food: m.food, grams: i.grams, portions: m.portions, said: i.said, estGrams: i.estGrams, confidence: i.confidence, basis: i.basis, alternatives: i.alternatives, time: i.time)
+            return BasketItem(food: m.food, grams: i.grams, portions: m.portions.filter(\.isUsable), said: i.said, estGrams: i.estGrams, confidence: i.confidence, basis: i.basis, alternatives: i.alternatives, time: i.time)
         }
         let named = d.items.compactMap { i in i.supplement.map { DescribedDose(supplement: $0, time: i.time) } }
         withAnimation(.snappy) {
@@ -333,6 +413,7 @@ struct FoodLogSheet: View {
             (draft?.cost ?? 0) + (d.costUsd ?? 0),
             (draft?.ids ?? []) + (d.draftId.map { [$0] } ?? [])
         )
+        if !items.isEmpty || !named.isEmpty { withAnimation(.snappy) { step = .review } }
         let missed = d.items.filter { $0.match == nil && $0.supplement == nil }.map(\.said)
         if !missed.isEmpty {
             model.show("No match for \(missed.joined(separator: ", ")). Search for \(missed.count > 1 ? "them" : "it") instead.", kind: .error)
@@ -438,6 +519,10 @@ private struct BasketCard: View {
                     HStack(spacing: 6) {
                         if let t = item.time { tag("At \(t)", fg: .bg, bg: .fg) }
                         tag(item.food.sourceShort)
+                        // A web food shows the page its numbers came from.
+                        if item.food.source == "web", let url = item.food.sourceUrl.flatMap(URL.init(string:)), let h = item.food.sourceHost {
+                            Link(h, destination: url).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.coral).lineLimit(1)
+                        }
                         if !item.food.verified { tag("Unverified", fg: .dangerInk, bg: Color.danger.opacity(0.1)) }
                         if let c = item.confidence, c < 0.6 {
                             tag("Check the amount", fg: .apricotInk, bg: .apricot)
@@ -518,7 +603,7 @@ private struct BasketCard: View {
                             item.portions = []
                             withAnimation(.snappy) { swapping = false }
                             Task {
-                                if let r = try? await model.api.get("food/foods/\(a.id)", as: FoodPortions.self) { item.portions = r.portions }
+                                if let r = try? await model.api.get("food/foods/\(a.id)", as: FoodPortions.self) { item.portions = r.portions.filter(\.isUsable) }
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
@@ -661,35 +746,207 @@ private struct DescribePane: View {
     }
 }
 
+// MARK: Search
+
+/// One way to measure a food: g, ml (when the food has a volume portion), or a portion ("1 roti" → roti).
+private struct UnitOption: Hashable {
+    let label: String
+    /// Grams in one of this unit.
+    let per: Double
+}
+
+/// Grams per ml from the first volume portion the food has (a cup, a tablespoon...), as the server does.
+private func density(_ portions: [Portion]) -> Double? {
+    let volumes: [(String, Double)] = [("cup", 236.588), ("fl oz", 29.5735), ("fluid oz", 29.5735), ("tablespoon", 14.7868), ("teaspoon", 4.92892)]
+    for (word, ml) in volumes {
+        if let p = portions.first(where: { $0.label.lowercased().trimmingCharacters(in: .whitespaces).hasPrefix("1 \(word)") }) {
+            let d = p.grams / ml
+            if d >= 0.2 && d <= 1.6 { return d }
+        }
+    }
+    return nil
+}
+
+private func unitOptions(_ portions: [Portion]) -> [UnitOption] {
+    var out = [UnitOption(label: "g", per: 1)]
+    if let d = density(portions) { out.append(UnitOption(label: "ml", per: d)) }
+    for p in portions where p.isUsable {
+        var n = 1.0
+        var label = p.label.trimmingCharacters(in: .whitespaces)
+        let parts = label.split(separator: " ", maxSplits: 1).map(String.init)
+        if parts.count == 2, let q = Double(parts[0]) {
+            n = q
+            label = parts[1]
+        }
+        if n > 0, !label.isEmpty, !out.contains(where: { $0.label == label }) {
+            out.append(UnitOption(label: label, per: p.grams / n))
+        }
+    }
+    return out
+}
+
+/// Set the amount before adding, as in MyFitnessPal: a number, a unit, and what it comes to.
+private struct AmountEditor: View {
+    @Environment(AppModel.self) private var model
+    let food: FoodSummary
+    let add: (Double) -> Void
+    @State private var options = [UnitOption(label: "g", per: 1)]
+    @State private var unit = "g"
+    @State private var qty: Double
+    @FocusState private var typing: Bool
+
+    init(food: FoodSummary, add: @escaping (Double) -> Void) {
+        self.food = food
+        self.add = add
+        _qty = State(initialValue: food.servingG ?? 100)
+    }
+
+    private var per: Double { options.first { $0.label == unit }?.per ?? 1 }
+    private var grams: Double { (qty * per * 10).rounded() / 10 }
+
+    /// Changing the unit keeps the weight the same.
+    private var unitBinding: Binding<String> {
+        Binding(
+            get: { unit },
+            set: { u in
+                guard let next = options.first(where: { $0.label == u }) else { return }
+                qty = ((grams / next.per) * 10).rounded() / 10
+                unit = u
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                TextField("0", value: $qty, format: .number.precision(.fractionLength(0...1)))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.center)
+                    .font(.num(17))
+                    .frame(width: 84, height: 44)
+                    .background(Color.bg, in: Capsule())
+                    .focused($typing)
+                    .accessibilityLabel("Amount of \(food.name)")
+                Menu {
+                    Picker("Unit", selection: unitBinding) {
+                        ForEach(options, id: \.label) { Text($0.label).tag($0.label) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(unit).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(Color.fg)
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: 170, minHeight: 44, maxHeight: 44)
+                    .background(Color.bg, in: Capsule())
+                }
+                .accessibilityLabel("Unit, \(unit)")
+                if unit != "g" {
+                    Text("= \(Int(grams.rounded())) g").font(.system(size: 13)).monospacedDigit().foregroundStyle(Color.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            HStack {
+                (Text("\(Int(food.protein(grams).rounded())) g").font(.num(17)).foregroundColor(.coral) + Text(" protein · \(Int(food.kcal(grams).rounded())) kcal").font(.system(size: 13)).foregroundColor(.muted))
+                    .monospacedDigit()
+                Spacer()
+                Button {
+                    typing = false
+                    add(grams)
+                } label: {
+                    Text("Add")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.bg)
+                        .padding(.horizontal, 22)
+                        .frame(height: 44)
+                        .background(Color.fg, in: Capsule())
+                }
+                .disabled(grams <= 0)
+                .opacity(grams <= 0 ? 0.4 : 1)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
+        .toolbar {
+            if typing {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { typing = false }.fontWeight(.bold)
+                }
+            }
+        }
+        .task {
+            guard let r = try? await model.api.get("food/foods/\(food.id)", as: FoodPortions.self) else { return }
+            let o = unitOptions(r.portions)
+            options = o
+            // Start on the portion that is the food's own serving ("1 roti" for roti); otherwise grams.
+            if let serving = food.servingG, let match = o.first(where: { $0.label != "g" && $0.label != "ml" && abs($0.per - serving) < 0.5 }) {
+                unit = match.label
+                qty = 1
+            }
+        }
+    }
+}
+
+/// Tap a row to set its amount; the + adds it at the usual amount.
 private struct FoodRows: View {
     let foods: [FoodSummary]
-    let pick: (FoodSummary) -> Void
+    let pick: (FoodSummary, Double?) -> Void
+    @State private var open: String?
+    @State private var added: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(foods.enumerated()), id: \.element.id) { i, f in
                 if i > 0 { Rectangle().fill(Color.surface3).frame(height: 1) }
-                Button { pick(f) } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            (Text(f.favourite ? "★ " : "").foregroundColor(.coral) + Text(f.name).foregroundColor(.fg) + Text(f.brand.map { " · \($0)" } ?? "").foregroundColor(.muted))
-                                .font(.system(size: 16, weight: .semibold))
-                                .lineLimit(1)
-                            Text("\(f.protein100g.map { "\(Int($0.rounded())) g protein" } ?? "Protein unknown") · \(Int(f.kcal100g.rounded())) kcal per 100 g · \(f.sourceShort)")
-                                .font(.system(size: 13))
-                                .monospacedDigit()
-                                .foregroundStyle(Color.muted)
-                                .lineLimit(1)
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        Button {
+                            Haptics.tick()
+                            withAnimation(.snappy) { open = open == f.id ? nil : f.id }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                (Text(f.favourite ? "★ " : "").foregroundColor(.coral) + Text(f.name).foregroundColor(.fg) + Text(f.brand.map { " · \($0)" } ?? "").foregroundColor(.muted))
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .lineLimit(1)
+                                Text("\(f.protein100g.map { "\(Int($0.rounded())) g protein" } ?? "Protein unknown") · \(Int(f.kcal100g.rounded())) kcal per 100 g · \(f.sourceLabel)")
+                                    .font(.system(size: 13))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Color.muted)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 16)
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
                         }
-                        Spacer(minLength: 4)
-                        Image(systemName: "plus").font(.system(size: 14, weight: .heavy)).foregroundStyle(Color.fg).frame(width: 40, height: 40).background(Color.bg, in: Circle())
+                        .buttonStyle(PressStyle(scale: 0.98))
+                        .accessibilityHint("Set the amount")
+                        Button {
+                            Haptics.tick()
+                            pick(f, nil)
+                            added.insert(f.id)
+                        } label: {
+                            Image(systemName: added.contains(f.id) ? "checkmark" : "plus")
+                                .font(.system(size: 14, weight: .heavy))
+                                .foregroundStyle(added.contains(f.id) ? Color.bg : Color.fg)
+                                .frame(width: 40, height: 40)
+                                .background(added.contains(f.id) ? Color.fg : Color.bg, in: Circle())
+                        }
+                        .padding(.horizontal, 8)
+                        .accessibilityLabel(added.contains(f.id) ? "\(f.name) added" : "Add \(f.name)")
                     }
-                    .padding(.leading, 16)
-                    .padding(.trailing, 8)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
+                    if open == f.id {
+                        AmountEditor(food: f) { g in
+                            Haptics.tick()
+                            pick(f, g)
+                            added.insert(f.id)
+                            withAnimation(.snappy) { open = nil }
+                        }
+                        .transition(.opacity)
+                    }
                 }
-                .buttonStyle(PressStyle(scale: 0.98))
             }
         }
         .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -698,16 +955,25 @@ private struct FoodRows: View {
 
 private struct SearchPane: View {
     @Environment(AppModel.self) private var model
-    let onPick: (FoodSummary) -> Void
+    let onPick: (FoodSummary, Double?) -> Void
     let onPickMeal: (SavedMeal) -> Void
     @State private var q = ""
     @State private var results: [FoodSummary] = []
     @State private var searched = ""
     @State private var quick: QuickFoods?
+    @State private var view = QuickView.recent
+    @State private var web: (q: String, state: WebState)?
     @FocusState private var focused: Bool
 
+    enum QuickView: String, CaseIterable, Identifiable {
+        case recent = "Recent", frequent = "Frequent", favourites = "Favourites", meals = "Meals"
+        var id: String { rawValue }
+    }
+    enum WebState { case loading, none }
+    private struct WebPayload: Encodable { let query: String }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.muted)
                 TextField("Foods, recipes, brands", text: $q)
@@ -727,43 +993,31 @@ private struct SearchPane: View {
 
             let term = q.trimmingCharacters(in: .whitespaces)
             if term.count >= 2 {
+                webRow(term)
                 if results.isEmpty {
-                    Text(searched == term ? "No matches. Try another name, or add it under My foods on the web." : "Searching…")
-                        .font(.system(size: 15)).foregroundStyle(Color.muted).padding(.horizontal, 4)
+                    if searched != term {
+                        Text("Searching…").font(.system(size: 15)).foregroundStyle(Color.muted).padding(.horizontal, 4)
+                    }
                 } else {
                     FoodRows(foods: results, pick: onPick)
                 }
             } else if let quick {
-                if !quick.meals.isEmpty {
-                    section("Saved meals") {
-                        VStack(spacing: 0) {
-                            ForEach(Array(quick.meals.enumerated()), id: \.element.id) { i, m in
-                                if i > 0 { Rectangle().fill(Color.surface3).frame(height: 1) }
-                                Button { onPickMeal(m) } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(m.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.fg)
-                                            Text("\(Int(m.protein.rounded())) g protein · \(Int(m.kcal.rounded())) kcal · \(m.items.map(\.food.name).joined(separator: ", "))")
-                                                .font(.system(size: 13)).foregroundStyle(Color.muted).lineLimit(1)
-                                        }
-                                        Spacer(minLength: 4)
-                                        Image(systemName: "plus").font(.system(size: 14, weight: .heavy)).foregroundStyle(Color.fg).frame(width: 40, height: 40).background(Color.bg, in: Circle())
-                                    }
-                                    .padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 10)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(PressStyle(scale: 0.98))
-                            }
-                        }
-                        .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    }
+                chips
+                switch view {
+                case .recent:
+                    if quick.recent.isEmpty { hint("Foods you log show up here.") } else { FoodRows(foods: quick.recent, pick: onPick) }
+                case .frequent:
+                    if (quick.frequent ?? []).isEmpty { hint("Foods you log twice or more show up here, most often first.") } else { FoodRows(foods: quick.frequent ?? [], pick: onPick) }
+                case .favourites:
+                    if quick.favourites.isEmpty { hint("Star a food when you check its amount to keep it here.") } else { FoodRows(foods: quick.favourites, pick: onPick) }
+                case .meals:
+                    if quick.meals.isEmpty { hint("Save a few foods as a meal when you review them.") } else { mealRows(quick.meals) }
                 }
-                if !quick.favourites.isEmpty { section("Favourites") { FoodRows(foods: quick.favourites, pick: onPick) } }
-                if !quick.recent.isEmpty { section("Recent") { FoodRows(foods: quick.recent, pick: onPick) } }
             }
         }
         .task { quick = try? await model.api.get("food/quick", as: QuickFoods.self) }
         .task(id: q) {
+            web = nil
             let term = q.trimmingCharacters(in: .whitespaces)
             guard term.count >= 2 else { results = []; return }
             try? await Task.sleep(for: .milliseconds(220))
@@ -776,10 +1030,114 @@ private struct SearchPane: View {
         .onAppear { focused = true }
     }
 
-    private func section(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.muted).padding(.horizontal, 4)
-            content()
+    private var chips: some View {
+        HStack(spacing: 8) {
+            ForEach(QuickView.allCases) { v in
+                Button {
+                    Haptics.tick()
+                    view = v
+                } label: {
+                    Text(v.rawValue)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(view == v ? Color.bg : Color.fg2)
+                        .padding(.horizontal, 16)
+                        .frame(height: 40)
+                        .background(view == v ? Color.fg : Color.surface, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(view == v ? .isSelected : [])
+            }
+        }
+    }
+
+    private func hint(_ text: String) -> some View {
+        Text(text).font(.system(size: 15)).foregroundStyle(Color.muted).padding(.horizontal, 4)
+    }
+
+    private func mealRows(_ meals: [SavedMeal]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(meals.enumerated()), id: \.element.id) { i, m in
+                if i > 0 { Rectangle().fill(Color.surface3).frame(height: 1) }
+                Button { onPickMeal(m) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(m.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.fg)
+                            Text("\(Int(m.protein.rounded())) g protein · \(Int(m.kcal.rounded())) kcal · \(m.items.map(\.food.name).joined(separator: ", "))")
+                                .font(.system(size: 13)).foregroundStyle(Color.muted).lineLimit(1)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "plus").font(.system(size: 14, weight: .heavy)).foregroundStyle(Color.fg).frame(width: 40, height: 40).background(Color.bg, in: Circle())
+                    }
+                    .padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle(scale: 0.98))
+            }
+        }
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    /// Not in the database: look the label up on the web and save it for next time.
+    @ViewBuilder private func webRow(_ term: String) -> some View {
+        if let w = web, w.q == term, w.state == .loading {
+            HStack(spacing: 12) {
+                ProgressView()
+                Text("Reading a nutrition label for \u{201C}\(term)\u{201D}…").font(.system(size: 15)).foregroundStyle(Color.muted)
+            }
+            .padding(.horizontal, 4)
+            .accessibilityElement(children: .combine)
+        } else if let w = web, w.q == term, w.state == .none {
+            hint("No reliable label found. Try the brand and product name, or add it under My foods on the web.")
+        } else if term.count >= 3, searched == term {
+            if results.isEmpty {
+                Button { searchWeb(term) } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkle").foregroundStyle(Color.coral)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("No match. Search the web for \u{201C}\(term)\u{201D}")
+                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.fg).lineLimit(1)
+                            Text("Looks it up on Open Food Facts, then the web, and saves it for next time").font(.system(size: 13)).foregroundStyle(Color.muted)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.coral.opacity(0.1), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                .buttonStyle(PressStyle(scale: 0.98))
+            } else {
+                // Results exist: a slim line, always in view under the search field, not buried below 25 rows.
+                Button { searchWeb(term) } label: {
+                    Label("Not finding it? Search the web for \u{201C}\(term)\u{201D}", systemImage: "sparkle")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.coral)
+                        .lineLimit(1)
+                        .padding(.horizontal, 4)
+                        .frame(minHeight: 36)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func searchWeb(_ term: String) {
+        web = (term, .loading)
+        Task {
+            do {
+                let r = try await model.api.post("food/web", WebPayload(query: term), as: WebFoodResult.self)
+                if let m = r.food {
+                    Haptics.restEnd()
+                    onPick(m.food, nil)
+                    web = nil
+                    let where_ = m.food.source == "off" ? "Open Food Facts" : (m.food.sourceHost ?? "the web")
+                    model.show(r.cached ? "Added \(m.food.name)" : "Found on \(where_), saved for next time")
+                } else {
+                    web = (term, .none)
+                }
+            } catch {
+                web = nil
+                model.show(error)
+            }
         }
     }
 }

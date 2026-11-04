@@ -8,7 +8,7 @@ import { ProteinHero } from "@/components/food/protein-hero";
 import { MealList } from "@/components/food/meal-list";
 import { LogProvider } from "@/components/food/log-context";
 import { ComposerDock } from "@/components/food/composer-dock";
-import { SlotCard } from "@/components/supplements/slot-card";
+import { SupplementsLine } from "@/components/food/supplements-line";
 
 export const metadata = { title: "Food" };
 
@@ -34,11 +34,7 @@ export default async function FoodPage({ searchParams }: { searchParams: Promise
         />
         <WeekStrip days={week} selected={date} today={today} target={view.targets.protein} />
         <ProteinHero view={view} />
-        {slots.slots.length > 0 && (
-          <div className="mt-6">
-            <SlotCard data={slots} compact />
-          </div>
-        )}
+        <SupplementsLine data={slots} />
         <h2 className="section-label mx-5 mt-7 mb-3">Meals</h2>
         <MealList view={view} />
       </div>

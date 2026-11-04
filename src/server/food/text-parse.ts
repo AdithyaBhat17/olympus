@@ -104,8 +104,8 @@ Rules:
 - name: what the person called it, lowercase English (keep Indian dish names: roti, dal tadka, poha, paneer bhurji).
 - search: 1-4 words to look it up in a food database (no quantities, no brands unless given).
 - quantity + unit: as said ("2" + "roti", "150" + "g", "1" + "katori", "1" + "cup"). Use "serving" if none was said.
-- grams: your best estimate of the total edible weight of this item, cooked as eaten. Grams said explicitly are exact.
-  Typical Indian home portions: roti/chapati 40 g each, phulka 30 g, paratha 80 g, katori of dal/sabzi 150 g, bowl of rice 150 g, idli 40 g, dosa 100 g, cup of tea/coffee 150 ml, glass of milk 250 ml, tbsp ghee/oil 13 g, scoop of whey 31 g, 1 egg 50 g.
+- grams: your best estimate of the total edible weight of this item in grams, cooked as eaten, never millilitres. Grams said explicitly are exact. For a liquid said in ml, convert with its density (milk 1.03 g/ml, oil 0.92, water/tea/coffee 1.0).
+  Typical Indian home portions: roti/chapati 40 g each, phulka 30 g, paratha 80 g, katori of dal/sabzi 150 g, bowl of rice 150 g, idli 40 g, dosa 100 g, cup of tea/coffee 150 g, glass of milk 258 g (250 ml), tbsp ghee/oil 13 g, scoop of whey 31 g, 1 egg 50 g.
 - confidence: 0-1, how sure you are of the grams (1 when the weight was given).
 - time: when it was eaten, as 24-hour "HH:mm", only if the text says ("at 9:30" = "09:30", "12pm" = "12:00", "8 in the evening" = "20:00"). A time applies to the items after it until the next time. "" if no time was said.
 - supplement: if the item is one of the supplements or medicines listed below, its exact name from the list; otherwise "". A supplement still gets quantity and unit; grams can be 0 for tablets.
@@ -168,6 +168,34 @@ export function splitByTime<T extends { time?: string | null }>(items: T[]): Arr
     .map(([time, items]) => ({ time, items }));
 }
 
+const ML_PER_UNIT: Record<string, number> = { ml: 1, millilitre: 1, milliliter: 1, millilitres: 1, milliliters: 1, l: 1000, litre: 1000, liter: 1000, litres: 1000, liters: 1000 };
+
+/** The volume the person stated, in ml, or null if the unit isn't a volume. */
+function stateMl(item: ParsedItem): number | null {
+  const per = ML_PER_UNIT[item.unit];
+  return per ? item.quantity * per : null;
+}
+
+/** US volume portions as written in USDA labels ("1 cup", "1 tablespoon", "1 fl oz"), in ml. */
+const VOLUME_PORTIONS: Array<[RegExp, number]> = [
+  [/^1 cup\b/, 236.588],
+  [/^1 fl(uid)? oz\b/, 29.5735],
+  [/^1 tablespoon\b/, 14.7868],
+  [/^1 teaspoon\b/, 4.92892],
+];
+
+/** Grams per ml from the first volume portion the food has, or null. */
+export function densityFromPortions(portions: Array<{ label: string; grams: number }>): number | null {
+  for (const [re, ml] of VOLUME_PORTIONS) {
+    const p = portions.find((x) => re.test(x.label.toLowerCase().trim()));
+    if (p) {
+      const d = p.grams / ml;
+      if (d >= 0.2 && d <= 1.6) return d;
+    }
+  }
+  return null;
+}
+
 export interface PortionChoice {
   grams: number;
   /** Where the grams came from, shown on the confirm sheet. */
@@ -185,7 +213,13 @@ export function chooseGrams(
   usualGrams: number | null
 ): PortionChoice {
   const unit = item.unit;
-  if (unit === "g" || unit === "gram" || unit === "grams" || unit === "ml") return { grams: Math.round(item.quantity), basis: "stated" };
+  if (unit === "g" || unit === "gram" || unit === "grams") return { grams: Math.round(item.quantity), basis: "stated" };
+  const ml = stateMl(item);
+  if (ml !== null) {
+    // 200 ml of milk is not 200 g: take the food's own density from a volume portion (a cup, a tbsp), else water's.
+    const density = densityFromPortions(portions);
+    return { grams: Math.round(ml * (density ?? 1)), basis: density ? "portion" : "estimate" };
+  }
   if (usualGrams && (unit === "serving" || item.quantity === 1)) return { grams: Math.round(usualGrams * item.quantity), basis: "usual" };
   const UNIT_WORDS: Record<string, string> = { tbsp: "tablespoon", tbs: "tablespoon", tsp: "teaspoon", pc: "piece", pcs: "piece" };
   const unitWord = UNIT_WORDS[unit] ?? unit.replace(/e?s$/, "");

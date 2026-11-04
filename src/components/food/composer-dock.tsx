@@ -30,46 +30,36 @@ export function BarcodeIcon({ size = 20 }: { size?: number }) {
 }
 
 /**
- * The way in, always in reach: a describe field sitting just above the tab
- * bar (MacroFactor / Alma), with search and barcode beside it. Replaces the
- * floating "Log food" button that crowded the nav.
+ * The way in, always in reach: one button. It opens the log sheet on the tab
+ * the athlete used last; each meal's + opens it for that meal.
  */
 export function ComposerDock() {
   const open = useOpenLog();
-  const go = (tab: "describe" | "search" | "barcode") => {
-    hapticTick();
-    open({ tab });
-  };
   return (
     <>
-      {/* Content fades out under the dock and tab bar instead of colliding with them. */}
+      {/* Content fades out under the button and tab bar instead of colliding with them. */}
       <div
         aria-hidden="true"
         className="fixed z-30 inset-x-0 bottom-0 pointer-events-none bg-gradient-to-t from-bg from-55% to-bg/0"
-        style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 190px)" }}
+        style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 170px)" }}
       />
       <div
-        className="fixed z-40 inset-x-0 flex justify-center px-4 pointer-events-none"
+        className="fixed z-40 inset-x-0 flex justify-end px-4 pointer-events-none"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" }}
       >
-        <div className="glass pointer-events-auto w-full max-w-[400px] h-[60px] rounded-full p-1.5 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => go("describe")}
-            className="press-soft flex-1 min-w-0 h-12 rounded-full bg-surface pl-4 pr-3 flex items-center gap-2.5 text-left"
-          >
-            <span className="text-accent shrink-0">
-              <SparkIcon />
-            </span>
-            <span className="truncate text-[16px] text-muted">Describe what you ate</span>
-          </button>
-          <button type="button" onClick={() => go("search")} aria-label="Search foods" className="w-12 h-12 rounded-full bg-surface flex items-center justify-center text-fg shrink-0">
-            <SearchIcon />
-          </button>
-          <button type="button" onClick={() => go("barcode")} aria-label="Barcode" className="w-12 h-12 rounded-full bg-surface flex items-center justify-center text-fg shrink-0">
-            <BarcodeIcon />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            hapticTick();
+            open();
+          }}
+          className="press-soft pointer-events-auto h-14 pl-5 pr-6 rounded-full bg-accent text-accent-ink text-[17px] font-extrabold inline-flex items-center gap-2.5 shadow-lg"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add food
+        </button>
       </div>
     </>
   );

@@ -133,7 +133,7 @@ function MealCard({ meal, view }: { meal: Meal; view: DayView }) {
   const totals = view.byMeal[meal];
   const add = () => {
     hapticTick();
-    open({ meal, tab: "describe" });
+    open({ meal });
   };
 
   if (!items.length) {

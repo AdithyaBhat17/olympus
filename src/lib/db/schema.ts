@@ -616,7 +616,7 @@ export const planItemsRelations = relations(planItems, ({ one }) => ({
 // Food (Phase 2): database, recipes, logs, weigh-ins. See migration-012-food.sql.
 // ---------------------------------------------------------------------------
 
-export type FoodSourceKind = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off";
+export type FoodSourceKind = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off" | "web";
 
 const num = (name: string, precision: number, scale: number) => numeric(name, { precision, scale, mode: "number" });
 
@@ -625,6 +625,8 @@ export const foods = pgTable("foods", {
   userId: text("user_id"),
   source: text("source").$type<FoodSourceKind>().notNull(),
   sourceId: text("source_id"),
+  /** The page a web-sourced food's numbers came from. */
+  sourceUrl: text("source_url"),
   name: text("name").notNull(),
   brand: text("brand"),
   barcode: text("barcode"),
