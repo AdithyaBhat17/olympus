@@ -13,6 +13,8 @@ struct FoodView: View {
     @State private var log: LogRequest?
     @State private var editing: DayLogItem?
     @State private var openSlot: SlotRef?
+    /// The sheet opens on the mode used last (search until the athlete chooses).
+    @AppStorage("food.lastMode") private var lastMode = FoodLogSheet.Mode.search.rawValue
 
     struct SlotRef: Identifiable { let id: String }
 
@@ -101,8 +103,9 @@ struct FoodView: View {
                     .padding(.top, 16)
 
                 if !s.slots.slots.isEmpty {
-                    SupplementTiles(day: slotsBinding(s), isToday: s.isToday, open: { openSlot = .init(id: $0.id) })
-                        .padding(.top, 24)
+                    SupplementsLine(day: s.slots) { openSlot = .init(id: $0.id) }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
                 }
 
                 Text("Meals")
@@ -114,7 +117,7 @@ struct FoodView: View {
 
                 VStack(spacing: 10) {
                     ForEach(Meal.allCases) { meal in
-                        MealCard(meal: meal, view: s.view, add: { log = .init(mode: .describe, meal: meal) }, edit: { editing = $0 })
+                        MealCard(meal: meal, view: s.view, add: { log = .init(mode: FoodLogSheet.Mode(rawValue: lastMode) ?? .search, meal: meal) }, edit: { editing = $0 })
                     }
                 }
                 .padding(.horizontal, 16)
@@ -125,7 +128,7 @@ struct FoodView: View {
         .refreshable { await load() }
         .safeAreaPadding(.bottom, 160)
         .overlay(alignment: .bottom) {
-            ComposerDock { mode in log = .init(mode: mode, meal: s.defaultMeal) }
+            AddFoodButton { log = .init(mode: FoodLogSheet.Mode(rawValue: lastMode) ?? .search, meal: s.defaultMeal) }
                 .padding(.bottom, 84)
         }
     }
@@ -480,57 +483,69 @@ struct PressStyle: ButtonStyle {
     }
 }
 
-// MARK: Dock
+// MARK: Add button
 
-/// The way in, always in reach above the tab bar: describe, search, scan.
-struct ComposerDock: View {
-    let open: (FoodLogSheet.Mode) -> Void
+/// The way in, always in reach above the tab bar: one button. It opens the log
+/// sheet on the mode used last; each meal's + opens it for that meal.
+struct AddFoodButton: View {
+    let open: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack {
+            Spacer()
             Button {
                 Haptics.tick()
-                open(.describe)
+                open()
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkle").font(.system(size: 16, weight: .bold)).foregroundStyle(Color.coral)
-                    Text("Describe what you ate").font(.system(size: 16)).foregroundStyle(Color.muted).lineLimit(1)
-                    Spacer(minLength: 0)
+                    Image(systemName: "plus").font(.system(size: 17, weight: .heavy))
+                    Text("Add food").font(.system(size: 17, weight: .heavy))
                 }
-                .padding(.horizontal, 16)
-                .frame(height: 48)
-                .background(Color.surface, in: Capsule())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 22)
+                .frame(height: 56)
+                .background(Color.coral, in: Capsule())
+                .shadow(color: Color.fg.opacity(0.18), radius: 14, y: 8)
             }
-            .buttonStyle(PressStyle(scale: 0.98))
-            dockButton("magnifyingglass", "Search foods") { open(.search) }
-            dockButton("barcode.viewfinder", "Scan a barcode") { open(.barcode) }
+            .buttonStyle(PressStyle())
         }
-        .padding(6)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.9), lineWidth: 0.5))
-        .shadow(color: Color.fg.opacity(0.14), radius: 16, y: 8)
         .padding(.horizontal, 16)
         .background(alignment: .bottom) {
-            // Content fades out under the dock and the tab bar.
+            // Content fades out under the button and the tab bar.
             LinearGradient(stops: [.init(color: .bg.opacity(0), location: 0), .init(color: .bg, location: 0.45)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 200)
+                .frame(height: 180)
                 .offset(y: 96)
                 .allowsHitTesting(false)
         }
     }
+}
 
-    private func dockButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
+/// Supplements on the food tab: one line that opens the next slot due.
+struct SupplementsLine: View {
+    let day: TodaySlots
+    let open: (TodaySlots.Slot) -> Void
+
+    var body: some View {
+        let items = day.slots.flatMap(\.items)
+        let done = items.filter(\.isDone).count
+        let next = day.slots.first { $0.items.contains { !$0.isDone } }
         Button {
             Haptics.tick()
-            action()
+            if let slot = next ?? day.slots.first { open(slot) }
         } label: {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.fg)
-                .frame(width: 48, height: 48)
-                .background(Color.surface, in: Circle())
+            HStack(spacing: 12) {
+                Circle().fill(done == items.count ? Color.coral : Color.surface3).frame(width: 10, height: 10)
+                Text("Supplements").font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.fg)
+                Spacer(minLength: 8)
+                Text(done == items.count ? "All taken" : "\(done) of \(items.count) taken\(next.map { " · next \($0.label)" } ?? "")")
+                    .font(.system(size: 13)).monospacedDigit().foregroundStyle(Color.muted).lineLimit(1)
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.faint)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 56)
+            .background(Color.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .buttonStyle(PressStyle())
-        .accessibilityLabel(label)
+        .buttonStyle(PressStyle(scale: 0.98))
+        .accessibilityLabel("Supplements, \(done) of \(items.count) taken")
     }
 }

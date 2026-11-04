@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { foodFavourites, foodPortions, foods, recipeIngredients, savedMealItems, savedMeals, type FoodRow } from "@/lib/db/schema";
 import { isStrongMatch, rankCandidates, recipePer100, searchText, type FoodSource, type Per100 } from "@/domain/nutrition";
 import { DomainError } from "../errors";
-import { offFood, tagsFor } from "./sources";
+import { offFood, tagsFor, type MappedFood } from "./sources";
 
 export interface FoodSummary {
   id: string;
@@ -19,6 +19,8 @@ export interface FoodSummary {
   servingG: number | null;
   servingLabel: string | null;
   verified: boolean;
+  /** Where a web-sourced food's numbers came from. */
+  sourceUrl?: string | null;
   favourite: boolean;
   timesLogged: number;
   /** Contains the food word of the query (see isStrongMatch). Weak ones are offered, never auto-picked. */
@@ -43,12 +45,13 @@ const toSummary = (r: Row): FoodSummary => ({
   servingG: r.serving_g == null ? null : Number(r.serving_g),
   servingLabel: (r.serving_label as string | null) ?? null,
   verified: Boolean(r.verified),
+  sourceUrl: (r.source_url as string | null) ?? null,
   favourite: Boolean(r.favourite),
   timesLogged: Number(r.times ?? 0),
 });
 
 const SUMMARY_COLS = sql.raw(
-  `f.id, f.name, f.brand, f.source, f.kcal_100g, f.protein_100g, f.carbs_100g, f.fat_100g, f.fibre_100g, f.serving_g, f.serving_label, f.verified`
+  `f.id, f.name, f.brand, f.source, f.kcal_100g, f.protein_100g, f.carbs_100g, f.fat_100g, f.fibre_100g, f.serving_g, f.serving_label, f.verified, f.source_url`
 );
 
 function rowsOf(res: unknown): Row[] {
@@ -119,6 +122,25 @@ export async function recentFoods(userId: string, limit = 20): Promise<FoodSumma
     ) r JOIN foods f ON f.id = r.food_id
     WHERE (f.user_id IS NULL OR f.user_id = ${userId})
     ORDER BY r.last_at DESC
+    LIMIT ${limit}`);
+  return rowsOf(res).map(toSummary);
+}
+
+/** What you log most (last 90 days, at least twice), most often first. */
+export async function frequentFoods(userId: string, limit = 15): Promise<FoodSummary[]> {
+  const res = await db.execute(sql`
+    SELECT ${SUMMARY_COLS}, r.last_at,
+      EXISTS (SELECT 1 FROM food_favourites v WHERE v.user_id = ${userId} AND v.food_id = f.id) AS favourite,
+      r.times
+    FROM (
+      SELECT i.food_id, max(l.eaten_at) AS last_at, count(*)::int AS times
+      FROM food_log_items i JOIN food_logs l ON l.id = i.log_id
+      WHERE l.user_id = ${userId} AND i.food_id IS NOT NULL AND l.local_date > current_date - 90
+      GROUP BY i.food_id
+      HAVING count(*) >= 2
+    ) r JOIN foods f ON f.id = r.food_id
+    WHERE (f.user_id IS NULL OR f.user_id = ${userId}) AND f.archived_at IS NULL
+    ORDER BY r.times DESC, r.last_at DESC
     LIMIT ${limit}`);
   return rowsOf(res).map(toSummary);
 }
@@ -207,6 +229,11 @@ export async function foodByBarcode(barcode: string, fetchImpl: typeof fetch = f
   if (body.status !== 1 || !body.product) return null;
   const mapped = offFood({ code, ...body.product });
   if (!mapped) return null;
+  return saveSharedFood(mapped);
+}
+
+/** A mapped database food (Open Food Facts) saved once for everyone, with its portions. */
+export async function saveSharedFood(mapped: MappedFood): Promise<FoodRow> {
   const [saved] = await db
     .insert(foods)
     .values(mapped.food)

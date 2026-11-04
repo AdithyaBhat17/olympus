@@ -144,7 +144,7 @@ export function mealForTime(localMinutes: number): Meal {
 
 // --- Search ranking ----------------------------------------------------------
 
-export type FoodSource = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off";
+export type FoodSource = "user" | "recipe" | "indb" | "usda_foundation" | "usda_sr" | "usda_fndds" | "off" | "web";
 
 /** Your own first, then Indian verified data, then USDA, then crowd-sourced packaged foods. */
 const SOURCE_BONUS: Record<FoodSource, number> = {
@@ -156,6 +156,8 @@ const SOURCE_BONUS: Record<FoodSource, number> = {
   // Foods as eaten (guacamole, hummus, burritos); below INDB, so Indian dishes stay Indian.
   usda_fndds: 0.1,
   off: 0,
+  // Looked up on the web for this athlete and cached; only exists where nothing curated matched.
+  web: 0.1,
 };
 
 export interface SearchCandidate {

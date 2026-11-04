@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseGrams, cleanItem, isParseResult, matchSupplement, parseOutcome, parsePrompt, splitByTime, type ParsedItem } from "./text-parse";
+import { chooseGrams, densityFromPortions, cleanItem, isParseResult, matchSupplement, parseOutcome, parsePrompt, splitByTime, type ParsedItem } from "./text-parse";
 
 const item = (over: Partial<ParsedItem>): ParsedItem => ({
   name: "roti",
@@ -73,6 +73,27 @@ describe("chooseGrams", () => {
     const guac = [{ label: "1 tablespoon", grams: 15 }, { label: "1 individual container", grams: 70 }];
     expect(chooseGrams(item({ unit: "tbsp", quantity: 2, grams: 30 }), guac, null)).toEqual({ grams: 30, basis: "portion" });
     expect(chooseGrams(item({ unit: "tsp", quantity: 1, grams: 5 }), [{ label: "1 teaspoon", grams: 4 }], null)).toEqual({ grams: 4, basis: "portion" });
+  });
+
+  it("ml is volume, not weight: density comes from the food's cup/tbsp portion", () => {
+    const milk = [{ label: "1 cup", grams: 244 }];
+    expect(chooseGrams(item({ unit: "ml", quantity: 200, grams: 206 }), milk, null)).toEqual({ grams: 206, basis: "stated" });
+    expect(chooseGrams(item({ unit: "l", quantity: 1, grams: 1000 }), milk, null).grams).toBe(1031);
+    const oil = [{ label: "1 tablespoon", grams: 13.6 }];
+    expect(chooseGrams(item({ unit: "ml", quantity: 15, grams: 14 }), oil, null).grams).toBe(14);
+  });
+
+  it("ml with no volume portion: the model's own conversion if believable, else water", () => {
+    expect(chooseGrams(item({ unit: "ml", quantity: 200, grams: 206 }), [], null)).toEqual({ grams: 206, basis: "estimate" });
+    expect(chooseGrams(item({ unit: "ml", quantity: 200, grams: 80 }), [], null)).toEqual({ grams: 200, basis: "estimate" });
+  });
+
+  it("density reads the number and more unit spellings: '2 tablespoon', '250 ml', '1 cup, chopped'", () => {
+    expect(densityFromPortions([{ label: "2 tablespoon", grams: 27.2 }])).toBeCloseTo(0.92, 2);
+    expect(densityFromPortions([{ label: "250 ml", grams: 257.5 }])).toBeCloseTo(1.03, 2);
+    expect(densityFromPortions([{ label: "1 cup, chopped", grams: 120 }])).toBeCloseTo(0.507, 2);
+    expect(densityFromPortions([{ label: "1 slice", grams: 30 }, { label: "1 cup", grams: 244 }])).toBeCloseTo(1.03, 2);
+    expect(densityFromPortions([{ label: "1 cup", grams: 5 }])).toBeNull(); // implausible: not a density
   });
 
   it("then the model's estimate", () => {

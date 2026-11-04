@@ -104,8 +104,8 @@ Rules:
 - name: what the person called it, lowercase English (keep Indian dish names: roti, dal tadka, poha, paneer bhurji).
 - search: 1-4 words to look it up in a food database (no quantities, no brands unless given).
 - quantity + unit: as said ("2" + "roti", "150" + "g", "1" + "katori", "1" + "cup"). Use "serving" if none was said.
-- grams: your best estimate of the total edible weight of this item, cooked as eaten. Grams said explicitly are exact.
-  Typical Indian home portions: roti/chapati 40 g each, phulka 30 g, paratha 80 g, katori of dal/sabzi 150 g, bowl of rice 150 g, idli 40 g, dosa 100 g, cup of tea/coffee 150 ml, glass of milk 250 ml, tbsp ghee/oil 13 g, scoop of whey 31 g, 1 egg 50 g.
+- grams: your best estimate of the total edible weight of this item in grams, cooked as eaten, never millilitres. Grams said explicitly are exact. For a liquid said in ml, convert with its density (milk 1.03 g/ml, oil 0.92, water/tea/coffee 1.0).
+  Typical Indian home portions: roti/chapati 40 g each, phulka 30 g, paratha 80 g, katori of dal/sabzi 150 g, bowl of rice 150 g, idli 40 g, dosa 100 g, cup of tea/coffee 150 g, glass of milk 258 g (250 ml), tbsp ghee/oil 13 g, scoop of whey 31 g, 1 egg 50 g.
 - confidence: 0-1, how sure you are of the grams (1 when the weight was given).
 - time: when it was eaten, as 24-hour "HH:mm", only if the text says ("at 9:30" = "09:30", "12pm" = "12:00", "8 in the evening" = "20:00"). A time applies to the items after it until the next time. "" if no time was said.
 - supplement: if the item is one of the supplements or medicines listed below, its exact name from the list; otherwise "". A supplement still gets quantity and unit; grams can be 0 for tablets.
@@ -168,6 +168,41 @@ export function splitByTime<T extends { time?: string | null }>(items: T[]): Arr
     .map(([time, items]) => ({ time, items }));
 }
 
+const ML_PER_UNIT: Record<string, number> = { ml: 1, millilitre: 1, milliliter: 1, millilitres: 1, milliliters: 1, l: 1000, litre: 1000, liter: 1000, litres: 1000, liters: 1000 };
+
+/** The volume the person stated, in ml, or null if the unit isn't a volume. */
+function stateMl(item: ParsedItem): number | null {
+  const per = ML_PER_UNIT[item.unit];
+  return per ? item.quantity * per : null;
+}
+
+/** Millilitres in one of a volume unit, for the units USDA and OFF portions are written in. */
+const VOLUME_ML: Array<[RegExp, number]> = [
+  [/^cups?$/, 236.588],
+  [/^(fl\.?\s?oz|fluid ounces?)$/, 29.5735],
+  [/^(tablespoons?|tbsp)$/, 14.7868],
+  [/^(teaspoons?|tsp)$/, 4.92892],
+  [/^(millilit(?:er|re)s?|ml)$/, 1],
+  [/^(lit(?:er|re)s?|l)$/, 1000],
+];
+
+/**
+ * Grams per ml from the first portion that is a volume ("1 cup", "2 tablespoon",
+ * "250 ml", "1 cup, chopped"), or null. The number counts: "2 tablespoon = 28 g".
+ */
+export function densityFromPortions(portions: Array<{ label: string; grams: number }>): number | null {
+  for (const p of portions) {
+    const m = p.label.toLowerCase().trim().match(/^(\d+(?:\.\d+)?)\s*(cups?|fl\.?\s?oz|fluid ounces?|tablespoons?|tbsp|teaspoons?|tsp|millilit(?:er|re)s?|ml|lit(?:er|re)s?|l)\b/);
+    if (!m) continue;
+    const per = VOLUME_ML.find(([re]) => re.test(m[2]))?.[1];
+    const n = Number(m[1]);
+    if (!per || !(n > 0)) continue;
+    const d = p.grams / (n * per);
+    if (d >= 0.2 && d <= 1.6) return d;
+  }
+  return null;
+}
+
 export interface PortionChoice {
   grams: number;
   /** Where the grams came from, shown on the confirm sheet. */
@@ -185,7 +220,16 @@ export function chooseGrams(
   usualGrams: number | null
 ): PortionChoice {
   const unit = item.unit;
-  if (unit === "g" || unit === "gram" || unit === "grams" || unit === "ml") return { grams: Math.round(item.quantity), basis: "stated" };
+  if (unit === "g" || unit === "gram" || unit === "grams") return { grams: Math.round(item.quantity), basis: "stated" };
+  const ml = stateMl(item);
+  if (ml !== null) {
+    // 200 ml of milk is not 200 g. The volume was stated, so with the food's own density (from a cup, tablespoon, ml... portion) it is "stated".
+    const density = densityFromPortions(portions);
+    if (density) return { grams: Math.round(ml * density), basis: "stated" };
+    // No volume portion: the model's own conversion if it's a believable density, else water's. An estimate either way.
+    const implied = item.grams / ml;
+    return { grams: Math.round(item.grams > 0 && implied >= 0.7 && implied <= 1.3 ? item.grams : ml), basis: "estimate" };
+  }
   if (usualGrams && (unit === "serving" || item.quantity === 1)) return { grams: Math.round(usualGrams * item.quantity), basis: "usual" };
   const UNIT_WORDS: Record<string, string> = { tbsp: "tablespoon", tbs: "tablespoon", tsp: "teaspoon", pc: "piece", pcs: "piece" };
   const unitWord = UNIT_WORDS[unit] ?? unit.replace(/e?s$/, "");

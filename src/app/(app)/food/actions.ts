@@ -9,6 +9,7 @@ import {
   createUserFood,
   deleteSavedMeal,
   favouriteFoods,
+  frequentFoods,
   listSavedMeals,
   saveMeal,
   getFood,
@@ -22,6 +23,7 @@ import {
 import { deleteItem, deleteLog, updateItemGrams, type NewLog } from "@/server/food/logs";
 import { barcodeSummary, logWithNudges, type DescribedDose } from "@/server/food/screen";
 import { draftFromText } from "@/server/food/log-text";
+import { webLookupFood } from "@/server/food/web-lookup";
 
 type R<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -58,8 +60,18 @@ export async function searchFoodsAction(query: string) {
 
 export async function quickFoodsAction() {
   return run(async (userId) => {
-    const [recent, favourites, meals] = await Promise.all([recentFoods(userId, 15), favouriteFoods(userId), listSavedMeals(userId)]);
-    return { recent, favourites, meals };
+    const [recent, frequent, favourites, meals] = await Promise.all([recentFoods(userId, 15), frequentFoods(userId, 15), favouriteFoods(userId), listSavedMeals(userId)]);
+    return { recent, frequent, favourites, meals };
+  }, false);
+}
+
+/** "Search the web" from the food search: find the label, save it as the athlete's own food. */
+export async function webFoodAction(query: string) {
+  return run(async (userId) => {
+    const q = str(query, 120).trim();
+    if (q.length < 3) throw new DomainError("Type a few more letters first.");
+    const r = await webLookupFood(userId, q);
+    return { food: r.food, cached: r.cached, reason: r.reason ?? null };
   }, false);
 }
 

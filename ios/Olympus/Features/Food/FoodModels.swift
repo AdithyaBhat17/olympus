@@ -175,6 +175,11 @@ struct SlotItem: Codable, Identifiable, Sendable {
 struct Portion: Codable, Hashable, Sendable {
     var label: String
     var grams: Double
+
+    /// USDA survey data has portions like "Guideline amount per cup of hot cereal": not something to choose.
+    var isUsable: Bool {
+        label.trimmingCharacters(in: .whitespaces).range(of: #"^(\d+(\.\d+)?\s+)?guideline amount|not specified"#, options: [.regularExpression, .caseInsensitive]) == nil
+    }
 }
 
 struct FoodSummary: Codable, Identifiable, Hashable, Sendable {
@@ -191,6 +196,14 @@ struct FoodSummary: Codable, Identifiable, Hashable, Sendable {
     var servingLabel: String?
     var verified: Bool
     var favourite: Bool
+    /// The page a web-sourced food's numbers came from.
+    var sourceUrl: String?
+
+    /// "acme.example" for a web food, else the short source name.
+    var sourceHost: String? {
+        sourceUrl.flatMap { URL(string: $0)?.host?.replacingOccurrences(of: "www.", with: "") }
+    }
+    var sourceLabel: String { source == "web" ? "✦ \(sourceHost ?? "Web")" : sourceShort }
 
     var sourceShort: String {
         switch source {
@@ -199,6 +212,7 @@ struct FoodSummary: Codable, Identifiable, Hashable, Sendable {
         case "indb": "INDB"
         case "usda_foundation", "usda_sr", "usda_fndds": "USDA"
         case "off": "OFF"
+        case "web": "Web"
         default: source
         }
     }
@@ -263,12 +277,21 @@ struct SavedMeal: Codable, Identifiable, Sendable {
 
 struct QuickFoods: Codable, Sendable {
     var recent: [FoodSummary]
+    /// Absent from an older server.
+    var frequent: [FoodSummary]?
     var favourites: [FoodSummary]
     var meals: [SavedMeal]
 }
 
 struct FoodSearchResult: Codable, Sendable {
     var foods: [FoodSummary]
+}
+
+/// POST food/web: a product found on the web and cached as the athlete's own food.
+struct WebFoodResult: Decodable, Sendable {
+    var food: DraftMatch?
+    var cached: Bool
+    var reason: String?
 }
 
 struct FoodPortions: Codable, Sendable {
