@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localToUtc, tzOffsetMin } from "./dates";
+import { localHour, localToUtc, tzOffsetMin } from "./dates";
 
 describe("localToUtc", () => {
   it("handles Dubai and Bengaluru (half-hour offset)", () => {
@@ -10,5 +10,15 @@ describe("localToUtc", () => {
   it("handles DST zones", () => {
     expect(localToUtc("2026-07-01", "12:00", "Europe/London").toISOString()).toBe("2026-07-01T11:00:00.000Z");
     expect(localToUtc("2026-01-01", "12:00", "Europe/London").toISOString()).toBe("2026-01-01T12:00:00.000Z");
+  });
+});
+
+describe("localHour", () => {
+  it("reads the wall-clock hour in a timezone, midnight as 0", () => {
+    const d = new Date("2026-11-06T04:30:00Z");
+    expect(localHour(d, "Asia/Kolkata")).toBe(10);
+    expect(localHour(d, "Asia/Dubai")).toBe(8);
+    expect(localHour(d, "America/New_York")).toBe(23);
+    expect(localHour(new Date("2026-11-06T18:30:00Z"), "Asia/Kolkata")).toBe(0);
   });
 });

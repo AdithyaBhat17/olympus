@@ -14,7 +14,7 @@ import {
   type SupplementRow,
   type SupplementSlot,
 } from "@/lib/db/schema";
-import { addDays, isoDateInTz, localToUtc } from "@/lib/dates";
+import { addDays, isoDateInTz, localHour, localToUtc } from "@/lib/dates";
 import {
   checkTiming,
   daysLeft,
@@ -33,6 +33,7 @@ import {
 import { DomainError } from "./errors";
 import { getProfile, todayFor } from "./profile";
 import { createLog, deleteLog } from "./food/logs";
+import { getFoodsByIds } from "./food/foods";
 import { sendPushToUser } from "./push";
 
 // --- Stack -------------------------------------------------------------------------
@@ -115,17 +116,26 @@ function clean(input: SupplementInput) {
   };
 }
 
+/** A linked food must be a shared food or the user's own; fail at save, not at the first dose. */
+async function checkFood(userId: string, foodId: string | null): Promise<void> {
+  if (!foodId) return;
+  if (!(await getFoodsByIds(userId, [foodId])).has(foodId)) throw new DomainError("That food isn't available. Pick one from your foods.");
+}
+
 export async function addSupplement(userId: string, input: SupplementInput): Promise<string> {
   const v = clean(input);
+  await checkFood(userId, v.foodId);
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(supplements).where(eq(supplements.userId, userId));
   const [row] = await db.insert(supplements).values({ userId, ...v, position: n }).returning({ id: supplements.id });
   return row.id;
 }
 
 export async function updateSupplement(userId: string, id: string, input: SupplementInput): Promise<void> {
+  const v = clean(input);
+  await checkFood(userId, v.foodId);
   const res = await db
     .update(supplements)
-    .set({ ...clean(input), updatedAt: new Date() })
+    .set({ ...v, updatedAt: new Date() })
     .where(and(eq(supplements.id, id), eq(supplements.userId, userId)))
     .returning({ id: supplements.id });
   if (!res.length) throw new DomainError("That supplement doesn't exist.");
@@ -438,6 +448,24 @@ export async function dailySupplementReminders(userId: string): Promise<boolean>
     tag: "supplements-daily",
   });
   return true;
+}
+
+/** 8am local: the hour supplement reminders go out. */
+export const REMINDER_HOUR = 8;
+
+/** Sends reminders to every user whose local clock reads REMINDER_HOUR at `now`. One user failing doesn't stop the rest. */
+export async function remindersDueAt(now: Date): Promise<Array<{ user: number; sent: boolean; error?: string }>> {
+  const out: Array<{ user: number; sent: boolean; error?: string }> = [];
+  for (const [i, userId] of (await supplementUserIds()).entries()) {
+    try {
+      const { timezone } = await getProfile(userId);
+      if (localHour(now, timezone) !== REMINDER_HOUR) continue;
+      out.push({ user: i, sent: await dailySupplementReminders(userId) });
+    } catch (err) {
+      out.push({ user: i, sent: false, error: String(err instanceof Error ? err.message : err).slice(0, 200) });
+    }
+  }
+  return out;
 }
 
 export async function supplementUserIds(): Promise<string[]> {
