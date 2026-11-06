@@ -428,8 +428,8 @@ export const externalActivities = pgTable(
   "external_activities",
   {
     userId: text("user_id").notNull(),
-    source: text("source").$type<"apple_health" | "garmin">().notNull(),
-    /** HKWorkout UUID. */
+    source: text("source").$type<"apple_health" | "garmin" | "whoop">().notNull(),
+    /** HKWorkout UUID, Garmin activity id or Whoop workout UUID. */
     externalId: text("external_id").notNull(),
     /** Local date the activity started, in the athlete's timezone. */
     date: date("date").notNull(),
@@ -468,6 +468,8 @@ export interface ActivityDetails {
   /** Minutes east of UTC where it was recorded. */
   utcOffsetMin?: number;
   totalKcal?: number;
+  /** Whoop: workout strain, 0–21. */
+  strain?: number;
 }
 
 export interface FitLap {

@@ -5,14 +5,14 @@ import { db } from "@/lib/db";
 import { externalActivities, sessions } from "@/lib/db/schema";
 import { addDays, formatTimeInTz, isoDateInTz } from "@/lib/dates";
 import { getProfile } from "./profile";
-import { outsideSessions, preferGarmin } from "./activity-overlap";
+import { outsideSessions, preferRicherSource } from "./activity-overlap";
 
 /**
- * Workouts from Apple Health (Watch, Garmin Connect, Strava...) and from the
- * Garmin API, so Claude sees the training Olympus didn't log. The app
+ * Workouts from Apple Health (Watch, Garmin Connect, Strava...), the Garmin
+ * API and Whoop, so Claude sees the training Olympus didn't log. The app
  * de-duplicates devices before sending (OlympusCore.distinctWorkouts); here
- * an Apple Health sync replaces its range, and a Garmin activity hides the
- * Apple Health copy of itself (preferGarmin).
+ * an Apple Health sync replaces its range, and a Garmin or Whoop activity hides
+ * the copies of itself from poorer sources (preferRicherSource).
  */
 
 const bpm = z.number().int().min(30).max(240);
@@ -118,7 +118,7 @@ export async function listActivities(userId: string, date: string, days: number)
   ]);
   const spans = olympus.map((s) => ({ startMs: s.startedAt!.getTime(), endMs: s.finishedAt!.getTime() }));
   const withSpans = rows.map((r) => ({ ...r, startMs: r.startedAt.getTime(), endMs: r.endedAt.getTime() }));
-  return outsideSessions(preferGarmin(withSpans), spans).map((r) => ({
+  return outsideSessions(preferRicherSource(withSpans), spans).map((r) => ({
     date: r.date,
     start: formatTimeInTz(r.startedAt, timezone),
     activityType: r.activityType,

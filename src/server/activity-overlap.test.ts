@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outsideSessions, preferGarmin, sameTraining } from "./activity-overlap";
+import { outsideSessions, preferRicherSource, sameTraining } from "./activity-overlap";
 
 const at = (hhmm: string) => Date.parse(`2026-10-31T${hhmm}:00Z`);
 const span = (from: string, to: string) => ({ startMs: at(from), endMs: at(to) });
@@ -26,7 +26,7 @@ describe("activities vs Olympus sessions", () => {
   });
 });
 
-describe("preferGarmin", () => {
+describe("preferRicherSource", () => {
   const at = (source: string, startMin: number, endMin: number) => ({
     source,
     startMs: startMin * 60_000,
@@ -36,17 +36,27 @@ describe("preferGarmin", () => {
   it("drops the Apple Health copy of a Garmin activity", () => {
     const g = at("garmin", 0, 60);
     const ah = at("apple_health", 1, 61);
-    expect(preferGarmin([ah, g])).toEqual([g]);
+    expect(preferRicherSource([ah, g])).toEqual([g]);
   });
 
   it("keeps Apple Health workouts Garmin didn't record", () => {
     const g = at("garmin", 0, 60);
     const run = at("apple_health", 120, 150);
-    expect(preferGarmin([g, run])).toEqual([g, run]);
+    expect(preferRicherSource([g, run])).toEqual([g, run]);
+  });
+
+  it("drops the Whoop and Apple Health copies of a Garmin activity", () => {
+    const g = at("garmin", 0, 60);
+    expect(preferRicherSource([at("apple_health", 1, 61), at("whoop", 0, 59), g])).toEqual([g]);
+  });
+
+  it("keeps Whoop over Apple Health when there is no Garmin", () => {
+    const w = at("whoop", 0, 60);
+    expect(preferRicherSource([at("apple_health", 1, 61), w])).toEqual([w]);
   });
 
   it("changes nothing without Garmin", () => {
     const a = [at("apple_health", 0, 30), at("apple_health", 10, 40)];
-    expect(preferGarmin(a)).toEqual(a);
+    expect(preferRicherSource(a)).toEqual(a);
   });
 });

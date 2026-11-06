@@ -1,26 +1,33 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { integrations } from "@/lib/db/schema";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { dailyWearable, externalActivities, integrations } from "@/lib/db/schema";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { upsertCheckIn } from "../checkins";
 import {
   mainSleepByDate,
+  parseWorkout,
   recoveryByDate,
   sleepDetailByDate,
+  wearableByDate,
   type WhoopRecovery,
   type WhoopSleep,
+  type WhoopWearableDay,
+  type WhoopWorkout,
 } from "./whoop-parse";
 
 /**
  * WHOOP Developer API v2 — sleep → daily check-in sleep minutes, recovery →
- * HRV + resting HR (used only where Apple Health has none, see upsertCheckIn).
+ * HRV + resting HR (ranked below Garmin, above Apple Health: see
+ * check-in-sources), workouts → external_activities. The fallback for
+ * everything Garmin tracks that Whoop also measures; stress, Body Battery and
+ * steps have no Whoop equivalent.
  * Docs: https://developer.whoop.com/api/ (OAuth 2.0, scope read:sleep + offline).
  */
 
 const AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth";
 const TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token";
 const API = "https://api.prod.whoop.com/developer/v2";
-export const WHOOP_SCOPES = "offline read:sleep read:recovery";
+export const WHOOP_SCOPES = "offline read:sleep read:recovery read:workout";
 const STALE_MS = 30 * 60 * 1000;
 
 export function whoopConfigured(): boolean {
@@ -116,6 +123,12 @@ async function accessToken(userId: string): Promise<string | null> {
   return t.access_token;
 }
 
+class WhoopHttpError extends Error {
+  constructor(readonly path: string, readonly status: number) {
+    super(`WHOOP ${path} ${status}`);
+  }
+}
+
 /** Up to 5 pages of a v2 collection, newest first, since `start`. */
 async function fetchAll<T>(token: string, path: string, start: string): Promise<T[]> {
   const records: T[] = [];
@@ -126,7 +139,7 @@ async function fetchAll<T>(token: string, path: string, start: string): Promise<
     u.searchParams.set("limit", "25");
     if (next) u.searchParams.set("nextToken", next);
     const res = await fetch(u, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    if (!res.ok) throw new Error(`WHOOP ${path} ${res.status}`);
+    if (!res.ok) throw new WhoopHttpError(path, res.status);
     const body = (await res.json()) as { records: T[]; next_token?: string | null };
     records.push(...body.records);
     next = body.next_token ?? undefined;
@@ -135,15 +148,89 @@ async function fetchAll<T>(token: string, path: string, start: string): Promise<
   return records;
 }
 
+/**
+ * Workouts need `read:workout`, which connections made before it was added
+ * lack (Whoop answers 403). Those keep syncing sleep and recovery and get
+ * workouts after reconnecting.
+ */
+async function fetchWorkouts(token: string, start: string): Promise<WhoopWorkout[]> {
+  try {
+    return await fetchAll<WhoopWorkout>(token, "/activity/workout", start);
+  } catch (err) {
+    if (err instanceof WhoopHttpError && err.status === 403) return [];
+    throw err;
+  }
+}
+
+const WEARABLE_COLUMNS = [
+  "hrvMs", "hrvMethod", "restingHr", "sleepMin", "deepMin", "lightMin", "remMin", "awakeMin", "awakenings",
+  "napMin", "sleepStart", "sleepEnd", "sleepUtcOffsetMin", "respirationAvg",
+] as const;
+
+/** One row per date, replaced whole so a value Whoop stops reporting is cleared. */
+async function storeWearable(userId: string, days: Map<string, WhoopWearableDay>) {
+  const rows = Array.from(days, ([date, d]) => {
+    const row: Record<string, unknown> = { userId, date, source: "whoop", updatedAt: new Date() };
+    for (const c of WEARABLE_COLUMNS) row[c] = (d as Record<string, unknown>)[c] ?? null;
+    return row as typeof dailyWearable.$inferInsert;
+  });
+  if (!rows.length) return;
+  const set: Record<string, unknown> = { updatedAt: sql`now()` };
+  for (const c of WEARABLE_COLUMNS) set[c] = sql.raw(`excluded.${dailyWearable[c].name}`);
+  await db
+    .insert(dailyWearable)
+    .values(rows)
+    .onConflictDoUpdate({ target: [dailyWearable.userId, dailyWearable.date, dailyWearable.source], set });
+}
+
+async function storeWorkouts(userId: string, workouts: WhoopWorkout[]): Promise<number> {
+  let stored = 0;
+  for (const w of workouts) {
+    const a = parseWorkout(w);
+    if (!a) continue;
+    const row = {
+      date: a.date,
+      startedAt: a.startedAt,
+      endedAt: a.endedAt,
+      activityType: a.activityType,
+      device: "WHOOP",
+      durationMin: a.durationMin,
+      distanceM: a.distanceM,
+      activeKcal: a.activeKcal,
+      avgHr: a.avgHr,
+      maxHr: a.maxHr,
+      hrCoveredMin: a.hrCoveredMin,
+      details: {
+        ...(a.utcOffsetMin !== undefined ? { utcOffsetMin: a.utcOffsetMin } : {}),
+        ...(a.strain !== undefined ? { strain: a.strain } : {}),
+        ...(a.activeKcal != null ? { totalKcal: a.activeKcal } : {}),
+      },
+      updatedAt: new Date(),
+    };
+    await db
+      .insert(externalActivities)
+      .values({ userId, source: "whoop", externalId: a.externalId, ...row })
+      .onConflictDoUpdate({
+        target: [externalActivities.userId, externalActivities.source, externalActivities.externalId],
+        set: row,
+      });
+    stored++;
+  }
+  return stored;
+}
+
 export async function syncWhoop(userId: string, days = 3): Promise<number> {
   try {
     const token = await accessToken(userId);
     if (!token) return 0;
     const start = new Date(Date.now() - days * 86_400_000).toISOString();
-    const [sleeps, recoveries] = await Promise.all([
+    const [sleeps, recoveries, workouts] = await Promise.all([
       fetchAll<WhoopSleep>(token, "/activity/sleep", start),
       fetchAll<WhoopRecovery>(token, "/recovery", start),
+      fetchWorkouts(token, start),
     ]);
+    await storeWearable(userId, wearableByDate(sleeps, recoveries));
+    await storeWorkouts(userId, workouts);
 
     const byDate = mainSleepByDate(sleeps);
     const details = sleepDetailByDate(sleeps);
@@ -202,4 +289,13 @@ export async function syncWhoopIfStale(userId: string): Promise<void> {
     .returning({ userId: integrations.userId });
   if (claimed.length === 0) return;
   await syncWhoop(userId, 3);
+}
+
+/** Every athlete with Whoop connected, for the daily cron. */
+export async function whoopUserIds(): Promise<string[]> {
+  const rows = await db
+    .select({ userId: integrations.userId })
+    .from(integrations)
+    .where(eq(integrations.provider, "whoop"));
+  return rows.map((r) => r.userId);
 }
