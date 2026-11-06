@@ -55,6 +55,13 @@ describe("preferRicherSource", () => {
     expect(preferRicherSource([at("apple_health", 1, 61), w])).toEqual([w]);
   });
 
+  it("doesn't let a dropped duplicate hide another workout", () => {
+    const g = at("garmin", 0, 60);
+    const w = at("whoop", 30, 90); // half inside g: same training, dropped
+    const a = at("apple_health", 80, 140); // only touches w, which is gone
+    expect(preferRicherSource([g, w, a])).toEqual([g, a]);
+  });
+
   it("changes nothing without Garmin", () => {
     const a = [at("apple_health", 0, 30), at("apple_health", 10, 40)];
     expect(preferRicherSource(a)).toEqual(a);

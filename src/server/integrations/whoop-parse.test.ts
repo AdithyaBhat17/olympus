@@ -127,7 +127,7 @@ describe("whoop workouts", () => {
       date: "2026-10-01",
       activityType: "weightlifting",
       durationMin: 60,
-      activeKcal: 250,
+      totalKcal: 250,
       avgHr: 118,
       maxHr: 161,
       hrCoveredMin: 54,

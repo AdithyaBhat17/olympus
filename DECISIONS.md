@@ -79,7 +79,9 @@ Newest first. What was decided, and why.
 
 - **Whoop now covers everything Garmin tracks that it also measures:** daily sleep, HRV, resting HR and stages (already merged into the check-in; now also written to `daily_wearable` with source `whoop`), plus workouts in `external_activities` (source `whoop`, scope `read:workout`). The check-in order stays Garmin > Whoop > Apple Health, so switching devices needs no setting.
 - **Stress, Body Battery, steps, sleep need and 1 Hz HR stay Garmin-only.** Whoop's API has no equivalent. Strain is kept in `details.strain` but not mixed into `trainingLoad`, which already derives HR load from avg HR and duration.
-- **Whoop kilojoules become `activeKcal` as-is** (÷ 4.184). Whoop doesn't split out BMR the way Garmin's calories do.
+- **Whoop kilojoules become `details.totalKcal` only** (÷ 4.184). They include resting burn, so `activeKcal` stays empty rather than mean something different from Garmin's.
+- **Whoop's `daily_wearable` rows are merged, not replaced.** The 3-day window can hold a nap whose night began before it, and a whole-row replace would wipe that night's values. Workouts Whoop no longer returns inside the window are deleted, so a workout removed in the app stops counting toward load.
+- **Whoop's wearable and workout writes can't block the check-in sync.** They run after it, and a workout fetch failure (including a missing scope) is logged and skipped. The cron claims the sync slot like page loads do, so it can't race the refresh-token rotation, and runs beside the Garmin loop.
 - **`preferGarmin` became `preferRicherSource`:** Garmin > Whoop > Apple Health. Whoop copies its workouts into Apple Health, so without this a Whoop wearer saw each one twice.
 - **The daily cron syncs Whoop too,** independent of Garmin, so a lapsed Garmin key doesn't stop it.
 - **Existing Whoop connections lack `read:workout`.** A 403 on workouts is treated as "none", so sleep and recovery keep working until the athlete reconnects.

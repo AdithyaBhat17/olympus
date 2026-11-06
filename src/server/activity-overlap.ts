@@ -35,7 +35,11 @@ const rank = (source: string) => {
  * Apple Health. Same-source activities are never merged here.
  */
 export function preferRicherSource<T extends Span & { source: string }>(activities: T[]): T[] {
-  return activities.filter(
-    (a) => !activities.some((b) => rank(b.source) < rank(a.source) && sameTraining(a, b))
-  );
+  const kept: T[] = [];
+  // Richest first, and each activity is checked only against ones that survive,
+  // so a dropped duplicate can't hide a different workout.
+  for (const a of [...activities].sort((x, y) => rank(x.source) - rank(y.source))) {
+    if (!kept.some((k) => rank(k.source) < rank(a.source) && sameTraining(a, k))) kept.push(a);
+  }
+  return activities.filter((a) => kept.includes(a));
 }

@@ -26,9 +26,7 @@ export interface WhoopSleep {
 
 /** `iso` shifted into the sleep's own timezone, as an ISO string. */
 function local(iso: string, offset: string | undefined): string {
-  const m = /^([+-])(\d{2}):(\d{2})$/.exec(offset ?? "+00:00");
-  const offsetMin = m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;
-  return new Date(new Date(iso).getTime() + offsetMin * 60_000).toISOString();
+  return new Date(new Date(iso).getTime() + (offsetMinutes(offset) ?? 0) * 60_000).toISOString();
 }
 
 /** The wake-up date in the sleep's own timezone: last night's sleep belongs to today. */
@@ -151,7 +149,8 @@ export interface ParsedWorkout {
   activityType: string;
   durationMin: number;
   distanceM: number | null;
-  activeKcal: number | null;
+  /** Total energy over the workout; Whoop doesn't split out resting burn. */
+  totalKcal: number | null;
   avgHr: number | null;
   maxHr: number | null;
   hrCoveredMin: number | null;
@@ -174,8 +173,9 @@ const inRange = (v: number | undefined, lo: number, hi: number) =>
 /**
  * A scored workout as an external activity. Unscored ones, and anything with a
  * non-positive or over-a-day duration, are skipped. Whoop's kilojoules are the
- * energy burned over the workout, so they become kcal as-is (no BMR split like
- * Garmin's). HR is covered for `percent_recorded` of the duration.
+ * total energy over the workout, resting burn included, so they become
+ * `totalKcal` only: `activeKcal` stays empty rather than mean something
+ * different from Garmin's. HR is covered for `percent_recorded` of the duration.
  */
 export function parseWorkout(w: WhoopWorkout): ParsedWorkout | null {
   if (w.score_state !== "SCORED" || !w.score) return null;
@@ -198,7 +198,7 @@ export function parseWorkout(w: WhoopWorkout): ParsedWorkout | null {
     activityType: (w.sport_name ?? "other").trim().toLowerCase().replace(/\s+/g, "-") || "other",
     durationMin,
     distanceM: inRange(s.distance_meter, 0, 1_000_000),
-    activeKcal: s.kilojoule != null ? inRange(s.kilojoule / KJ_PER_KCAL, 0, 20_000) : null,
+    totalKcal: s.kilojoule != null ? inRange(s.kilojoule / KJ_PER_KCAL, 0, 20_000) : null,
     avgHr,
     maxHr: inRange(s.max_heart_rate, 30, 240),
     hrCoveredMin: covered,
