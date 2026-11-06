@@ -143,17 +143,25 @@ The Today check-in (sleep, protein, water) can be typed in the app, told to
 Claude (`upsert_check_in`), or synced. A value you enter yourself is never
 overwritten by a sync.
 
-### Whoop → sleep
+### Whoop → sleep, recovery, workouts
 
 1. Create an app at [developer.whoop.com](https://developer.whoop.com) with
-   scopes `offline read:sleep read:recovery` and redirect URI
+   scopes `offline read:sleep read:recovery read:workout` and redirect URI
    `<APP_URL>/api/integrations/whoop/callback`.
 2. Set `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`.
 3. In the app: Settings › Connections › Whoop › Connect.
 
 Sleep is time asleep (in bed − awake − no data), dated by the morning you
 woke up. It refreshes in the background every 30 minutes while you use the
-app, and whenever Claude calls `get_recovery`.
+app, and whenever Claude calls `get_recovery`. The daily cron also syncs
+Whoop, so it works as the fallback when the Garmin key lapses.
+
+Whoop fills the same slots as Garmin where it measures the same thing: sleep,
+HRV (RMSSD), resting HR, sleep stages and workouts. Garmin wins when both
+report; Whoop beats Apple Health. Stress, Body Battery, steps and per-second
+HR have no Whoop equivalent and stay Garmin-only. Connections made before
+`read:workout` was added keep syncing sleep and recovery; reconnect Whoop in
+Settings to start pulling workouts.
 
 ### MyFitnessPal / Apple Health → protein and water
 
