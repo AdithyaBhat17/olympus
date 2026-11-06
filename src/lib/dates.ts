@@ -88,3 +88,9 @@ export function localToUtc(isoDate: string, hhmm: string, tz: string): Date {
   t = guess - tzOffsetMin(new Date(t), tz) * 60_000;
   return new Date(t);
 }
+
+/** The hour (0-23) on the wall clock in `tz` at instant `d`. */
+export function localHour(d: Date, tz: string): number {
+  const h = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hourCycle: "h23" }).format(d);
+  return Number(h) % 24;
+}

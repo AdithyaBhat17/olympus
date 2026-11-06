@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Sheet } from "@/components/session/sheet";
 import { cn } from "@/lib/utils";
-import { MARKERS, SLOTS } from "@/domain/supplements";
+import { MARKERS, SLOTS, suggestTags } from "@/domain/supplements";
 import type { StackItem } from "@/server/supplements";
 import type { FoodSummary } from "@/server/food/foods";
 import type { SupplementSlot } from "@/lib/db/schema";
@@ -162,7 +162,17 @@ export function StackEditor({ existing }: { existing?: StackItem }) {
               </div>
             </div>
             <div className={label}>
-              What it contains (for timing rules and lab checklists)
+              What it contains
+              <span className="text-[12px]">Timing warnings (like thyroid medicine and coffee or calcium) only work when this is set.</span>
+              {suggestTags(f.name).some((t) => !f.tags.includes(t)) && (
+                <button
+                  type="button"
+                  className={small}
+                  onClick={() => setF({ ...f, tags: [...new Set([...f.tags, ...suggestTags(f.name)])] })}
+                >
+                  Add suggested: {suggestTags(f.name).filter((t) => !f.tags.includes(t)).map((t) => t.replace("_", " ")).join(", ")}
+                </button>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {TAGS.map((t) => (
                   <button key={t} type="button" className={chip(f.tags.includes(t))} onClick={() => toggle("tags", t)}>{t.replace("_", " ")}</button>

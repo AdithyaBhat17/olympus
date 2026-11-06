@@ -9,6 +9,7 @@ import {
   nudgeText,
   retestDue,
   scheduleLabel,
+  suggestTags,
   servingsLeft,
   weekday,
   type TimingRule,
@@ -142,5 +143,16 @@ describe("labs", () => {
     const thy = labChecklist({ at: 0, markers: ["TSH"], fasting: false }, []);
     expect(thy).toHaveLength(1);
     expect(thy[0].text).toContain("ask your doctor");
+  });
+});
+
+describe("suggestTags", () => {
+  it("suggests levothyroxine for common brand and generic names", () => {
+    for (const n of ["Thyronorm 75", "Levothyroxine", "Eltroxin 50 mcg", "Synthroid"]) expect(suggestTags(n)).toContain("levothyroxine");
+  });
+  it("finds minerals and protein, and nothing for unknown names", () => {
+    expect(suggestTags("Calcium + Vitamin D3")).toEqual(["calcium", "vitamin_d"]);
+    expect(suggestTags("ON Gold Standard Whey")).toEqual(["protein"]);
+    expect(suggestTags("Ashwagandha")).toEqual([]);
   });
 });

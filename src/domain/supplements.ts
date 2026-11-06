@@ -275,3 +275,25 @@ export function nudgeSummary(nudges: Nudge[]): string | null {
   const when = Math.max(...gaps) < 5 ? `taken with ${list}` : `${fmtRange(Math.min(...gaps), Math.max(...gaps))} from ${list}`;
   return `${subject} was ${when}. They're usually kept ${fmtRange(Math.min(...want), Math.max(...want))} apart. Details and sources: Supplements › Timing rules.`;
 }
+
+/**
+ * Tags to suggest from a supplement's name, so timing warnings work without the
+ * user knowing the tags drive them. Only obvious names; never guesses a drug.
+ */
+const TAG_HINTS: Array<[RegExp, string]> = [
+  [/\b(thyronorm|levothyrox\w*|eltroxin|synthroid|euthyrox|thyroxine|thyrox)\b/i, "levothyroxine"],
+  [/\bcalcium\b/i, "calcium"],
+  [/\b(iron|ferrous|ferrum)\b/i, "iron"],
+  [/\bmagnesium\b/i, "magnesium"],
+  [/\b(multivit\w*|multi-vit\w*)\b/i, "multivitamin"],
+  [/\bbiotin\b/i, "biotin"],
+  [/\b(vitamin d3?|cholecalciferol)\b/i, "vitamin_d"],
+  [/\bselenium\b/i, "selenium"],
+  [/\bcreatine\b/i, "creatine"],
+  [/\bcollagen\b/i, "collagen"],
+  [/\b(whey|protein)\b/i, "protein"],
+];
+
+export function suggestTags(name: string): string[] {
+  return [...new Set(TAG_HINTS.filter(([re]) => re.test(name)).map(([, tag]) => tag))];
+}
