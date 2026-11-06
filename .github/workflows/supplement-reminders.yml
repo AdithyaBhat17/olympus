@@ -1,5 +1,7 @@
 # Hourly trigger for /api/cron/supplements. Vercel Hobby only allows one cron
 # run a day, and these reminders go out at 8am in each user's own timezone.
+# Note: GitHub pauses scheduled workflows after 60 days without repo activity
+# (public repos); re-enable from the Actions tab if reminders stop.
 # Repo secrets needed: APP_URL (e.g. https://your-app.vercel.app) and CRON_SECRET
 # (the same value as the CRON_SECRET env var in Vercel).
 name: Supplement reminders
@@ -16,6 +18,10 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set the APP_URL and CRON_SECRET repository secrets (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
           curl --fail --silent --show-error --max-time 60 --retry 2 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$APP_URL/api/cron/supplements"

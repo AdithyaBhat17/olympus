@@ -281,7 +281,7 @@ export function nudgeSummary(nudges: Nudge[]): string | null {
  * user knowing the tags drive them. Only obvious names; never guesses a drug.
  */
 const TAG_HINTS: Array<[RegExp, string]> = [
-  [/\b(thyronorm|levothyrox\w*|eltroxin|synthroid|euthyrox|thyroxine|thyrox)\b/i, "levothyroxine"],
+  [/\b(thyronorm|levothyrox\w*|eltroxin|synthroid|euthyrox|thyroxine)\b/i, "levothyroxine"],
   [/\bcalcium\b/i, "calcium"],
   [/\b(iron|ferrous|ferrum)\b/i, "iron"],
   [/\bmagnesium\b/i, "magnesium"],
