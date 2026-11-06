@@ -1,27 +1,35 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { integrations } from "@/lib/db/schema";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { externalActivities, integrations } from "@/lib/db/schema";
+import { and, eq, gte, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import { upsertCheckIn } from "../checkins";
+import { upsertWearableDays, type WearableColumn } from "./wearable-store";
 import {
   mainSleepByDate,
+  parseWorkout,
   recoveryByDate,
   sleepDetailByDate,
+  wearableByDate,
   type WhoopRecovery,
   type WhoopSleep,
+  type WhoopWorkout,
 } from "./whoop-parse";
 
 /**
  * WHOOP Developer API v2 — sleep → daily check-in sleep minutes, recovery →
- * HRV + resting HR (used only where Apple Health has none, see upsertCheckIn).
+ * HRV + resting HR (ranked below Garmin, above Apple Health: see
+ * check-in-sources), workouts → external_activities. The fallback for
+ * everything Garmin tracks that Whoop also measures; stress, Body Battery and
+ * steps have no Whoop equivalent.
  * Docs: https://developer.whoop.com/api/ (OAuth 2.0, scope read:sleep + offline).
  */
 
 const AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth";
 const TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token";
 const API = "https://api.prod.whoop.com/developer/v2";
-export const WHOOP_SCOPES = "offline read:sleep read:recovery";
+export const WHOOP_SCOPES = "offline read:sleep read:recovery read:workout";
 const STALE_MS = 30 * 60 * 1000;
+const MAX_RECORDS = 5 * 25; // fetchAll: 5 pages of 25
 
 export function whoopConfigured(): boolean {
   return !!process.env.WHOOP_CLIENT_ID && !!process.env.WHOOP_CLIENT_SECRET;
@@ -116,6 +124,12 @@ async function accessToken(userId: string): Promise<string | null> {
   return t.access_token;
 }
 
+class WhoopHttpError extends Error {
+  constructor(readonly path: string, readonly status: number) {
+    super(`WHOOP ${path} ${status}`);
+  }
+}
+
 /** Up to 5 pages of a v2 collection, newest first, since `start`. */
 async function fetchAll<T>(token: string, path: string, start: string): Promise<T[]> {
   const records: T[] = [];
@@ -126,7 +140,7 @@ async function fetchAll<T>(token: string, path: string, start: string): Promise<
     u.searchParams.set("limit", "25");
     if (next) u.searchParams.set("nextToken", next);
     const res = await fetch(u, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    if (!res.ok) throw new Error(`WHOOP ${path} ${res.status}`);
+    if (!res.ok) throw new WhoopHttpError(path, res.status);
     const body = (await res.json()) as { records: T[]; next_token?: string | null };
     records.push(...body.records);
     next = body.next_token ?? undefined;
@@ -135,14 +149,109 @@ async function fetchAll<T>(token: string, path: string, start: string): Promise<
   return records;
 }
 
+/**
+ * Workouts need `read:workout`, which connections made before it was added
+ * lack (Whoop answers 403, sometimes 401). They are optional: any failure here
+ * returns null so sleep and recovery still sync, and workouts arrive after
+ * reconnecting. `complete` is false when the page cap cut the list short.
+ */
+async function fetchWorkouts(token: string, start: string): Promise<{ records: WhoopWorkout[]; complete: boolean } | null> {
+  try {
+    const records = await fetchAll<WhoopWorkout>(token, "/activity/workout", start);
+    return { records, complete: records.length < MAX_RECORDS };
+  } catch (err) {
+    if (!(err instanceof WhoopHttpError && (err.status === 401 || err.status === 403))) {
+      console.error("whoop workouts", err);
+    }
+    return null;
+  }
+}
+
+const WEARABLE_COLUMNS: readonly WearableColumn[] = [
+  "hrvMs", "hrvMethod", "restingHr", "sleepMin", "deepMin", "lightMin", "remMin", "awakeMin", "awakenings",
+  "napMin", "sleepStart", "sleepEnd", "sleepUtcOffsetMin", "respirationAvg",
+];
+
+/**
+ * Upserts the window's workouts in one statement, then drops this athlete's
+ * Whoop rows inside the window that Whoop no longer returns (deleted or
+ * re-timed in the app), so they stop counting toward training load.
+ */
+async function storeWorkouts(userId: string, start: string, fetched: { records: WhoopWorkout[]; complete: boolean }) {
+  const parsed = fetched.records.map(parseWorkout).filter((a) => a != null);
+  if (parsed.length) {
+    const rows = parsed.map((a) => ({
+      userId,
+      source: "whoop" as const,
+      externalId: a.externalId,
+      date: a.date,
+      startedAt: a.startedAt,
+      endedAt: a.endedAt,
+      activityType: a.activityType,
+      device: "WHOOP",
+      durationMin: a.durationMin,
+      distanceM: a.distanceM,
+      activeKcal: null,
+      avgHr: a.avgHr,
+      maxHr: a.maxHr,
+      hrCoveredMin: a.hrCoveredMin,
+      details: {
+        ...(a.utcOffsetMin !== undefined ? { utcOffsetMin: a.utcOffsetMin } : {}),
+        ...(a.strain !== undefined ? { strain: a.strain } : {}),
+        ...(a.totalKcal != null ? { totalKcal: a.totalKcal } : {}),
+      },
+      updatedAt: new Date(),
+    }));
+    const t = externalActivities;
+    await db
+      .insert(t)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [t.userId, t.source, t.externalId],
+        set: {
+          date: sql`excluded.date`,
+          startedAt: sql`excluded.started_at`,
+          endedAt: sql`excluded.ended_at`,
+          activityType: sql`excluded.activity_type`,
+          device: sql`excluded.device`,
+          durationMin: sql`excluded.duration_min`,
+          distanceM: sql`excluded.distance_m`,
+          activeKcal: sql`excluded.active_kcal`,
+          avgHr: sql`excluded.avg_hr`,
+          maxHr: sql`excluded.max_hr`,
+          hrCoveredMin: sql`excluded.hr_covered_min`,
+          details: sql`excluded.details`,
+          updatedAt: sql`now()`,
+        },
+      });
+  }
+  // A truncated list only vouches for the span it reached (newest first).
+  const reachedFrom = fetched.complete
+    ? new Date(start)
+    : new Date(Math.min(...fetched.records.map((w) => Date.parse(w.start))));
+  if (Number.isNaN(reachedFrom.getTime())) return;
+  const ids = fetched.records.map((w) => w.id);
+  await db
+    .delete(externalActivities)
+    .where(
+      and(
+        eq(externalActivities.userId, userId),
+        eq(externalActivities.source, "whoop"),
+        gte(externalActivities.startedAt, reachedFrom),
+        ids.length ? notInArray(externalActivities.externalId, ids) : undefined
+      )
+    );
+}
+
 export async function syncWhoop(userId: string, days = 3): Promise<number> {
   try {
     const token = await accessToken(userId);
     if (!token) return 0;
     const start = new Date(Date.now() - days * 86_400_000).toISOString();
-    const [sleeps, recoveries] = await Promise.all([
+    const [sleeps, recoveries, workouts] = await Promise.all([
       fetchAll<WhoopSleep>(token, "/activity/sleep", start),
       fetchAll<WhoopRecovery>(token, "/recovery", start),
+      fetchWorkouts(token, start),
     ]);
 
     const byDate = mainSleepByDate(sleeps);
@@ -163,6 +272,15 @@ export async function syncWhoop(userId: string, days = 3): Promise<number> {
         "whoop"
       );
     }
+    // After the check-in, and failures contained: these are additions, and
+    // must never block the sleep and recovery sync that already worked.
+    try {
+      // Merge: the window can hold a nap whose night began before it.
+      await upsertWearableDays(userId, "whoop", WEARABLE_COLUMNS, wearableByDate(sleeps, recoveries), "merge");
+      if (workouts) await storeWorkouts(userId, start, workouts);
+    } catch (err) {
+      console.error("whoop wearable/workout store", err);
+    }
     await db
       .update(integrations)
       .set({ lastSyncAt: new Date(), lastError: null })
@@ -177,15 +295,13 @@ export async function syncWhoop(userId: string, days = 3): Promise<number> {
   }
 }
 
-/** Cheap enough to call on page loads: one row read unless 30 min have passed. */
-export async function syncWhoopIfStale(userId: string): Promise<void> {
-  if (!whoopConfigured()) return;
-  const row = await getWhoop(userId);
-  if (!row?.accessToken) return;
-  if (row.lastSyncAt && Date.now() - row.lastSyncAt.getTime() < STALE_MS) return;
-  // Claim the slot atomically before syncing: concurrent page loads don't race
-  // the refresh-token rotation, and a failing connection is retried every
-  // 30 min instead of on every navigation (lastError still records failures).
+/**
+ * Takes the sync slot atomically unless one was taken within `staleMs`.
+ * Concurrent syncs would race the refresh-token rotation (Whoop invalidates a
+ * refresh token on first use), and a failing connection is retried at most
+ * once per `staleMs`; lastError still records failures.
+ */
+async function claimSync(userId: string, staleMs: number): Promise<boolean> {
   const claimed = await db
     .update(integrations)
     .set({ lastSyncAt: new Date() })
@@ -193,13 +309,33 @@ export async function syncWhoopIfStale(userId: string): Promise<void> {
       and(
         eq(integrations.userId, userId),
         eq(integrations.provider, "whoop"),
-        or(
-          isNull(integrations.lastSyncAt),
-          lt(integrations.lastSyncAt, new Date(Date.now() - STALE_MS))
-        )
+        or(isNull(integrations.lastSyncAt), lt(integrations.lastSyncAt, new Date(Date.now() - staleMs)))
       )
     )
     .returning({ userId: integrations.userId });
-  if (claimed.length === 0) return;
-  await syncWhoop(userId, 3);
+  return claimed.length > 0;
+}
+
+/** Cheap enough to call on page loads: one row read unless 30 min have passed. */
+export async function syncWhoopIfStale(userId: string): Promise<void> {
+  if (!whoopConfigured()) return;
+  const row = await getWhoop(userId);
+  if (!row?.accessToken) return;
+  if (row.lastSyncAt && Date.now() - row.lastSyncAt.getTime() < STALE_MS) return;
+  if (await claimSync(userId, STALE_MS)) await syncWhoop(userId, 3);
+}
+
+/** For the daily cron: syncs unless another sync started in the last minute. Returns false if skipped. */
+export async function syncWhoopForCron(userId: string): Promise<number | null> {
+  if (!(await claimSync(userId, 60_000))) return null;
+  return syncWhoop(userId, 3);
+}
+
+/** Every athlete with Whoop connected, for the daily cron. */
+export async function whoopUserIds(): Promise<string[]> {
+  const rows = await db
+    .select({ userId: integrations.userId })
+    .from(integrations)
+    .where(eq(integrations.provider, "whoop"));
+  return rows.map((r) => r.userId);
 }

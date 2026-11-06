@@ -21,14 +21,25 @@ export function outsideSessions<T extends Span>(activities: T[], sessions: Span[
   return activities.filter((a) => !sessions.some((s) => sameTraining(a, s)));
 }
 
+const RICHNESS = ["garmin", "whoop", "apple_health"];
+const rank = (source: string) => {
+  const i = RICHNESS.indexOf(source);
+  return i === -1 ? RICHNESS.length : i;
+};
+
 /**
- * Garmin Connect copies every workout into Apple Health, so a Garmin wearer
- * syncing both would see each one twice. Where a Garmin activity and an
- * Apple Health one are the same training, the Garmin one (richer: training
- * effect, 1 Hz HR) is kept.
+ * Garmin Connect and Whoop both copy every workout into Apple Health, and
+ * someone wearing both devices records the same training twice. Where
+ * activities from different sources are the same training, the richest one is
+ * kept: Garmin (training effect, 1 Hz HR), then Whoop (strain, HR), then
+ * Apple Health. Same-source activities are never merged here.
  */
-export function preferGarmin<T extends Span & { source: string }>(activities: T[]): T[] {
-  const garmin = activities.filter((a) => a.source === "garmin");
-  if (!garmin.length) return activities;
-  return activities.filter((a) => a.source !== "apple_health" || !garmin.some((g) => sameTraining(a, g)));
+export function preferRicherSource<T extends Span & { source: string }>(activities: T[]): T[] {
+  const kept: T[] = [];
+  // Richest first, and each activity is checked only against ones that survive,
+  // so a dropped duplicate can't hide a different workout.
+  for (const a of [...activities].sort((x, y) => rank(x.source) - rank(y.source))) {
+    if (!kept.some((k) => rank(k.source) < rank(a.source) && sameTraining(a, k))) kept.push(a);
+  }
+  return activities.filter((a) => kept.includes(a));
 }

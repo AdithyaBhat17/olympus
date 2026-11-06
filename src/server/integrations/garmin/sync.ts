@@ -4,7 +4,6 @@ import { and, eq, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   activityStreams,
-  dailyWearable,
   externalActivities,
   integrations,
   rawGarmin,
@@ -12,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { addDays } from "@/lib/dates";
 import { upsertCheckIn } from "../../checkins";
+import { upsertWearableDays } from "../wearable-store";
 import { todayFor } from "../../profile";
 import { sendPushToUser } from "../../push";
 import { decryptSecret, encryptSecret } from "../../secrets";
@@ -162,20 +162,7 @@ const WEARABLE_COLUMNS = [
  * its window, so a value Garmin no longer reports is cleared rather than kept.
  */
 async function storeDays(userId: string, days: Map<string, WearableDay>) {
-  const rows = [...days.values()].map((d) => {
-    const row: Record<string, unknown> = { userId, date: d.date, source: "garmin", updatedAt: new Date() };
-    for (const c of WEARABLE_COLUMNS) row[c] = (d as Record<string, unknown>)[c] ?? null;
-    return row as typeof dailyWearable.$inferInsert;
-  });
-  for (let i = 0; i < rows.length; i += 50) {
-    const batch = rows.slice(i, i + 50);
-    const set: Record<string, unknown> = { updatedAt: sql`now()` };
-    for (const c of WEARABLE_COLUMNS) set[c] = sql.raw(`excluded.${dailyWearable[c].name}`);
-    await db
-      .insert(dailyWearable)
-      .values(batch)
-      .onConflictDoUpdate({ target: [dailyWearable.userId, dailyWearable.date, dailyWearable.source], set });
-  }
+  await upsertWearableDays(userId, "garmin", WEARABLE_COLUMNS, days, "replace");
   for (const d of days.values()) {
     const patch = checkInPatch(d);
     if (Object.keys(patch).length) await upsertCheckIn(userId, d.date, patch, "garmin");
