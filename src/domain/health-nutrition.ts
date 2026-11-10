@@ -43,12 +43,12 @@ export const HEALTH_NUTRIENT_KEYS = Object.keys(HEALTH_NUTRIENTS) as [HealthNutr
 export type HealthNutrition = Partial<Record<HealthNutrientKey, number>>;
 
 /**
- * True when Health has a real day of food: calories, or protein when MFP
- * didn't write energy. Caffeine or a stray vitamin alone is a supplement,
- * not a logged day, so it must not hide the food log.
+ * True when Health has a real day of food: calories. MFP writes energy with
+ * every entry; protein, caffeine or a vitamin alone is a shake, a scale app
+ * or a supplement, and must not hide the food log.
  */
 export function hasLoggedFood(n: HealthNutrition | null | undefined): boolean {
-  return !!n && ((n.kcal ?? 0) >= 1 || (n.proteinG ?? 0) >= 1);
+  return !!n && (n.kcal ?? 0) >= 1;
 }
 
 export interface FoodLogDay {

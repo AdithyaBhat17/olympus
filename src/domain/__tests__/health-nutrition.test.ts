@@ -18,6 +18,10 @@ describe("resolveDayNutrition", () => {
     expect(hasLoggedFood({ caffeineMg: 95 })).toBe(false);
     expect(resolveDayNutrition({ caffeineMg: 95 }, log)?.source).toBe("food_log");
   });
+  it("protein alone (a shake from another app) isn't a logged day", () => {
+    expect(hasLoggedFood({ proteinG: 25 })).toBe(false);
+    expect(resolveDayNutrition({ proteinG: 25 }, log)?.source).toBe("food_log");
+  });
   it("never adds the two together", () => {
     expect(resolveDayNutrition({ kcal: 500, proteinG: 30 }, log)?.nutrients.kcal).toBe(500);
   });

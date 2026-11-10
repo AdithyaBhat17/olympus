@@ -158,8 +158,15 @@ final class NutritionPayloadTests: XCTestCase {
         XCTAssertEqual(buildDays(dates: ["2026-10-02"], readings: r)[0].nutrition, ["proteinG": 120])
     }
 
-    func testADayOfZerosIsLeftOutSoItCannotOverwriteWhatWasThere() {
+    func testADayWithNothingSendsEmptyNutritionSoTheServerClearsIt() {
         let r = HealthReadings(nutrition: ["2026-10-02": ["kcal": 0]])
-        XCTAssertTrue(buildDays(dates: ["2026-10-02"], readings: r).isEmpty)
+        XCTAssertEqual(buildDays(dates: ["2026-10-02", "2026-10-03"], readings: r).map(\.nutrition), [[:], [:]])
+    }
+
+    func testAFailedNutritionReadClearsNothing() {
+        let r = HealthReadings(protein: ["2026-10-02": 100], nutrition: nil)
+        let days = buildDays(dates: ["2026-10-02", "2026-10-03"], readings: r)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertNil(days[0].nutrition)
     }
 }

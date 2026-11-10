@@ -1,11 +1,11 @@
 import "server-only";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { foodLogItems, foodLogs, healthNutritionDays, type FoodInputMode } from "@/lib/db/schema";
 import { addDays, formatTimeInTz, isoDateInTz, localToUtc, tzOffsetMin } from "@/lib/dates";
 import { dayTotals, forGrams, mealForTime, remaining, type DayTotals, type Meal, type Remaining } from "@/domain/nutrition";
-import { resolveDayNutrition, type DayNutrition } from "@/domain/health-nutrition";
-import { getCheckIn, upsertCheckIn } from "../checkins";
+import { hasLoggedFood, resolveDayNutrition, type DayNutrition } from "@/domain/health-nutrition";
+import { upsertCheckIn } from "../checkins";
 import { DomainError } from "../errors";
 import { getProfile } from "../profile";
 import { getFoodsByIds, per100 } from "./foods";
@@ -169,9 +169,6 @@ export async function syncProteinCheckIn(userId: string, date: string): Promise<
   // Imported MyFitnessPal history stays history: it doesn't rewrite old check-ins.
   const live = rows.filter((r) => r.mode !== "mfp_import");
   if (!live.length) return;
-  // Apple Health (MyFitnessPal) has this day: the food log is only the fallback.
-  const existing = await getCheckIn(userId, date);
-  if (existing?.sources?.protein === "apple_health") return;
   // Same rounding as the Food page (1 decimal, then whole grams), so they agree.
   const protein = Math.round(live.reduce((s, r) => s + (r.counts ? r.protein : 0), 0) * 10) / 10;
   await upsertCheckIn(userId, date, { proteinG: Math.round(protein) }, "food_log");
@@ -219,11 +216,17 @@ export interface DayView {
 
 export async function dayView(userId: string, date: string): Promise<DayView> {
   const profile = await getProfile(userId);
-  const logs = await db
-    .select()
-    .from(foodLogs)
-    .where(and(eq(foodLogs.userId, userId), eq(foodLogs.localDate, date)))
-    .orderBy(asc(foodLogs.eatenAt));
+  const [logs, [health]] = await Promise.all([
+    db
+      .select()
+      .from(foodLogs)
+      .where(and(eq(foodLogs.userId, userId), eq(foodLogs.localDate, date)))
+      .orderBy(asc(foodLogs.eatenAt)),
+    db
+      .select({ nutrients: healthNutritionDays.nutrients })
+      .from(healthNutritionDays)
+      .where(and(eq(healthNutritionDays.userId, userId), eq(healthNutritionDays.date, date))),
+  ]);
   const items = logs.length
     ? await db
         .select()
@@ -262,13 +265,13 @@ export async function dayView(userId: string, date: string): Promise<DayView> {
   });
   const all = out.flatMap((l) => l.items);
   const logTotals = dayTotals(all);
-  const [health] = await db
-    .select({ nutrients: healthNutritionDays.nutrients })
-    .from(healthNutritionDays)
-    .where(and(eq(healthNutritionDays.userId, userId), eq(healthNutritionDays.date, date)));
-  // Imported MFP history sits in the food log too; it isn't a live day, so it isn't the fallback.
-  const live = logs.length > 0 && logs.every((l) => l.inputMode === "mfp_import") ? null : logTotals;
-  const nutrition = resolveDayNutrition(health?.nutrients, live && { kcal: live.kcal, proteinG: live.proteinCounted, carbsG: live.carbs, fatG: live.fat, fibreG: live.fibre });
+  // Imported MFP history is history, not a live day: it isn't the fallback (same rule as syncProteinCheckIn).
+  const liveItems = out.filter((l) => l.inputMode !== "mfp_import").flatMap((l) => l.items);
+  const live = dayTotals(liveItems);
+  const nutrition = resolveDayNutrition(
+    health?.nutrients,
+    liveItems.length ? { kcal: live.kcal, proteinG: live.proteinCounted, carbsG: live.carbs, fatG: live.fat, fibreG: live.fibre } : null
+  );
   const n = nutrition?.source === "apple_health" ? nutrition.nutrients : null;
   const totals: DayTotals = n
     ? { kcal: n.kcal ?? 0, protein: n.proteinG ?? 0, carbs: n.carbsG ?? 0, fat: n.fatG ?? 0, fibre: n.fibreG ?? 0, proteinCounted: n.proteinG ?? 0, proteinExcluded: 0 }
@@ -310,8 +313,16 @@ export async function weekSummary(userId: string, endDate: string): Promise<Week
     GROUP BY l.local_date`);
   const rows = (res as unknown as { rows?: Record<string, unknown>[] }).rows ?? (res as unknown as Record<string, unknown>[]);
   const byDate = new Map(rows.map((r) => [String(r.date), r]));
+  // Apple Health wins a day it has food for, as in dayView, so the strip agrees with the page.
+  const healthDays = await db
+    .select({ date: healthNutritionDays.date, nutrients: healthNutritionDays.nutrients })
+    .from(healthNutritionDays)
+    .where(and(eq(healthNutritionDays.userId, userId), gte(healthNutritionDays.date, start), lte(healthNutritionDays.date, endDate)));
+  const healthByDate = new Map(healthDays.filter((h) => hasLoggedFood(h.nutrients)).map((h) => [h.date, h.nutrients]));
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(start, i);
+    const h = healthByDate.get(date);
+    if (h) return { date, protein: Math.round(h.proteinG ?? 0), kcal: Math.round(h.kcal ?? 0), logged: true };
     const r = byDate.get(date);
     return { date, protein: r ? Math.round(Number(r.protein)) : 0, kcal: r ? Math.round(Number(r.kcal)) : 0, logged: !!r };
   });

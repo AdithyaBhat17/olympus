@@ -107,7 +107,9 @@ final class HealthReader {
         async let rhr = daily(Self.restingHr, .discreteAverage, unit: .count().unitDivided(by: .minute()), from: start, to: end, calendar: calendar)
         // The first night starts the evening before the first date.
         async let sleep = sleepSamples(from: start.addingTimeInterval(-18 * 3600), to: end)
-        async let nutrition = nutritionDays(from: start, to: end, calendar: calendar)
+        // Not fatal: a type Health hasn't been allowed yet (a fresh update, before the
+        // sheet is accepted) must not stop sleep, HRV and protein from syncing. nil = unread.
+        async let nutrition: [String: [String: Double]]? = try? await nutritionDays(from: start, to: end, calendar: calendar)
 
         return try await HealthReadings(
             protein: protein,
@@ -115,7 +117,7 @@ final class HealthReader {
             nights: sleepNightsByDate(sleep, calendar: calendar),
             hrv: hrv,
             restingHr: rhr,
-            nutrition: nutrition
+            nutrition: await nutrition
         )
     }
 

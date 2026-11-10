@@ -47,9 +47,10 @@ public struct HealthReadings: Sendable {
     public var hrv: [String: Double] = [:]
     public var restingHr: [String: Double] = [:]
     /// Date → wire name → amount, from every Dietary type Health has data for.
-    public var nutrition: [String: [String: Double]] = [:]
+    /// nil when Health couldn't be read for it: then no day is cleared.
+    public var nutrition: [String: [String: Double]]?
 
-    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], sleepDetail: [String: SleepDetail] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]] = [:]) {
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], sleepDetail: [String: SleepDetail] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]]? = nil) {
         self.protein = protein
         self.water = water
         self.sleep = sleep
@@ -60,7 +61,7 @@ public struct HealthReadings: Sendable {
     }
 
     /// Minutes and detail per night from Health's sleep samples.
-    public init(protein: [String: Double] = [:], water: [String: Double] = [:], nights: [String: SleepNight], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]] = [:]) {
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], nights: [String: SleepNight], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]]? = nil) {
         self.init(protein: protein, water: water, sleep: nights.mapValues(\.minutes), sleepDetail: nights.mapValues(\.detail), hrv: hrv, restingHr: restingHr, nutrition: nutrition)
     }
 }
@@ -99,7 +100,9 @@ public func buildDays(dates: [String], readings r: HealthReadings) -> [DayValues
             restingHr: inRange(r.restingHr[d], 20...200),
             // Only alongside a night the server will take; minutes cap at a day.
             sleepDetail: sleepMin == nil ? nil : r.sleepDetail[d],
-            nutrition: nutritionDay(r.nutrition[d])
+            // A readable Health with nothing for the day sends {} so the server
+            // clears what MyFitnessPal has since deleted.
+            nutrition: r.nutrition.map { nutritionDay($0[d]) ?? [:] }
         )
         return day.isEmpty ? nil : day
     }
