@@ -2,8 +2,9 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { integrations } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { healthNutritionDays, integrations } from "@/lib/db/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { HEALTH_NUTRIENTS, type HealthNutrition, type HealthNutrientKey } from "@/domain/health-nutrition";
 import { isAllowedUser } from "@/lib/allowlist";
 import { sha256 } from "../oauth";
 import { upsertCheckIn, type CheckInPatch } from "../checkins";
@@ -82,6 +83,20 @@ const sleepDetail = z.object({
   awakenings: z.coerce.number().int().min(0).max(200).optional(),
 });
 
+/**
+ * Known nutrients only, each inside its daily cap. Anything else is dropped
+ * rather than failing the batch: one odd MFP sample shouldn't lose a week.
+ */
+const nutrition = z.record(z.string(), z.unknown()).transform((raw): HealthNutrition => {
+  const out: HealthNutrition = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const spec = HEALTH_NUTRIENTS[k as HealthNutrientKey];
+    const n = typeof v === "number" ? v : NaN;
+    if (spec && Number.isFinite(n) && n > 0 && n <= spec.max) out[k as HealthNutrientKey] = Math.round(n * 10) / 10;
+  }
+  return out;
+});
+
 const day = z
   .object({
     date: z
@@ -101,6 +116,7 @@ const day = z
     hrvMs: z.coerce.number().min(1).max(500).optional(),
     restingHr: z.coerce.number().min(20).max(200).optional(),
     sleepDetail: sleepDetail.optional(),
+    nutrition: nutrition.optional(),
   })
   .transform((d) => ({
     date: d.date?.slice(0, 10),
@@ -110,6 +126,7 @@ const day = z
     hrvMs: d.hrvMs,
     restingHr: d.restingHr,
     sleepDetail: d.sleepDetail,
+    nutrition: d.nutrition,
   }));
 
 export const healthIngestBody = z.union([z.object({ days: z.array(day).min(1).max(31) }), day]);
@@ -137,6 +154,16 @@ export async function ingestHealthDays(userId: string, parsed: HealthIngestBody)
     if (d.hrvMs != null) patch.hrvMs = d.hrvMs;
     if (d.restingHr != null) patch.restingHr = d.restingHr;
     if (d.sleepDetail) patch.sleepDetail = d.sleepDetail;
+    if (d.nutrition && Object.keys(d.nutrition).length) {
+      await db
+        .insert(healthNutritionDays)
+        .values({ userId, date, nutrients: d.nutrition })
+        .onConflictDoUpdate({
+          target: [healthNutritionDays.userId, healthNutritionDays.date],
+          // Health is the truth for the day: replace, so an entry deleted in MFP goes too.
+          set: { nutrients: d.nutrition, updatedAt: sql`now()` },
+        });
+    }
     if (Object.keys(patch).length === 0) continue;
     const row = await upsertCheckIn(userId, date, patch, "apple_health");
     saved.push({

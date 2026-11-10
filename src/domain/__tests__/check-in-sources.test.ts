@@ -93,9 +93,13 @@ describe("filterSyncPatch: protein and water", () => {
 });
 
 describe("filterSyncPatch: food log protein", () => {
-  it("no sync overrides the food log's protein", () => {
+  it("Apple Health (MyFitnessPal) replaces the food log's protein", () => {
     const ex = existing({ sources: { protein: "food_log" }, proteinG: 90 });
-    expect(filterSyncPatch({ proteinG: 120, waterMl: 2000 }, ex, "apple_health")).toEqual({ waterMl: 2000 });
+    expect(filterSyncPatch({ proteinG: 120, waterMl: 2000 }, ex, "apple_health")).toEqual({ proteinG: 120, waterMl: 2000 });
+  });
+  it("other devices don't touch the food log's protein", () => {
+    const ex = existing({ sources: { protein: "food_log" }, proteinG: 90 });
+    expect(filterSyncPatch({ proteinG: 120 }, ex, "garmin")).toEqual({});
   });
   it("a food-log value isn't outranked by a device for wearable fields either", () => {
     expect(syncOutranks("garmin", "food_log")).toBe(false);

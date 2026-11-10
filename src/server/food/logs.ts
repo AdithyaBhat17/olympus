@@ -1,10 +1,11 @@
 import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { foodLogItems, foodLogs, type FoodInputMode } from "@/lib/db/schema";
+import { foodLogItems, foodLogs, healthNutritionDays, type FoodInputMode } from "@/lib/db/schema";
 import { addDays, formatTimeInTz, isoDateInTz, localToUtc, tzOffsetMin } from "@/lib/dates";
 import { dayTotals, forGrams, mealForTime, remaining, type DayTotals, type Meal, type Remaining } from "@/domain/nutrition";
-import { upsertCheckIn } from "../checkins";
+import { resolveDayNutrition, type DayNutrition } from "@/domain/health-nutrition";
+import { getCheckIn, upsertCheckIn } from "../checkins";
 import { DomainError } from "../errors";
 import { getProfile } from "../profile";
 import { getFoodsByIds, per100 } from "./foods";
@@ -168,6 +169,9 @@ export async function syncProteinCheckIn(userId: string, date: string): Promise<
   // Imported MyFitnessPal history stays history: it doesn't rewrite old check-ins.
   const live = rows.filter((r) => r.mode !== "mfp_import");
   if (!live.length) return;
+  // Apple Health (MyFitnessPal) has this day: the food log is only the fallback.
+  const existing = await getCheckIn(userId, date);
+  if (existing?.sources?.protein === "apple_health") return;
   // Same rounding as the Food page (1 decimal, then whole grams), so they agree.
   const protein = Math.round(live.reduce((s, r) => s + (r.counts ? r.protein : 0), 0) * 10) / 10;
   await upsertCheckIn(userId, date, { proteinG: Math.round(protein) }, "food_log");
@@ -205,6 +209,12 @@ export interface DayView {
   totals: DayTotals;
   remaining: Remaining;
   targets: { kcal: number | null; protein: number | null };
+  /**
+   * Where `totals` and `remaining` come from: Apple Health (MyFitnessPal) when it
+   * has food for the day, else the food log. Carries every nutrient Health had
+   * (sodium, iron...) and, when both exist, the other source's day for comparison.
+   */
+  nutrition: DayNutrition | null;
 }
 
 export async function dayView(userId: string, date: string): Promise<DayView> {
@@ -251,7 +261,18 @@ export async function dayView(userId: string, date: string): Promise<DayView> {
     };
   });
   const all = out.flatMap((l) => l.items);
-  const totals = dayTotals(all);
+  const logTotals = dayTotals(all);
+  const [health] = await db
+    .select({ nutrients: healthNutritionDays.nutrients })
+    .from(healthNutritionDays)
+    .where(and(eq(healthNutritionDays.userId, userId), eq(healthNutritionDays.date, date)));
+  // Imported MFP history sits in the food log too; it isn't a live day, so it isn't the fallback.
+  const live = logs.length > 0 && logs.every((l) => l.inputMode === "mfp_import") ? null : logTotals;
+  const nutrition = resolveDayNutrition(health?.nutrients, live && { kcal: live.kcal, proteinG: live.proteinCounted, carbsG: live.carbs, fatG: live.fat, fibreG: live.fibre });
+  const n = nutrition?.source === "apple_health" ? nutrition.nutrients : null;
+  const totals: DayTotals = n
+    ? { kcal: n.kcal ?? 0, protein: n.proteinG ?? 0, carbs: n.carbsG ?? 0, fat: n.fatG ?? 0, fibre: n.fibreG ?? 0, proteinCounted: n.proteinG ?? 0, proteinExcluded: 0 }
+    : logTotals;
   const byMeal = { breakfast: { kcal: 0, protein: 0 }, lunch: { kcal: 0, protein: 0 }, dinner: { kcal: 0, protein: 0 }, snack: { kcal: 0, protein: 0 } };
   for (const l of out) {
     byMeal[l.meal].kcal += l.totals.kcal;
@@ -265,6 +286,7 @@ export async function dayView(userId: string, date: string): Promise<DayView> {
     totals,
     remaining: remaining(totals, { kcalTarget: targets.kcal, proteinTarget: targets.protein }),
     targets,
+    nutrition,
   };
 }
 

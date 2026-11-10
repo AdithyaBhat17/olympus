@@ -12,8 +12,12 @@ public struct DayValues: Codable, Equatable, Sendable {
     public var restingHr: Int?
     /// Stages and bed/wake times, for Claude; the app only shows sleepMin.
     public var sleepDetail: SleepDetail?
+    /// Everything Health holds under Dietary for the day (MyFitnessPal writes
+    /// it there), by wire name: kcal, carbsG, sodiumMg... Keys in
+    /// src/domain/health-nutrition.ts; the server drops unknown ones.
+    public var nutrition: [String: Double]?
 
-    public init(date: String, proteinG: Int? = nil, waterMl: Int? = nil, sleepMin: Int? = nil, hrvMs: Int? = nil, restingHr: Int? = nil, sleepDetail: SleepDetail? = nil) {
+    public init(date: String, proteinG: Int? = nil, waterMl: Int? = nil, sleepMin: Int? = nil, hrvMs: Int? = nil, restingHr: Int? = nil, sleepDetail: SleepDetail? = nil, nutrition: [String: Double]? = nil) {
         self.date = date
         self.proteinG = proteinG
         self.waterMl = waterMl
@@ -21,10 +25,11 @@ public struct DayValues: Codable, Equatable, Sendable {
         self.hrvMs = hrvMs
         self.restingHr = restingHr
         self.sleepDetail = sleepDetail
+        self.nutrition = nutrition
     }
 
     public var isEmpty: Bool {
-        proteinG == nil && waterMl == nil && sleepMin == nil && hrvMs == nil && restingHr == nil && sleepDetail == nil
+        proteinG == nil && waterMl == nil && sleepMin == nil && hrvMs == nil && restingHr == nil && sleepDetail == nil && nutrition == nil
     }
 }
 
@@ -41,19 +46,22 @@ public struct HealthReadings: Sendable {
     public var sleepDetail: [String: SleepDetail] = [:]
     public var hrv: [String: Double] = [:]
     public var restingHr: [String: Double] = [:]
+    /// Date → wire name → amount, from every Dietary type Health has data for.
+    public var nutrition: [String: [String: Double]] = [:]
 
-    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], sleepDetail: [String: SleepDetail] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:]) {
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], sleep: [String: Int] = [:], sleepDetail: [String: SleepDetail] = [:], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]] = [:]) {
         self.protein = protein
         self.water = water
         self.sleep = sleep
         self.sleepDetail = sleepDetail
         self.hrv = hrv
         self.restingHr = restingHr
+        self.nutrition = nutrition
     }
 
     /// Minutes and detail per night from Health's sleep samples.
-    public init(protein: [String: Double] = [:], water: [String: Double] = [:], nights: [String: SleepNight], hrv: [String: Double] = [:], restingHr: [String: Double] = [:]) {
-        self.init(protein: protein, water: water, sleep: nights.mapValues(\.minutes), sleepDetail: nights.mapValues(\.detail), hrv: hrv, restingHr: restingHr)
+    public init(protein: [String: Double] = [:], water: [String: Double] = [:], nights: [String: SleepNight], hrv: [String: Double] = [:], restingHr: [String: Double] = [:], nutrition: [String: [String: Double]] = [:]) {
+        self.init(protein: protein, water: water, sleep: nights.mapValues(\.minutes), sleepDetail: nights.mapValues(\.detail), hrv: hrv, restingHr: restingHr, nutrition: nutrition)
     }
 }
 
@@ -64,6 +72,16 @@ func inRange(_ v: Double?, _ range: ClosedRange<Double>) -> Int? {
     guard let v, v.isFinite else { return nil }
     let r = v.rounded()
     return range.contains(r) ? Int(r) : nil
+}
+
+/// One decimal, finite and above zero; a zero means nothing was logged.
+func nutritionDay(_ raw: [String: Double]?) -> [String: Double]? {
+    guard let raw else { return nil }
+    let kept = raw.compactMapValues { v -> Double? in
+        guard v.isFinite, v > 0 else { return nil }
+        return (v * 10).rounded() / 10
+    }
+    return kept.isEmpty ? nil : kept
 }
 
 /// Days in `dates` order (oldest first is fine) with at least one value.
@@ -80,7 +98,8 @@ public func buildDays(dates: [String], readings r: HealthReadings) -> [DayValues
             hrvMs: inRange(r.hrv[d], 1...500),
             restingHr: inRange(r.restingHr[d], 20...200),
             // Only alongside a night the server will take; minutes cap at a day.
-            sleepDetail: sleepMin == nil ? nil : r.sleepDetail[d]
+            sleepDetail: sleepMin == nil ? nil : r.sleepDetail[d],
+            nutrition: nutritionDay(r.nutrition[d])
         )
         return day.isEmpty ? nil : day
     }

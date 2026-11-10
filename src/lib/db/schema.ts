@@ -204,6 +204,7 @@ export const athleteProfiles = pgTable("athlete_profiles", {
 
 export type { CheckInSource, CheckInField } from "@/domain/check-in-sources";
 import type { CheckInSource, CheckInField, SyncSource } from "@/domain/check-in-sources";
+import type { HealthNutrientKey } from "@/domain/health-nutrition";
 
 /**
  * How a night went, from one device. Stage minutes are absent when the device
@@ -244,6 +245,18 @@ export const dailyCheckIns = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date] })]
+);
+
+/** A day's nutrition as Apple Health holds it (MyFitnessPal writes it there). Keys: src/domain/health-nutrition.ts. */
+export const healthNutritionDays = pgTable(
+  "health_nutrition_days",
+  {
+    userId: text("user_id").notNull(),
+    date: date("date").notNull(),
+    nutrients: jsonb("nutrients").$type<Partial<Record<HealthNutrientKey, number>>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.date] })]
 );

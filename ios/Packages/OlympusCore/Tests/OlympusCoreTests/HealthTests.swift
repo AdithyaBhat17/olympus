@@ -144,3 +144,22 @@ final class PayloadTests: XCTestCase {
         XCTAssertEqual(recentDates(count: 3, now: now, calendar: cal), ["2026-10-01", "2026-10-02", "2026-10-03"])
     }
 }
+
+final class NutritionPayloadTests: XCTestCase {
+    func testADayWithOnlyNutritionIsKept() {
+        let r = HealthReadings(nutrition: ["2026-10-02": ["kcal": 2104.46, "sodiumMg": 2300]])
+        let days = buildDays(dates: ["2026-10-02"], readings: r)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertEqual(days[0].nutrition, ["kcal": 2104.5, "sodiumMg": 2300])
+    }
+
+    func testZeroAndNonFiniteAmountsAreDropped() {
+        let r = HealthReadings(nutrition: ["2026-10-02": ["kcal": 0, "fatG": .nan, "proteinG": 120]])
+        XCTAssertEqual(buildDays(dates: ["2026-10-02"], readings: r)[0].nutrition, ["proteinG": 120])
+    }
+
+    func testADayOfZerosIsLeftOutSoItCannotOverwriteWhatWasThere() {
+        let r = HealthReadings(nutrition: ["2026-10-02": ["kcal": 0]])
+        XCTAssertTrue(buildDays(dates: ["2026-10-02"], readings: r).isEmpty)
+    }
+}

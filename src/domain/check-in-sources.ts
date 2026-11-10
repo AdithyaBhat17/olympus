@@ -9,15 +9,16 @@
  * a Watch, which isn't comparable with the RMSSD the other two report.
  *
  * Protein and water accumulate through the day: a sync may raise a human
- * value (they kept logging elsewhere) but never lower it. Once the Olympus
- * food log has anything for a day, its total is that day's protein and no
- * sync (the old MyFitnessPal → Health bridge) overrides it.
+ * value (they kept logging elsewhere) but never lower it. MyFitnessPal's
+ * database is the better one, so a day's protein from Apple Health (MFP writes
+ * it there) outranks the Olympus food log; the food log only fills days Health
+ * has no protein for, and never overwrites a day Health already filled.
  */
 
 export const SYNC_SOURCES = ["garmin", "whoop", "apple_health"] as const;
 export type SyncSource = (typeof SYNC_SOURCES)[number];
 export type HumanSource = "manual" | "claude";
-/** Protein summed from the food log: once anything is logged, it's the day's protein. */
+/** Protein summed from the food log: the fallback for days Apple Health has none. */
 export type FoodLogSource = "food_log";
 export type CheckInSource = HumanSource | SyncSource | FoodLogSource;
 export type CheckInField = "sleep" | "protein" | "water" | "hrv" | "rhr";
@@ -102,9 +103,11 @@ export function filterSyncPatch<P extends SyncPatch>(
   }
 
   // Accumulating fields: a sync may raise a human value but never lower it.
-  // Protein from the food log is the day's protein: no sync touches it.
-  if (sources.protein === "food_log") delete out.proteinG;
-  else if (isHumanSource(sources.protein) && (out.proteinG ?? -1) <= (existing.proteinG ?? -1)) {
+  // Protein from the food log is only a fallback: Apple Health (MFP's numbers)
+  // replaces it, Garmin and Whoop never carry protein so they leave it alone.
+  if (sources.protein === "food_log") {
+    if (source !== "apple_health") delete out.proteinG;
+  } else if (isHumanSource(sources.protein) && (out.proteinG ?? -1) <= (existing.proteinG ?? -1)) {
     delete out.proteinG;
   }
   if (isHumanSource(sources.water) && (out.waterMl ?? -1) <= (existing.waterMl ?? -1)) {
