@@ -2,11 +2,13 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { integrations } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { healthNutritionDays, integrations } from "@/lib/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { HEALTH_NUTRIENTS, hasLoggedFood, type HealthNutrition, type HealthNutrientKey } from "@/domain/health-nutrition";
 import { isAllowedUser } from "@/lib/allowlist";
 import { sha256 } from "../oauth";
-import { upsertCheckIn, type CheckInPatch } from "../checkins";
+import { getCheckIn, upsertCheckIn, type CheckInPatch } from "../checkins";
+import { syncProteinCheckIn } from "../food/logs";
 import { todayFor } from "../profile";
 
 /**
@@ -82,6 +84,20 @@ const sleepDetail = z.object({
   awakenings: z.coerce.number().int().min(0).max(200).optional(),
 });
 
+/**
+ * Known nutrients only, each inside its daily cap. Anything else is dropped
+ * rather than failing the batch: one odd MFP sample shouldn't lose a week.
+ */
+const nutrition = z.record(z.string(), z.unknown()).transform((raw): HealthNutrition => {
+  const out: HealthNutrition = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const spec = HEALTH_NUTRIENTS[k as HealthNutrientKey];
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+    if (spec && Number.isFinite(n) && n > 0 && n <= spec.max) out[k as HealthNutrientKey] = Math.round(n * 10) / 10;
+  }
+  return out;
+});
+
 const day = z
   .object({
     date: z
@@ -101,6 +117,7 @@ const day = z
     hrvMs: z.coerce.number().min(1).max(500).optional(),
     restingHr: z.coerce.number().min(20).max(200).optional(),
     sleepDetail: sleepDetail.optional(),
+    nutrition: nutrition.optional(),
   })
   .transform((d) => ({
     date: d.date?.slice(0, 10),
@@ -110,6 +127,7 @@ const day = z
     hrvMs: d.hrvMs,
     restingHr: d.restingHr,
     sleepDetail: d.sleepDetail,
+    nutrition: d.nutrition,
   }));
 
 export const healthIngestBody = z.union([z.object({ days: z.array(day).min(1).max(31) }), day]);
@@ -128,8 +146,29 @@ export async function ingestHealthDays(userId: string, parsed: HealthIngestBody)
     restingHr: number | null;
   }> = [];
   const today = await todayFor(userId);
-  for (const d of days) {
-    const date = d.date ?? today;
+  const dated = days.map((d) => ({ ...d, date: d.date ?? today }));
+
+  // Nutrition: Health is the truth for the day, so a day's row is replaced, and
+  // a day sent with none (everything deleted in MFP) is cleared. One write each.
+  const withFood = dated.filter((d) => d.nutrition && Object.keys(d.nutrition).length);
+  if (withFood.length) {
+    await db
+      .insert(healthNutritionDays)
+      .values(withFood.map((d) => ({ userId, date: d.date, nutrients: d.nutrition! })))
+      .onConflictDoUpdate({
+        target: [healthNutritionDays.userId, healthNutritionDays.date],
+        set: { nutrients: sql`excluded.nutrients`, updatedAt: sql`now()` },
+      });
+  }
+  const cleared = dated.filter((d) => d.nutrition && !Object.keys(d.nutrition).length).map((d) => d.date);
+  if (cleared.length) {
+    await db
+      .delete(healthNutritionDays)
+      .where(and(eq(healthNutritionDays.userId, userId), inArray(healthNutritionDays.date, cleared)));
+  }
+
+  for (const d of dated) {
+    const date = d.date;
     const patch: CheckInPatch = {};
     if (d.proteinG != null) patch.proteinG = d.proteinG;
     if (d.waterMl != null) patch.waterMl = d.waterMl;
@@ -137,6 +176,16 @@ export async function ingestHealthDays(userId: string, parsed: HealthIngestBody)
     if (d.hrvMs != null) patch.hrvMs = d.hrvMs;
     if (d.restingHr != null) patch.restingHr = d.restingHr;
     if (d.sleepDetail) patch.sleepDetail = d.sleepDetail;
+    // A newer client sends the whole day. Protein with no calories next to it is
+    // a shake or a scale app, not a food day: it must not replace the food log.
+    if (d.nutrition && !hasLoggedFood(d.nutrition)) delete patch.proteinG;
+    if (cleared.includes(date)) {
+      const existing = await getCheckIn(userId, date);
+      if (existing?.sources?.protein === "apple_health") {
+        await upsertCheckIn(userId, date, { proteinG: null }, "apple_health");
+        await syncProteinCheckIn(userId, date); // the food log takes the day back
+      }
+    }
     if (Object.keys(patch).length === 0) continue;
     const row = await upsertCheckIn(userId, date, patch, "apple_health");
     saved.push({

@@ -14,12 +14,52 @@ final class HealthReader {
 
     static let heartRate = HKQuantityType(.heartRate)
 
+    /// Every Dietary type worth keeping, by the wire name the server stores
+    /// (src/domain/health-nutrition.ts). MyFitnessPal decides which ones have
+    /// data; asking for all of them costs nothing and avoids a second prompt
+    /// the day it writes a new one.
+    static let nutrients: [(key: String, type: HKQuantityType, unit: HKUnit)] = {
+        let g = HKUnit.gram(), mg = HKUnit.gramUnit(with: .milli), mcg = HKUnit.gramUnit(with: .micro)
+        return [
+            ("kcal", HKQuantityType(.dietaryEnergyConsumed), .kilocalorie()),
+            ("proteinG", protein, g),
+            ("carbsG", HKQuantityType(.dietaryCarbohydrates), g),
+            ("fatG", HKQuantityType(.dietaryFatTotal), g),
+            ("satFatG", HKQuantityType(.dietaryFatSaturated), g),
+            ("monoFatG", HKQuantityType(.dietaryFatMonounsaturated), g),
+            ("polyFatG", HKQuantityType(.dietaryFatPolyunsaturated), g),
+            ("fibreG", HKQuantityType(.dietaryFiber), g),
+            ("sugarG", HKQuantityType(.dietarySugar), g),
+            ("cholesterolMg", HKQuantityType(.dietaryCholesterol), mg),
+            ("sodiumMg", HKQuantityType(.dietarySodium), mg),
+            ("potassiumMg", HKQuantityType(.dietaryPotassium), mg),
+            ("calciumMg", HKQuantityType(.dietaryCalcium), mg),
+            ("ironMg", HKQuantityType(.dietaryIron), mg),
+            ("magnesiumMg", HKQuantityType(.dietaryMagnesium), mg),
+            ("zincMg", HKQuantityType(.dietaryZinc), mg),
+            ("phosphorusMg", HKQuantityType(.dietaryPhosphorus), mg),
+            ("vitaminAMcg", HKQuantityType(.dietaryVitaminA), mcg),
+            ("vitaminCMg", HKQuantityType(.dietaryVitaminC), mg),
+            ("vitaminDMcg", HKQuantityType(.dietaryVitaminD), mcg),
+            ("vitaminEMg", HKQuantityType(.dietaryVitaminE), mg),
+            ("vitaminKMcg", HKQuantityType(.dietaryVitaminK), mcg),
+            ("vitaminB6Mg", HKQuantityType(.dietaryVitaminB6), mg),
+            ("vitaminB12Mcg", HKQuantityType(.dietaryVitaminB12), mcg),
+            ("folateMcg", HKQuantityType(.dietaryFolate), mcg),
+            ("caffeineMg", HKQuantityType(.dietaryCaffeine), mg),
+        ]
+    }()
+
     /// Types whose new samples wake the app. Heart rate isn't one: it's written
     /// all day, and session HR rides along on the syncs these trigger.
     static let workout = HKObjectType.workoutType()
 
-    static let sampleTypes: [HKSampleType] = [protein, water, sleep, hrv, restingHr, workout]
-    static let readTypes: Set<HKObjectType> = Set(sampleTypes + [heartRate])
+    /// Energy wakes the app for food: MFP writes it with protein on every entry,
+    /// so observing all 26 nutrient types would only fire 26 syncs for one meal.
+    static let energy = HKQuantityType(.dietaryEnergyConsumed)
+
+    static let sampleTypes: [HKSampleType] = [protein, energy, water, sleep, hrv, restingHr, workout]
+    static let readTypes: Set<HKObjectType> = Set(sampleTypes + [heartRate] + nutrients.map { $0.type })
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
@@ -67,14 +107,35 @@ final class HealthReader {
         async let rhr = daily(Self.restingHr, .discreteAverage, unit: .count().unitDivided(by: .minute()), from: start, to: end, calendar: calendar)
         // The first night starts the evening before the first date.
         async let sleep = sleepSamples(from: start.addingTimeInterval(-18 * 3600), to: end)
+        // Not fatal: a type Health hasn't been allowed yet (a fresh update, before the
+        // sheet is accepted) must not stop sleep, HRV and protein from syncing. nil = unread.
+        async let nutrition: [String: [String: Double]]? = try? await nutritionDays(from: start, to: end, calendar: calendar)
 
         return try await HealthReadings(
             protein: protein,
             water: water,
             nights: sleepNightsByDate(sleep, calendar: calendar),
             hrv: hrv,
-            restingHr: rhr
+            restingHr: rhr,
+            nutrition: await nutrition
         )
+    }
+
+    /// Date → nutrient → daily total for every Dietary type, read in parallel.
+    /// Health sums a day's samples; a type with none just has no entry.
+    private func nutritionDays(from start: Date, to end: Date, calendar: Calendar) async throws -> [String: [String: Double]] {
+        try await withThrowingTaskGroup(of: (String, [String: Double]).self) { group in
+            for n in Self.nutrients {
+                group.addTask {
+                    (n.key, try await self.daily(n.type, .cumulativeSum, unit: n.unit, from: start, to: end, calendar: calendar))
+                }
+            }
+            var out: [String: [String: Double]] = [:]
+            for try await (key, days) in group {
+                for (date, value) in days { out[date, default: [:]][key] = value }
+            }
+            return out
+        }
     }
 
     /// One statistic per calendar day. Health already de-duplicates sources for

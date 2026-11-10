@@ -79,6 +79,10 @@ export async function upsertCheckIn(
       source
     );
   }
+  // The food log is only the fallback: a day Health already filled stays Health's.
+  if (source === "food_log" && existing?.sources?.protein === "apple_health" && existing.proteinG != null) {
+    delete patch.proteinG;
+  }
   const next = {
     sleepMin: existing?.sleepMin ?? null,
     proteinG: existing?.proteinG ?? null,
